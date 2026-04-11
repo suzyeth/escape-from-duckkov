@@ -66,6 +66,7 @@ invUI.onUse((instanceId) => {
   player.isHealing = true;
   hud.pushKillFeed(`使用 ${def.name}…`);
   invUI.close();
+  if (_crosshairEl) _crosshairEl.style.display = 'block';
 });
 
 // Shift+click or right-click non-healing: drop item
@@ -160,6 +161,7 @@ let _firedRecentlyTimer   = 0;
 // ── Ambient sound timer ───────────────────────────────────────────────────────
 let _ambientTimer = 18 + Math.random() * 15; // first distant shot in 18-33s
 let _hitstopTimer = 0; // brief time freeze on kills
+let _lastWaveCount = 0; // track wave spawns for notification
 
 function _addScreenShake(intensity) {
   _shakeDecay = Math.min(_shakeDecay + intensity, 1.5);
@@ -609,6 +611,7 @@ stash.onSelect((loadout) => {
   _shakeZ            = 0;
   _shakeDecay        = 0;
   _hitstopTimer      = 0;
+  _lastWaveCount     = 0;
   _healTimer         = 0;
   _healInstanceId    = null;
   _extractTimer      = 0;
@@ -674,7 +677,10 @@ const loop = new GameLoop(
     }
 
     // Inventory toggle (Tab)
-    if (input.justPressed('Tab')) invUI.toggle();
+    if (input.justPressed('Tab')) {
+      invUI.toggle();
+      if (_crosshairEl) _crosshairEl.style.display = invUI.isOpen ? 'none' : 'block';
+    }
 
     // Pause movement when inventory is open
     if (!invUI.isOpen) {
@@ -705,6 +711,13 @@ const loop = new GameLoop(
     if (aiResult.eliteAlerted) {
       sound.playEliteAlert();
       hud.pushKillFeed('⚠ 精英鸭卒发现你！');
+    }
+
+    // Wave spawn notification
+    if (aiSystem.waveCount > _lastWaveCount) {
+      _lastWaveCount = aiSystem.waveCount;
+      hud.pushKillFeed(`⚠ 新一波鸭卒增援到达！`);
+      sound.playEliteAlert();
     }
 
     // Loot
