@@ -109,7 +109,7 @@ export class BulletSystem {
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(pos.x, 0.1, pos.z);
     this._scene.add(ring);
-    this._flashes.push({ mesh: ring, mat: ringMat, life: 0.25 });
+    this._flashes.push({ mesh: ring, mat: ringMat, life: 0.25, isKillRing: true });
 
     // Burst of particles
     const COUNT = 14;
@@ -204,8 +204,8 @@ export class BulletSystem {
       const f = this._flashes[i];
       f.life -= dt;
       if (f.mat) f.mat.opacity = Math.max(0, f.life * 8);
-      // Scale up ring flashes
-      if (f.mesh.geometry.type === 'RingGeometry') {
+      // Scale up kill ring flashes
+      if (f.isKillRing) {
         f.mesh.scale.setScalar(1 + (1 - f.life / 0.25) * 1.5);
       }
       if (f.life <= 0) {

@@ -193,20 +193,22 @@ export class Enemy {
     if (this.health <= 0) this._die();
   }
 
-  /** Flash all mesh materials white for a brief moment */
+  /** Flash all mesh materials white via emissive — no clones, no leaks */
   _flashHit() {
-    const origColors = [];
+    if (this._flashing) return; // debounce rapid hits
+    this._flashing = true;
     this.mesh.traverse(child => {
-      if (child.isMesh && child !== this._hpBar) {
-        origColors.push({ mesh: child, color: child.material.color.getHex() });
-        child.material = child.material.clone();
-        child.material.color.set(0xffffff);
+      if (child.isMesh && child !== this._hpBar && child.material.emissive) {
+        child.material.emissive.set(0xffffff);
       }
     });
     setTimeout(() => {
-      for (const { mesh, color } of origColors) {
-        if (mesh.material) mesh.material.color.set(color);
-      }
+      this.mesh.traverse(child => {
+        if (child.isMesh && child !== this._hpBar && child.material.emissive) {
+          child.material.emissive.set(0x000000);
+        }
+      });
+      this._flashing = false;
     }, 80);
   }
 

@@ -185,10 +185,6 @@ export class HealthSystem {
       amount         = amount - absorbed;
     }
     this._hp[target] = Math.max(0, this._hp[target] - amount);
-    // Head hit beyond max HP = fatal (instant death)
-    if (target === PART.HEAD && amount >= PART_DEFS[PART.HEAD].maxHp) {
-      this._hp[PART.HEAD] = 0;
-    }
     // 30 % chance to cause bleeding on each hit
     if (!this._bleeding && Math.random() < 0.30) {
       this._bleeding = true;

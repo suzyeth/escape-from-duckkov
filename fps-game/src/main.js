@@ -58,6 +58,19 @@ const _mouseNDC     = new THREE.Vector2();
 let   _aimWorldPos  = new THREE.Vector3(0, 0, -5);
 let   _aimMoved     = false;
 
+// Scratch vectors for hot paths (avoid per-frame allocations)
+const _scratchMuzzle  = new THREE.Vector3();
+const _scratchDir     = new THREE.Vector3();
+const _scratchMissRay = new THREE.Raycaster();
+const _scratchCamTarget = new THREE.Vector3();
+
+// Cached DOM refs
+const _crosshairEl = document.getElementById('crosshair');
+
+// Weapon constants (hoisted from handlePlayerShoot)
+const RECOIL_STR = { rifle: 0.22, pistol: 0.12, shotgun: 0.45, vss: 0.40, mp5: 0.10 };
+const SHAKE_STR  = { rifle: 0.25, pistol: 0.12, shotgun: 0.55, vss: 0.30, mp5: 0.15 };
+
 renderer.domElement.addEventListener('mousemove', (e) => {
   if (invUI.isOpen) return;
   _mouseNDC.set(
@@ -156,26 +169,24 @@ function handlePlayerShoot() {
   _firedRecentlyTimer   = 1.5;
 
   // Recoil kick + screen shake
-  const recoilStr = { rifle: 0.22, pistol: 0.12, shotgun: 0.45, vss: 0.40, mp5: 0.10 };
-  const shakeStr  = { rifle: 0.25, pistol: 0.12, shotgun: 0.55, vss: 0.30, mp5: 0.15 };
-  _recoilOffset += recoilStr[weapons.current.def.id] ?? 0.15;
-  _addScreenShake(shakeStr[weapons.current.def.id] ?? 0.2);
+  _recoilOffset += RECOIL_STR[weapons.current.def.id] ?? 0.15;
+  _addScreenShake(SHAKE_STR[weapons.current.def.id] ?? 0.2);
 
   // Gunshot sound + crosshair bloom
   sound.playShot(weapons.current.def.id);
-  const crosshair = document.getElementById('crosshair');
-  if (crosshair) {
-    crosshair.classList.add('shoot');
-    setTimeout(() => crosshair.classList.remove('shoot'), 80);
+  if (_crosshairEl) {
+    _crosshairEl.classList.add('shoot');
+    setTimeout(() => _crosshairEl.classList.remove('shoot'), 80);
   }
 
   const def      = weapons.current.def;
   const angle    = player.mesh.rotation.y;
-  const muzzlePos = new THREE.Vector3(
+  _scratchMuzzle.set(
     player.position.x + Math.sin(angle) * 0.6,
     0.5,
     player.position.z + Math.cos(angle) * 0.6
   );
+  const muzzlePos = _scratchMuzzle;
 
   bullets.spawnMuzzleFlash(muzzlePos);
 
@@ -197,11 +208,10 @@ function handlePlayerShoot() {
       bullets.spawnHitEffect(hitEnemy.position);
       sound.playHitMarker();
       // Crosshair hit flash
-      const ch = document.getElementById('crosshair');
-      if (ch) {
-        ch.classList.remove('shoot');
-        ch.classList.add('hit');
-        setTimeout(() => ch.classList.remove('hit'), 120);
+      if (_crosshairEl) {
+        _crosshairEl.classList.remove('shoot');
+        _crosshairEl.classList.add('hit');
+        setTimeout(() => _crosshairEl.classList.remove('hit'), 120);
       }
       if (!hitEnemy.isAlive) {
         _killCount++;
@@ -747,11 +757,11 @@ const loop = new GameLoop(
     );
 
     // Camera follow + recoil + shake
-    const target = player.position.clone().add(CAM_OFFSET);
-    target.x += _shakeX;
-    target.y += _recoilOffset;
-    target.z += _shakeZ;
-    camera.position.lerp(target, 0.12);
+    _scratchCamTarget.copy(player.position).add(CAM_OFFSET);
+    _scratchCamTarget.x += _shakeX;
+    _scratchCamTarget.y += _recoilOffset;
+    _scratchCamTarget.z += _shakeZ;
+    camera.position.lerp(_scratchCamTarget, 0.12);
     camera.lookAt(player.position);
 
     // HUD
