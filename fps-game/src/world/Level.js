@@ -1,0 +1,430 @@
+import * as THREE from 'three';
+
+/**
+ * Level — 150×150 Extraction Map
+ *
+ * Zones (top-down, Y-up):
+ *   NW  Factory Area      (-55…-15, -70…-20)
+ *   NE  Warehouse         ( 15… 65, -70…-20)
+ *   C   Central Square    (-20… 20, -20… 20)
+ *   SW  Apartment Ruins   (-65…-15,  20… 70)
+ *   SE  Parking Lot       ( 10… 65,  20… 65)
+ *   S   Basement Entrance (-20… 10,  55… 75)
+ *
+ * Extraction Points:
+ *   NORTH  (0, -73)   — always open, 10 s hold
+ *   EAST   (73, 0)    — always open, 10 s hold
+ *   BASEMENT (-30, 65) — requires key_basement
+ *
+ * Spawn Points (player):  4 corners, random each raid
+ */
+export class Level {
+  constructor(scene) {
+    this._scene = scene;
+
+    /** @type {THREE.Mesh[]} */
+    this.collidables = [];
+
+    /**
+     * Registered buildings for the roof-reveal system.
+     * @type {{ roof: THREE.Mesh, minX: number, maxX: number, minZ: number, maxZ: number }[]}
+     */
+    this._buildings = [];
+
+    /** @type {{ center: THREE.Vector3, radius: number, label: string, requiresKey?: string }[]} */
+    this.extractionPoints = [];
+
+    /**
+     * Door slot positions for DoorSystem to populate.
+     * Each entry matches the gap in the building's front wall.
+     * @type {{ cx:number, cz:number, gapW:number, h:number, color:number, name:string }[]}
+     */
+    this.doorSlots = [];
+
+    /** @type {THREE.Vector3[]} */
+    this.playerSpawnPoints = [
+      new THREE.Vector3(-62, 0, -64), // NW — west of factory, clear open ground
+      new THREE.Vector3( 63, 0, -64), // NE — east of warehouse, clear open ground
+      new THREE.Vector3(-65, 0,  62), // SW — south of apartments, clear open ground
+      new THREE.Vector3( 65, 0,  62), // SE — east of parking shed, clear open ground
+      new THREE.Vector3(  0, 0, -68), // N-center — gap between factory & warehouse
+      new THREE.Vector3(  0, 0,  70), // S-center — south of basement approach
+    ];
+
+    this._buildLighting();
+    this._buildGround();
+    this._buildBoundaryWalls();
+    this._buildFactoryZone();
+    this._buildWarehouseZone();
+    this._buildCentralSquare();
+    this._buildApartmentZone();
+    this._buildParkingZone();
+    this._buildBasementZone();
+    this._buildExtractionPoints();
+
+    scene.background = new THREE.Color(0x7a9aaa);   // overcast sky blue-grey
+    scene.fog        = new THREE.FogExp2(0x7a9aaa, 0.004); // lighter, less dense fog
+  }
+
+  // ── Lighting ──────────────────────────────────────────────────────────────
+
+  _buildLighting() {
+    // Bright ambient — no dark corners
+    this._scene.add(new THREE.AmbientLight(0xccdde8, 1.6));
+
+    const sun = new THREE.DirectionalLight(0xfff4e0, 2.4);
+    sun.position.set(40, 80, 40);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.camera.left   = -100;
+    sun.shadow.camera.right  =  100;
+    sun.shadow.camera.top    =  100;
+    sun.shadow.camera.bottom = -100;
+    sun.shadow.camera.near   = 1;
+    sun.shadow.camera.far    = 250;
+    sun.shadow.bias = -0.0005;
+    this._scene.add(sun);
+
+    // Secondary fill from opposite side
+    const fill = new THREE.DirectionalLight(0x88aacc, 0.9);
+    fill.position.set(-50, 40, -30);
+    this._scene.add(fill);
+
+    // Warm bounce from ground
+    const bounce = new THREE.DirectionalLight(0xddcc99, 0.4);
+    bounce.position.set(0, -1, 0);
+    this._scene.add(bounce);
+  }
+
+  // ── Ground ────────────────────────────────────────────────────────────────
+
+  _buildGround() {
+    const geo  = new THREE.PlaneGeometry(160, 160);
+    const mat  = new THREE.MeshLambertMaterial({ color: 0x5a5850 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.receiveShadow = true;
+    mesh.name = 'Floor';
+    this._scene.add(mesh);
+    this.collidables.push(mesh);
+
+    // Zone floor tints
+    const zones = [
+      { x: -35, z: -45, w: 40, d: 50, c: 0x35312a }, // Factory
+      { x:  40, z: -45, w: 50, d: 50, c: 0x2a2e35 }, // Warehouse
+      { x:   0, z:   0, w: 40, d: 40, c: 0x383832 }, // Central
+      { x: -40, z:  45, w: 50, d: 50, c: 0x332e28 }, // Apartments
+      { x:  37, z:  42, w: 55, d: 45, c: 0x2e3028 }, // Parking
+      { x:  -5, z:  65, w: 30, d: 20, c: 0x1e1e22 }, // Basement entrance
+    ];
+    zones.forEach(({ x, z, w, d, c }) => {
+      const g = new THREE.PlaneGeometry(w, d);
+      const m = new THREE.MeshLambertMaterial({ color: c });
+      const p = new THREE.Mesh(g, m);
+      p.rotation.x = -Math.PI / 2;
+      p.position.set(x, 0.005, z);
+      p.receiveShadow = true;
+      this._scene.add(p);
+    });
+  }
+
+  // ── Boundary walls ────────────────────────────────────────────────────────
+
+  _buildBoundaryWalls() {
+    const H = 3, C = 0x6a6258;
+    // North, South, West, East — with gaps for extraction exits
+    this._wall(  0, -76, 80, 0.6, H, C, 'BoundN_W');  // left half N
+    this._wall( 50, -76, 40, 0.6, H, C, 'BoundN_E');  // right half N (gap near 0)
+    this._wall(  0,  76, 160, 0.6, H, C, 'BoundS');
+    this._wall(-76,   0, 0.6, 160, H, C, 'BoundW');
+    this._wall( 76,  20, 0.6, 110, H, C, 'BoundE_S'); // gap near y=0
+    this._wall( 76, -40, 0.6,  70, H, C, 'BoundE_N');
+  }
+
+  // ── NW: Factory Zone ──────────────────────────────────────────────────────
+
+  _buildFactoryZone() {
+    const C = 0x5a5248;
+    // Main factory building (hollow: 4 walls + roof)
+    this._building(-40, -50, 32, 20, 3.0, C, 'Factory');
+    // Smaller outbuilding
+    this._building(-20, -60, 14, 10, 2.5, 0x706858, 'FactoryOut');
+    // Chimney stub
+    this._box(-50, -44, 2, 2, 8, 0x3a3530, 'Chimney');
+    // Crates near factory
+    [[-28,-42],[-30,-42],[-28,-40]].forEach(([x,z],i)=>this._box(x,z,1,1,1,0x8b6f47,`FactCrate${i}`));
+    // Metal barriers
+    [[-18,-48],[-14,-48],[-10,-48]].forEach(([x,z],i)=>this._box(x,z,2.5,0.9,0.5,0x707060,`FactBar${i}`));
+    // Zone divider wall (partial, with gaps)
+    this._wall(-10, -45, 0.5, 20, 3, C, 'FactDiv1');
+    this._wall(-10, -22, 0.5,  8, 3, C, 'FactDiv2');
+  }
+
+  // ── NE: Warehouse Zone ────────────────────────────────────────────────────
+
+  _buildWarehouseZone() {
+    const C = 0x4e5258;
+    this._building(40, -50, 40, 28, 3.2, C, 'Warehouse');
+    // Dock area
+    this._box(58, -38, 14, 0.4, 3, C, 'DockWall');
+    // Stacked crates
+    [[24,-42],[26,-42],[24,-40],[26,-40],[25,-38]].forEach(([x,z],i)=>this._box(x,z,1.8,1.8,1.8,0x7a6040,`WhCrate${i}`));
+    // Guard post
+    this._box(18, -58, 3, 3, 2.5, 0x5a5248, 'GuardPost');
+    // Fence line
+    for (let i = 0; i < 5; i++) this._box(20 + i*6, -70, 0.3, 2.5, 1.2, 0x3a3a3a, `Fence${i}`);
+  }
+
+  // ── C: Central Square ─────────────────────────────────────────────────────
+
+  _buildCentralSquare() {
+    // Concrete fountain / monument (non-collidable visual)
+    const geo = new THREE.CylinderGeometry(3, 3.5, 1.2, 8);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x888070 });
+    const fnt = new THREE.Mesh(geo, mat);
+    fnt.position.set(0, 0.6, 0);
+    fnt.castShadow = true;
+    this._scene.add(fnt);
+    this.collidables.push(fnt);
+
+    // Benches / barriers around square
+    const bPos = [[8,8],[8,-8],[-8,8],[-8,-8],[0,12],[0,-12],[12,0],[-12,0]];
+    bPos.forEach(([x,z],i)=>this._box(x,z,2.5,0.8,0.5,0x808070,`SqBar${i}`));
+
+    // Burnt-out vehicle (asymmetric cover)
+    this._box(5, -5, 4, 1.2, 2, 0x2a2a2a, 'BurntCar1');
+    this._box(-6, 6, 4, 1.2, 2, 0x2a2a2a, 'BurntCar2');
+
+    // Zone connector walls (corridors to other zones)
+    // N corridor to factory/warehouse
+    this._wall(-10, -20, 0.4, 0, 0, 0, ''); // gap is open
+    // Sandbag wall
+    [[-16,-16],[-16,-12],[-16,-8]].forEach(([x,z],i)=>this._box(x,z,0.6,0.8,2,0x9a8a6a,`Sand${i}`));
+  }
+
+  // ── SW: Apartment Ruins ───────────────────────────────────────────────────
+
+  _buildApartmentZone() {
+    const C = 0x5c5040;
+    // Apartment block A
+    this._building(-48, 40, 28, 18, 3.0, C, 'AptA');
+    // Apartment block B (more damaged — open walls)
+    this._wall(-35, 56, 16, 0.5, 2.5, C, 'AptB_N');
+    this._wall(-43, 62, 0.5, 12, 2.5, C, 'AptB_W');
+    this._wall(-27, 60, 0.5, 8,  2.5, C, 'AptB_E');
+    // Rubble piles
+    [[-55,28],[-52,30],[-48,27],[-40,35],[-32,30]].forEach(([x,z],i)=>
+      this._box(x,z,1.5+Math.random(),0.7,1.5+Math.random(),0x6a5a48,`Rubble${i}`)
+    );
+    // Street barriers
+    [[-20,28],[-14,28],[-8,28]].forEach(([x,z],i)=>this._box(x,z,2.5,0.9,0.5,0x707060,`AptBar${i}`));
+    // Abandoned car
+    this._box(-30, 44, 4, 1.5, 2, 0x3a3030, 'AptCar');
+  }
+
+  // ── SE: Parking Lot ───────────────────────────────────────────────────────
+
+  _buildParkingZone() {
+    // Car wrecks as cover
+    const carPos = [[20,30],[28,30],[36,30],[44,30],[52,30],[20,40],[36,45],[52,42],[44,55],[20,55]];
+    carPos.forEach(([x,z],i)=>this._box(x,z,4+(i%2),1.4,2,0x2e2e2e,`Car${i}`));
+    // Concrete dividers
+    [[24,36],[32,36],[40,36],[48,36]].forEach(([x,z],i)=>this._box(x,z,0.3,0.7,6,0x807060,`ParkDiv${i}`));
+    // Guard booth at entrance
+    this._building(12, 25, 5, 5, 2.2, 0x6c6258, 'ParkBooth');
+    // Storage shed
+    this._building(56, 50, 12, 10, 2.2, 0x5e6050, 'ParkShed');
+  }
+
+  // ── S: Basement Entrance ──────────────────────────────────────────────────
+
+  _buildBasementZone() {
+    // Stairway walls leading down
+    this._wall(-5, 60, 0.5, 12, 2.5, 0x3a3a40, 'BasN_W');
+    this._wall( 5, 60, 0.5, 12, 2.5, 0x3a3a40, 'BasN_E');
+    this._wall( 0, 66, 12, 0.5, 2.5, 0x3a3a40, 'BasS');
+    // Locked door marker (darker)
+    const dGeo = new THREE.BoxGeometry(3, 2.5, 0.2);
+    const dMat = new THREE.MeshLambertMaterial({ color: 0x1a1a2a });
+    const door = new THREE.Mesh(dGeo, dMat);
+    door.position.set(0, 1.25, 54.5);
+    this._scene.add(door);
+    // Key lock icon (small orange box)
+    const lGeo = new THREE.BoxGeometry(0.3, 0.3, 0.1);
+    const lMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+    const lock = new THREE.Mesh(lGeo, lMat);
+    lock.position.set(0.8, 1.2, 54.4);
+    this._scene.add(lock);
+  }
+
+  // ── Extraction points ────────────────────────────────────────────────────
+
+  _buildExtractionPoints() {
+    // NORTH exit
+    this._makeExtraction( 0, -73, 'NORTH出口', null);
+    // EAST exit
+    this._makeExtraction(73,   0, 'EAST出口',  null);
+    // BASEMENT (key required)
+    this._makeExtraction(-5,  66, '地下室',    'key_basement');
+  }
+
+  _makeExtraction(x, z, label, requiresKey) {
+    const geo = new THREE.PlaneGeometry(6, 6);
+    const mat = new THREE.MeshBasicMaterial({
+      color:       requiresKey ? 0xffaa00 : 0x00ff80,
+      transparent: true,
+      opacity:     0.28,
+      depthWrite:  false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.01, z);
+    mesh.name = `Extraction_${label}`;
+    this._scene.add(mesh);
+
+    const sprite = this._makeTextSprite(label, requiresKey ? '#ffaa00' : '#00ff80');
+    sprite.position.set(x, 3, z);
+    this._scene.add(sprite);
+
+    this.extractionPoints.push({
+      center:      new THREE.Vector3(x, 0, z),
+      radius:      3.5,
+      label,
+      requiresKey,
+    });
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /**
+   * Hollow building: 4 walls + interior floor + roof-reveal roof.
+   *
+   * The roof starts fully opaque (player outside → can't see in).
+   * When the player enters the building footprint, `updateRoofs()` fades
+   * the roof out so the interior becomes visible.
+   *
+   * Front wall has a doorway gap.
+   */
+  _building(cx, cz, w, d, h, color, name) {
+    const hw = w / 2, hd = d / 2;
+    // Walls
+    this._wall(cx,      cz - hd, w,   0.5, h, color, `${name}_WallBack`);
+    this._wall(cx - hw, cz,      0.5, d,   h, color, `${name}_WallLeft`);
+    this._wall(cx + hw, cz,      0.5, d,   h, color, `${name}_WallRight`);
+    const gapW  = Math.min(3, w * 0.25);
+    const sideW = (w - gapW) / 2;
+    this._wall(cx - sideW / 2 - gapW / 2, cz + hd, sideW, 0.5, h, color, `${name}_WallFrontL`);
+    this._wall(cx + sideW / 2 + gapW / 2, cz + hd, sideW, 0.5, h, color, `${name}_WallFrontR`);
+
+    // Record door slot (gap in front wall, centered on cx at z = cz + hd)
+    this.doorSlots.push({ cx, cz: cz + hd, gapW, h, color, name: `${name}_Door` });
+
+    // Interior floor — always present; only revealed when roof fades out
+    const iGeo   = new THREE.PlaneGeometry(w - 1.0, d - 1.0);
+    const iMat   = new THREE.MeshLambertMaterial({ color: 0x1a1714 });
+    const iFloor = new THREE.Mesh(iGeo, iMat);
+    iFloor.rotation.x = -Math.PI / 2;
+    iFloor.position.set(cx, 0.01, cz);
+    iFloor.receiveShadow = true;
+    iFloor.name = `${name}_IntFloor`;
+    this._scene.add(iFloor);
+
+    // Roof — transparent-capable so we can lerp opacity per frame.
+    // Slightly oversized (+0.2) to fully cover wall tops and avoid gaps.
+    // NOT added to collidables: all raycasts are horizontal so a horizontal
+    // roof plane would never be hit anyway.
+    const rGeo = new THREE.BoxGeometry(w + 0.2, 0.35, d + 0.2);
+    const rMat = new THREE.MeshLambertMaterial({
+      color,
+      transparent: true,
+      opacity:     1.0,
+    });
+    const roof = new THREE.Mesh(rGeo, rMat);
+    roof.position.set(cx, h + 0.18, cz);
+    roof.castShadow    = true;
+    roof.receiveShadow = true;
+    roof.name = `${name}_Roof`;
+    this._scene.add(roof);
+
+    // Register for per-frame reveal updates
+    this._buildings.push({
+      roof,
+      minX: cx - hw,
+      maxX: cx + hw,
+      minZ: cz - hd,
+      maxZ: cz + hd,
+    });
+  }
+
+  /**
+   * Returns building footprint rects for the minimap renderer.
+   * @returns {{ minX:number, maxX:number, minZ:number, maxZ:number }[]}
+   */
+  get buildingOutlines() {
+    return this._buildings.map(b => ({
+      minX: b.minX, maxX: b.maxX, minZ: b.minZ, maxZ: b.maxZ,
+    }));
+  }
+
+  /**
+   * Call every frame. Smoothly hides the roof of the building the player is
+   * currently inside, and restores roofs of all other buildings.
+   *
+   * @param {THREE.Vector3} playerPos
+   */
+  updateRoofs(playerPos) {
+    const px = playerPos.x, pz = playerPos.z;
+    for (const b of this._buildings) {
+      const inside = px > b.minX && px < b.maxX && pz > b.minZ && pz < b.maxZ;
+      const target = inside ? 0.0 : 1.0;
+      const cur    = b.roof.material.opacity;
+      // Lerp: fade in/out over ~10 frames
+      b.roof.material.opacity = cur + (target - cur) * 0.14;
+      b.roof.visible = b.roof.material.opacity > 0.02;
+    }
+  }
+
+  _wall(cx, cz, w, d, h, color, name) {
+    if (!name || h <= 0) return;
+    const geo  = new THREE.BoxGeometry(w, h, d);
+    const mat  = new THREE.MeshLambertMaterial({ color });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cx, h / 2, cz);
+    mesh.castShadow    = true;
+    mesh.receiveShadow = true;
+    mesh.name = name;
+    this._scene.add(mesh);
+    this.collidables.push(mesh);
+    return mesh;
+  }
+
+  _box(cx, cz, w, h, d, color, name) {
+    const geo  = new THREE.BoxGeometry(w, h, d);
+    const mat  = new THREE.MeshLambertMaterial({ color });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cx, h / 2, cz);
+    mesh.castShadow    = true;
+    mesh.receiveShadow = true;
+    mesh.name = name;
+    this._scene.add(mesh);
+    this.collidables.push(mesh);
+    return mesh;
+  }
+
+  _makeTextSprite(text, color = '#fff') {
+    const canvas  = document.createElement('canvas');
+    canvas.width  = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.font = 'bold 24px Courier New';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 32);
+    const tex    = new THREE.CanvasTexture(canvas);
+    const mat    = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(5, 1.25, 1);
+    return sprite;
+  }
+}

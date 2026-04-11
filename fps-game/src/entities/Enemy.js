@@ -1,0 +1,501 @@
+import * as THREE from 'three';
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const RADIUS        = 0.50;
+const HEIGHT        = 1.6;
+const PATROL_SPEED  = 1.8;
+const CHASE_SPEED   = 3.8;
+const VISION_RANGE  = 18;
+const VISION_FOV    = Math.PI * 0.65;  // ~117°
+const HEARING_RANGE = 12;
+const SHOOT_RANGE   = 16;
+const SHOOT_INTERVAL = 1.3;
+const SHOOT_DAMAGE   = 10;
+
+// Elite variant stats
+const ELITE_HP             = 160;
+const ELITE_SHOOT_INTERVAL = 0.85;
+const ELITE_SHOOT_DAMAGE   = 16;
+const ELITE_VISION_RANGE   = 24;
+const ELITE_SHOOT_RANGE    = 22;
+
+const WALL_DIRS = [
+  new THREE.Vector3( 1, 0,  0),
+  new THREE.Vector3(-1, 0,  0),
+  new THREE.Vector3( 0, 0,  1),
+  new THREE.Vector3( 0, 0, -1),
+];
+
+export const STATE = { PATROL: 0, ALERT: 1, COMBAT: 2, SEARCH: 3, DEAD: 4 };
+
+// Hoisted — avoids recreating array every frame inside _updatePatrolVisuals
+const STATE_COLORS = [
+  0x33cc55,   // PATROL  — green
+  0xffaa00,   // ALERT   — orange
+  0xff2222,   // COMBAT  — red
+  0xffff00,   // SEARCH  — yellow
+  0x444444,   // DEAD    — grey
+];
+
+/**
+ * Enemy (Scav / 鸭卒)
+ * Simple top-down AI: patrol waypoints → detect player → chase + shoot.
+ */
+export class Enemy {
+  /**
+   * @param {THREE.Scene}     scene
+   * @param {THREE.Vector3}   spawnPos
+   * @param {THREE.Vector3[]} waypoints
+   * @param {boolean}         isElite    — stronger, tougher, better drops
+   */
+  constructor(scene, spawnPos, waypoints = [], isElite = false) {
+    this._scene     = scene;
+    this.position   = spawnPos.clone();
+    this.position.y = 0;
+    this.waypoints  = waypoints;
+    this._wpIdx     = 0;
+    this.isElite    = isElite;
+
+    this.state      = STATE.PATROL;
+    this.health     = isElite ? ELITE_HP : 80;
+    this.maxHealth  = isElite ? ELITE_HP : 80;
+
+    // Per-instance overrides for elite stats
+    this._shootRange    = isElite ? ELITE_SHOOT_RANGE    : SHOOT_RANGE;
+    this._shootInterval = isElite ? ELITE_SHOOT_INTERVAL : SHOOT_INTERVAL;
+    this._shootDamage   = isElite ? ELITE_SHOOT_DAMAGE   : SHOOT_DAMAGE;
+    this._visionRange   = isElite ? ELITE_VISION_RANGE   : VISION_RANGE;
+
+    this._facing       = 0;          // Y-axis angle (radians)
+    this._alertTimer   = 0;
+    this._shootTimer   = Math.random() * (isElite ? ELITE_SHOOT_INTERVAL : SHOOT_INTERVAL);
+    this._prevState    = STATE.PATROL; // track state transitions for alert events
+
+    // Search state: remembered last seen player position
+    this._lastKnownPos  = null;
+    this._lostSightTimer = 0;    // how long since losing visual on player
+    this._searchTimer    = 0;    // countdown while searching at last known pos
+    this._searchLookTimer = 0;   // rotate & look around sub-timer
+
+    // Raycasters (reused)
+    this._wallRay   = new THREE.Raycaster();
+    this._visionRay = new THREE.Raycaster();
+
+    // Pre-allocated scratch vectors — never allocate inside hot-path methods
+    this._v1       = new THREE.Vector3();
+    this._v2       = new THREE.Vector3();
+    this._origin05 = new THREE.Vector3();
+
+    this.mesh = this._buildMesh();
+    scene.add(this.mesh);
+
+    // Patrol visualisation (built after mesh so scene ref is ready)
+    this._buildPatrolVisuals();
+  }
+
+  // ── Public ──────────────────────────────────────────────────────────────────
+
+  get isAlive() { return this.state !== STATE.DEAD; }   // DEAD = 4
+
+  /**
+   * @param {number} dt
+   * @param {THREE.Vector3} playerPos
+   * @param {THREE.Object3D[]} collidables
+   * @param {boolean} playerFiredRecently
+   * @returns {{ shot:boolean, origin?:THREE.Vector3, dir?:THREE.Vector3, damage?:number }}
+   */
+  update(dt, playerPos, collidables, playerFiredRecently) {
+    const dist       = this.position.distanceTo(playerPos);
+    const canSee     = this._checkVision(playerPos, collidables);
+    const canHear    = playerFiredRecently && dist < HEARING_RANGE;
+
+    // Track last known position whenever visible
+    if (canSee) {
+      this._lastKnownPos  = playerPos.clone();
+      this._lostSightTimer = 0;
+    } else if (this.state === STATE.COMBAT) {
+      this._lostSightTimer += dt;
+    }
+
+    // ── State machine ───────────────────────────────────────────────────────
+    if (this.state === STATE.PATROL) {
+      if (canSee || canHear) {
+        this.state = STATE.COMBAT;
+        if (canHear && !canSee) this._lastKnownPos = playerPos.clone();
+      }
+
+    } else if (this.state === STATE.ALERT) {
+      this._alertTimer -= dt;
+      if (canSee)                     this.state = STATE.COMBAT;
+      else if (this._alertTimer <= 0) this.state = STATE.PATROL;
+
+    } else if (this.state === STATE.COMBAT) {
+      if (canSee) {
+        this._lostSightTimer = 0;
+      } else if (this._lostSightTimer > 2.5 && this._lastKnownPos) {
+        // Lost sight → go investigate last known position
+        this.state        = STATE.SEARCH;
+        this._searchTimer = 5.0;
+        this._searchLookTimer = 0;
+      }
+
+    } else if (this.state === STATE.SEARCH) {
+      if (canSee) {
+        this.state = STATE.COMBAT;    // spotted again → back to combat
+      } else {
+        this._searchTimer -= dt;
+        if (this._searchTimer <= 0) {
+          this.state = STATE.PATROL;  // gave up searching → patrol
+        }
+      }
+    }
+
+    // ── Behaviour ───────────────────────────────────────────────────────────
+    // Detect elite transitioning into combat for the first time this cycle
+    const justEnteredCombat = this.isElite
+      && this._prevState !== STATE.COMBAT
+      && this.state === STATE.COMBAT;
+    this._prevState = this.state;
+
+    let shot = { shot: false };
+
+    if (this.state === STATE.PATROL) {
+      this._doPatrol(dt, collidables);
+
+    } else if (this.state === STATE.ALERT) {
+      this._facePos(playerPos);
+
+    } else if (this.state === STATE.COMBAT) {
+      this._doCombat(dt, playerPos, collidables);
+      shot = this._tryShoot(dt, playerPos, collidables);
+
+    } else if (this.state === STATE.SEARCH) {
+      this._doSearch(dt, collidables);
+    }
+
+    this._syncMesh();
+    return { ...shot, eliteAlert: justEnteredCombat };
+  }
+
+  takeDamage(amount) {
+    if (!this.isAlive) return;
+    this.health = Math.max(0, this.health - amount);
+    // Switch to combat on hit regardless of vision
+    if (this.state === STATE.PATROL || this.state === STATE.ALERT) {
+      this.state = STATE.COMBAT;
+    }
+    if (this.health <= 0) this._die();
+  }
+
+  // ── Private ─────────────────────────────────────────────────────────────────
+
+  _doPatrol(dt, collidables) {
+    if (this.waypoints.length === 0) return;
+    const wp   = this.waypoints[this._wpIdx];
+    const dist = this.position.distanceTo(wp);
+    if (dist < 0.6) {
+      this._wpIdx = (this._wpIdx + 1) % this.waypoints.length;
+      return;
+    }
+    this._facePos(wp);
+    this._moveTo(wp, PATROL_SPEED, dt, collidables);
+  }
+
+  _doSearch(dt, collidables) {
+    if (!this._lastKnownPos) return;
+    const dist = this.position.distanceTo(this._lastKnownPos);
+
+    if (dist > 1.2) {
+      // Move toward last known position
+      this._facePos(this._lastKnownPos);
+      this._moveTo(this._lastKnownPos, CHASE_SPEED * 0.8, dt, collidables);
+    } else {
+      // Arrived — rotate and scan (look around every ~1.5 s)
+      this._searchLookTimer -= dt;
+      if (this._searchLookTimer <= 0) {
+        this._facing        += (Math.random() - 0.5) * Math.PI * 1.2;
+        this._searchLookTimer = 1.0 + Math.random() * 0.8;
+      }
+    }
+  }
+
+  _doCombat(dt, playerPos, collidables) {
+    const dist = this.position.distanceTo(playerPos);
+    this._facePos(playerPos);
+    if (dist > this._shootRange * 0.55) {
+      this._moveTo(playerPos, CHASE_SPEED, dt, collidables);
+    } else if (dist < this._shootRange * 0.25) {
+      // Back away — use _v2 as scratch target (not _v1, which _moveTo uses internally)
+      this._v2.subVectors(this.position, playerPos).normalize().add(this.position);
+      this._moveTo(this._v2, PATROL_SPEED, dt, collidables);
+    }
+  }
+
+  _tryShoot(dt, playerPos, collidables) {
+    this._shootTimer = Math.max(0, this._shootTimer - dt);
+    if (this._shootTimer > 0) return { shot: false };
+    if (this.position.distanceTo(playerPos) > this._shootRange) return { shot: false };
+
+    // Wall occlusion check before firing — reuse scratch vectors
+    this._origin05.set(this.position.x, 0.5, this.position.z);
+    this._v1.set(playerPos.x - this._origin05.x, 0, playerPos.z - this._origin05.z);
+    const dist = this._v1.length();
+    this._v1.normalize();
+    this._visionRay.set(this._origin05, this._v1);
+    this._visionRay.far = dist - 0.2;
+    const wallHits = this._visionRay.intersectObjects(collidables, false);
+    if (wallHits.some(h => h.object.name !== 'Floor')) return { shot: false };
+
+    this._shootTimer = this._shootInterval + (Math.random() * 0.5 - 0.25);
+
+    // Clone dir/origin only on actual shot (fire-rate gated — acceptable allocation)
+    this._v2.copy(this._v1);
+    const spread = this.isElite ? 0.04 : 0.08; // elite has tighter aim
+    this._v2.x += (Math.random() - 0.5) * spread;
+    this._v2.z += (Math.random() - 0.5) * spread;
+    this._v2.normalize();
+
+    return { shot: true, origin: this._origin05.clone(), dir: this._v2.clone(), damage: this._shootDamage };
+  }
+
+  _checkVision(playerPos, collidables) {
+    this._origin05.set(this.position.x, 0.5, this.position.z);
+    this._v1.set(playerPos.x - this._origin05.x, 0, playerPos.z - this._origin05.z);
+    const dist = this._v1.length();
+    if (dist > this._visionRange) return false;
+
+    // Field of view check
+    this._v1.normalize();
+    this._v2.set(Math.sin(this._facing), 0, Math.cos(this._facing));
+    if (this._v2.dot(this._v1) < Math.cos(VISION_FOV / 2)) return false;
+
+    // Occlusion check
+    this._visionRay.set(this._origin05, this._v1);
+    this._visionRay.far = dist - 0.1;
+    const hits = this._visionRay.intersectObjects(collidables, false);
+    return hits.every(h => h.object.name === 'Floor');
+  }
+
+  _facePos(target) {
+    const dx = target.x - this.position.x;
+    const dz = target.z - this.position.z;
+    this._facing = Math.atan2(dx, dz);
+  }
+
+  _moveTo(target, speed, dt, collidables) {
+    this._v1.set(target.x - this.position.x, 0, target.z - this.position.z);
+    const len = this._v1.length();
+    if (len < 0.01) return;
+    this._v1.normalize().multiplyScalar(speed * dt);
+    this.position.add(this._v1);
+    this.position.y = 0;
+    this._resolveWalls(collidables);
+  }
+
+  _resolveWalls(collidables) {
+    // Compute origin once — same for all 4 directions
+    this._origin05.set(this.position.x, 0.5, this.position.z);
+    this._wallRay.near = 0;
+    this._wallRay.far  = RADIUS + 0.08;
+    for (const dir of WALL_DIRS) {
+      this._wallRay.set(this._origin05, dir);
+      const hits = this._wallRay.intersectObjects(collidables, false);
+      if (hits.length > 0) {
+        const overlap = RADIUS - hits[0].distance;
+        if (overlap > 0) {
+          this.position.x -= dir.x * overlap;
+          this.position.z -= dir.z * overlap;
+        }
+      }
+    }
+  }
+
+  _die() {
+    this.state = STATE.DEAD;
+    // Lay flat (rotate 90° around Z)
+    this.mesh.rotation.z = Math.PI / 2;
+    this.mesh.position.y = 0.15;
+    // Grey out
+    this.mesh.traverse(child => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+        child.material.color.set(0x444444);
+      }
+    });
+    // Hide patrol visualisation
+    this._hidePatrolVisuals();
+  }
+
+  _syncMesh() {
+    if (!this.isAlive) return;
+    this.mesh.position.set(this.position.x, HEIGHT / 2, this.position.z);
+    this.mesh.rotation.y = this._facing;
+
+    // Scale health bar
+    const pct = this.health / this.maxHealth;
+    if (this._hpBar) {
+      this._hpBar.scale.x  = Math.max(0.001, pct);
+      this._hpBar.position.x = (pct - 1) * 0.5;
+    }
+
+    // Update patrol visualisation
+    this._updatePatrolVisuals();
+  }
+
+  // ── Patrol Visualisation ────────────────────────────────────────────────────
+
+  /** Build all patrol-range debug visuals once at spawn. */
+  _buildPatrolVisuals() {
+    if (this.waypoints.length === 0) return;
+
+    const Y = 0.04; // float just above ground
+
+    // ── 1. Patrol route loop line ─────────────────────────────────────────────
+    const routePts = [...this.waypoints, this.waypoints[0]].map(
+      p => new THREE.Vector3(p.x, Y, p.z)
+    );
+    const routeGeo = new THREE.BufferGeometry().setFromPoints(routePts);
+    const routeMat = new THREE.LineBasicMaterial({
+      color: 0x33cc55, transparent: true, opacity: 0.50, depthWrite: false,
+    });
+    this._patrolLine = new THREE.Line(routeGeo, routeMat);
+    this._patrolLine.renderOrder = 1;
+    this._scene.add(this._patrolLine);
+
+    // ── 2. Waypoint diamond markers ───────────────────────────────────────────
+    this._waypointMarkers = this.waypoints.map((wp, idx) => {
+      const geo = new THREE.PlaneGeometry(0.55, 0.55);
+      // Rotate plane to make a diamond (45°)
+      geo.rotateZ(Math.PI / 4);
+      const mat = new THREE.MeshBasicMaterial({
+        color:       idx === 0 ? 0x00ff88 : 0x22aa44,
+        transparent: true,
+        opacity:     0.65,
+        depthWrite:  false,
+        side:        THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(wp.x, Y, wp.z);
+      mesh.renderOrder = 2;
+      this._scene.add(mesh);
+      return mesh;
+    });
+
+    // ── 3. "Next target" bright marker (moves to current waypoint) ───────────
+    const tGeo = new THREE.PlaneGeometry(0.7, 0.7);
+    tGeo.rotateZ(Math.PI / 4);
+    const tMat = new THREE.MeshBasicMaterial({
+      color: 0xffff00, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide,
+    });
+    this._targetMarker = new THREE.Mesh(tGeo, tMat);
+    this._targetMarker.rotation.x = -Math.PI / 2;
+    this._targetMarker.renderOrder = 3;
+    this._scene.add(this._targetMarker);
+
+    // ── 4. State ring (circle around enemy) ───────────────────────────────────
+    const segs   = 36;
+    const RING_R = 1.1;   // visual radius (not a gameplay radius)
+    const circlePts = Array.from({ length: segs + 1 }, (_, i) => {
+      const a = (i / segs) * Math.PI * 2;
+      return new THREE.Vector3(Math.cos(a) * RING_R, Y, Math.sin(a) * RING_R);
+    });
+    const ringGeo = new THREE.BufferGeometry().setFromPoints(circlePts);
+    const ringMat = new THREE.LineBasicMaterial({
+      color: 0x33cc55, transparent: true, opacity: 0.80, depthWrite: false,
+    });
+    this._stateRing = new THREE.Line(ringGeo, ringMat);
+    this._stateRing.renderOrder = 2;
+    this._scene.add(this._stateRing);
+  }
+
+  /** Called every frame from _syncMesh to keep visuals in sync. */
+  _updatePatrolVisuals() {
+    if (this._stateRing) {
+      this._stateRing.position.set(this.position.x, 0, this.position.z);
+      this._stateRing.material.color.setHex(STATE_COLORS[this.state]);
+    }
+
+    // Route line colour also reflects state
+    if (this._patrolLine) {
+      this._patrolLine.material.color.setHex(
+        this.state === STATE.PATROL ? 0x33cc55
+          : this.state === STATE.ALERT  ? 0xffaa00
+          : 0xff2222
+      );
+    }
+
+    // Move next-target marker to current waypoint only while patrolling
+    if (this._targetMarker) {
+      if (this.state === STATE.PATROL && this.waypoints.length > 0) {
+        const wp = this.waypoints[this._wpIdx];
+        this._targetMarker.position.set(wp.x, 0.04, wp.z);
+        this._targetMarker.visible = true;
+        // Pulse scale
+        const pulse = 0.8 + Math.sin(Date.now() * 0.004) * 0.2;
+        this._targetMarker.scale.setScalar(pulse);
+      } else {
+        this._targetMarker.visible = false;
+      }
+    }
+  }
+
+  /** Hide all visuals when enemy dies. */
+  _hidePatrolVisuals() {
+    if (this._patrolLine)    this._patrolLine.visible    = false;
+    if (this._stateRing)     this._stateRing.visible     = false;
+    if (this._targetMarker)  this._targetMarker.visible  = false;
+    this._waypointMarkers?.forEach(m => { m.visible = false; });
+  }
+
+  _buildMesh() {
+    const g = new THREE.Group();
+
+    // Body — elite enemies are darker/bulkier looking
+    const bGeo = new THREE.CylinderGeometry(
+      this.isElite ? 0.50 : 0.42,
+      this.isElite ? 0.50 : 0.42,
+      this.isElite ? 1.25 : 1.1,
+      8
+    );
+    const bMat = new THREE.MeshLambertMaterial({ color: this.isElite ? 0x3a0a0a : 0x7a1e1e });
+    const body = new THREE.Mesh(bGeo, bMat);
+    body.castShadow = true;
+    g.add(body);
+
+    // Head
+    const hGeo = new THREE.SphereGeometry(this.isElite ? 0.34 : 0.30, 8, 6);
+    const hMat = new THREE.MeshLambertMaterial({ color: this.isElite ? 0xcc9944 : 0xf0c060 });
+    const head = new THREE.Mesh(hGeo, hMat);
+    head.position.y = this.isElite ? 0.85 : 0.75;
+    head.castShadow = true;
+    g.add(head);
+
+    // Facing dot (red for scav, gold for elite)
+    const nGeo = new THREE.BoxGeometry(0.12, 0.12, 0.30);
+    const nMat = new THREE.MeshLambertMaterial({ color: this.isElite ? 0xffcc00 : 0xff2020 });
+    const nose = new THREE.Mesh(nGeo, nMat);
+    nose.position.set(0, this.isElite ? 0.38 : 0.28, 0.50);
+    g.add(nose);
+
+    const barY = this.isElite ? 1.55 : 1.35;
+    const barW = this.isElite ? 1.3  : 1.0;
+
+    // HP bar background
+    const bgGeo = new THREE.BoxGeometry(barW, 0.09, 0.05);
+    const bgMat = new THREE.MeshBasicMaterial({ color: this.isElite ? 0x1a0000 : 0x220000 });
+    const bg    = new THREE.Mesh(bgGeo, bgMat);
+    bg.position.set(0, barY, 0);
+    g.add(bg);
+
+    // HP bar fill — gold for elite
+    const fGeo = new THREE.BoxGeometry(barW, 0.09, 0.06);
+    const fMat = new THREE.MeshBasicMaterial({ color: this.isElite ? 0xffaa00 : 0xff3333 });
+    this._hpBar = new THREE.Mesh(fGeo, fMat);
+    this._hpBar.position.set(0, barY, 0);
+    g.add(this._hpBar);
+
+    return g;
+  }
+}

@@ -1,0 +1,214 @@
+/**
+ * InventorySystem
+ * Grid-based inventory (Tarkov-style Tetris grid).
+ * Items occupy w×h cells; placement finds first available space.
+ */
+
+export const ITEM_DEFS = {
+  rifle_ammo: {
+    id: 'rifle_ammo', name: '5.45mm弹药', w: 1, h: 2,
+    color: '#6a7a6a', stackable: true,  maxStack: 60, value: 80,  weight: 0.01, // kg per round
+  },
+  pistol_ammo: {
+    id: 'pistol_ammo', name: '9mm弹药', w: 1, h: 1,
+    color: '#6a6a7a', stackable: true,  maxStack: 50, value: 50,  weight: 0.008,
+  },
+  shotgun_ammo: {
+    id: 'shotgun_ammo', name: '12号弹壳', w: 1, h: 1,
+    color: '#8a6a3a', stackable: true,  maxStack: 20, value: 60,  weight: 0.04,
+  },
+  bandage: {
+    id: 'bandage', name: '绷带', w: 1, h: 1,
+    color: '#c8b89a', stackable: true,  maxStack: 5,  value: 200, weight: 0.10,
+    heals: 15,
+  },
+  medkit: {
+    id: 'medkit', name: '急救包', w: 2, h: 2,
+    color: '#cc4444', stackable: false, value: 900,  weight: 0.95,
+    heals: 60,
+  },
+  painkillers: {
+    id: 'painkillers', name: '止痛药', w: 1, h: 2,
+    color: '#aaaa44', stackable: false, value: 400,  weight: 0.15,
+    heals: 30,
+  },
+  dogtag: {
+    id: 'dogtag', name: '狗牌', w: 1, h: 1,
+    color: '#aaaaaa', stackable: false, value: 500,  weight: 0.05,
+  },
+  cash: {
+    id: 'cash', name: '鸭元', w: 1, h: 1,
+    color: '#88aa55', stackable: true,  maxStack: 999, value: 1,  weight: 0.0,
+  },
+  vss_ammo: {
+    id: 'vss_ammo', name: 'SP-6弹药', w: 1, h: 2,
+    color: '#5a8a7a', stackable: true, maxStack: 30, value: 120, weight: 0.014,
+  },
+  mp5_ammo: {
+    id: 'mp5_ammo', name: '9mm SMG弹', w: 1, h: 1,
+    color: '#7a6a8a', stackable: true, maxStack: 90, value: 55, weight: 0.009,
+  },
+  key_basement: {
+    id: 'key_basement', name: '地下室钥匙', w: 1, h: 1,
+    color: '#d4a017', stackable: false, value: 1500, weight: 0.08,
+  },
+  vest_light: {
+    id: 'vest_light', name: '轻型防弹衣', w: 2, h: 3,
+    color: '#4a6a5a', stackable: false, value: 1200, weight: 4.5,
+    armor: { armorHp: 80,  reduce: 0.40 },
+  },
+  vest_heavy: {
+    id: 'vest_heavy', name: '重型防弹衣', w: 2, h: 3,
+    color: '#3a5040', stackable: false, value: 2800, weight: 7.5,
+    armor: { armorHp: 150, reduce: 0.60 },
+  },
+  helmet: {
+    id: 'helmet', name: '防弹头盔', w: 2, h: 2,
+    color: '#4a4a5a', stackable: false, value: 1800, weight: 1.8,
+    armor: { armorHp: 50,  reduce: 0.55, headOnly: true },
+  },
+};
+
+const ROWS = 8;
+const COLS = 10;
+
+export class InventorySystem {
+  constructor() {
+    // grid[row][col] = itemInstanceId | null
+    this._grid  = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    /** @type {Map<number, {id:number, def:object, count:number, row:number, col:number}>} */
+    this.items  = new Map();
+    this._nextId = 1;
+
+    // Starting gear
+    this.addItem('rifle_ammo',  60);
+    this.addItem('pistol_ammo', 17);
+    this.addItem('bandage',      2);
+  }
+
+  get rows() { return ROWS; }
+  get cols() { return COLS; }
+
+  /**
+   * Total carried weight in kg.
+   * Weight > 25 kg prevents sprinting; > 35 kg slows walk by 20%.
+   */
+  get totalWeight() {
+    let w = 0;
+    for (const item of this.items.values()) {
+      w += (item.def.weight ?? 0) * (item.def.stackable ? item.count : 1);
+    }
+    return w;
+  }
+
+  /** Clear all items and the grid (call before applying a fresh loadout). */
+  reset() {
+    this._grid  = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    this.items  = new Map();
+    this._nextId = 1;
+  }
+
+  /**
+   * Add item by definition id. Returns true if space was found.
+   * @param {string} defId
+   * @param {number} count
+   */
+  addItem(defId, count = 1) {
+    const def = ITEM_DEFS[defId];
+    if (!def) return false;
+
+    // Stack into existing slot for stackables; handle overflow by continuing
+    if (def.stackable) {
+      for (const item of this.items.values()) {
+        if (item.def.id === defId && item.count < def.maxStack) {
+          const room = def.maxStack - item.count;
+          const take = Math.min(room, count);
+          item.count += take;
+          count -= take;
+          if (count <= 0) return true;
+        }
+      }
+      if (count <= 0) return true;
+    }
+
+    // Place new slot (may be called with remaining overflow count)
+    const pos = this._findSpace(def.w, def.h);
+    if (!pos) return false;  // inventory full
+
+    const id   = this._nextId++;
+    const item = { id, def, count: def.stackable ? count : 1, row: pos.row, col: pos.col };
+    this.items.set(id, item);
+    this._fill(pos.row, pos.col, def.w, def.h, id);
+    return true;
+  }
+
+  /**
+   * Remove one stack of an item by instance id.
+   */
+  removeItem(instanceId) {
+    const item = this.items.get(instanceId);
+    if (!item) return;
+    this._fill(item.row, item.col, item.def.w, item.def.h, null);
+    this.items.delete(instanceId);
+  }
+
+  /**
+   * Find the best healing item in inventory (highest heals value).
+   * @returns {{ def: object, instanceId: string }|null}
+   */
+  getBestHealingItem() {
+    let best = null;
+    for (const [instanceId, item] of this.items.entries()) {
+      if (item.def.heals && (!best || item.def.heals > best.item.def.heals)) {
+        best = { def: item.def, instanceId };
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Consume a healing item by instanceId and return HP healed.
+   * @param {string} instanceId
+   * @returns {number}
+   */
+  useHealing(instanceId) {
+    const item = this.items.get(instanceId);
+    if (!item) return 0;
+    const heals = item.def.heals;
+    if (item.def.stackable) {
+      item.count--;
+      if (item.count <= 0) this.removeItem(item.id);
+    } else {
+      this.removeItem(item.id);
+    }
+    return heals;
+  }
+
+  // ── Private ────────────────────────────────────────────────────────────────
+
+  _findSpace(w, h) {
+    for (let r = 0; r <= ROWS - h; r++) {
+      for (let c = 0; c <= COLS - w; c++) {
+        if (this._canPlace(r, c, w, h)) return { row: r, col: c };
+      }
+    }
+    return null;
+  }
+
+  _canPlace(row, col, w, h) {
+    for (let r = row; r < row + h; r++) {
+      for (let c = col; c < col + w; c++) {
+        if (this._grid[r][c] !== null) return false;
+      }
+    }
+    return true;
+  }
+
+  _fill(row, col, w, h, value) {
+    for (let r = row; r < row + h; r++) {
+      for (let c = col; c < col + w; c++) {
+        this._grid[r][c] = value;
+      }
+    }
+  }
+}
