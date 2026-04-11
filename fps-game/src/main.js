@@ -53,6 +53,10 @@ invUI.onUse((instanceId) => {
   const item = inventory.items.get(instanceId);
   if (!item || !item.def.heals) return;
   if (_healTimer > 0) return; // already healing
+  if (health.effectiveHpFraction >= 0.99 && !health.isBleeding) {
+    hud.pushKillFeed('当前血量充足');
+    return;
+  }
 
   const def = item.def;
   _healDuration   = Math.max(0.1, def.id === 'medkit' ? 3.0 : def.id === 'painkillers' ? 2.5 : 1.8);
@@ -397,6 +401,11 @@ function handleHealing() {
   }
 
   if (input.justPressed('KeyH')) {
+    // Don't heal at full HP if not bleeding
+    if (health.effectiveHpFraction >= 0.99 && !health.isBleeding) {
+      hud.pushKillFeed('当前血量充足');
+      return;
+    }
     const result = inventory.getBestHealingItem();
     if (!result) {
       hud.pushKillFeed('背包里没有急救物品！');
@@ -634,6 +643,7 @@ const loop = new GameLoop(
   // update
   (dt) => {
     if (!gameStarted) return;
+    try {
 
     // Hitstop — brief freeze on kills
     if (_hitstopTimer > 0) {
@@ -814,6 +824,16 @@ const loop = new GameLoop(
     hud.setFractureState(health.legFractured, health.armFractured);
 
     input.endFrame();
+
+    } catch (err) {
+      console.error('Game loop error:', err);
+      // Reset stuck states
+      player.isHealing = false;
+      _healTimer = 0;
+      _hitstopTimer = 0;
+      hud.setHealChannel(-1);
+      input.endFrame();
+    }
   },
   // render
   () => renderer.render(scene, camera)
