@@ -114,7 +114,7 @@ export class StashScreen {
         <div class="stash-card-sub">${loadout.subtitle}</div>
         <div class="stash-card-desc">${loadout.description}</div>
         <ul class="stash-card-items">
-          ${loadout.items.map(i => `<li>${i.defId.replace('_', ' ')} ×${i.count}</li>`).join('')}
+          ${loadout.items.map(i => `<li>${i.defId.replaceAll('_', ' ')} ×${i.count}</li>`).join('')}
         </ul>
         <button class="stash-select-btn">装备出发</button>
       `;

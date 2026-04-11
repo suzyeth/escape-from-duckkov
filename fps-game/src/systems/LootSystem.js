@@ -25,9 +25,15 @@ function _rollContainerLoot(tier = 'normal') {
       { defId: 'painkillers', count: () => 1               },
     ],
   };
-  const pool   = tables[tier] ?? tables.normal;
+  const pool   = tables[tier.toLowerCase()] ?? tables.normal;
   const count  = tier === 'rich' ? 3 : 2;
-  const chosen = [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+  // Fisher-Yates shuffle (uniform distribution)
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const chosen = shuffled.slice(0, count);
   return chosen.map(e => ({ defId: e.defId, count: e.count() }));
 }
 
@@ -73,7 +79,7 @@ export class LootSystem {
       const dist = playerPos.distanceTo(c.pos);
       if (dist < CONTAINER_RANGE) {
         // Pulse
-        const s = 1.0 + Math.sin(Date.now() * 0.004) * 0.06;
+        const s = 1.0 + Math.sin(performance.now() * 0.004) * 0.06;
         c.mesh.scale.set(s, 1, s);
 
         if (ePressed && !pickup) {
@@ -90,7 +96,7 @@ export class LootSystem {
       const item = this._items[i];
       const dist = playerPos.distanceTo(item.pos);
 
-      const scale = dist < PICKUP_RANGE ? 1.0 + Math.sin(Date.now() * 0.005) * 0.1 : 1.0;
+      const scale = dist < PICKUP_RANGE ? 1.0 + Math.sin(performance.now() * 0.005) * 0.1 : 1.0;
       item.mesh.scale.setScalar(scale);
 
       if (ePressed && dist < PICKUP_RANGE && !pickup) {

@@ -457,7 +457,7 @@ export class Enemy {
         this._targetMarker.position.set(wp.x, 0.04, wp.z);
         this._targetMarker.visible = true;
         // Pulse scale
-        const pulse = 0.8 + Math.sin(Date.now() * 0.004) * 0.2;
+        const pulse = 0.8 + Math.sin(performance.now() * 0.004) * 0.2;
         this._targetMarker.scale.setScalar(pulse);
       } else {
         this._targetMarker.visible = false;

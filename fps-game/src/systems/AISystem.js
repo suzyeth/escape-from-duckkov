@@ -22,7 +22,9 @@ export class AISystem {
   // ── Public ─────────────────────────────────────────────────────────────────
 
   get aliveCount() {
-    return this.enemies.filter(e => e.isAlive).length;
+    let count = 0;
+    for (const e of this.enemies) if (e.isAlive) count++;
+    return count;
   }
 
   /**

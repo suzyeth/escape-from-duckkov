@@ -45,6 +45,14 @@ export class InventoryUI {
   refresh() {
     if (!this._grid) return;
 
+    // Abort any in-progress drag to prevent ghost elements
+    if (this._dragItem) {
+      if (this._dragEl) { this._dragEl.remove(); this._dragEl = null; }
+      if (this._dragSourceEl) { try { this._dragSourceEl.style.opacity = '1'; } catch {} this._dragSourceEl = null; }
+      this._dragItem = null;
+      this._clearDropPreview();
+    }
+
     // Update weight display
     const weightEl = document.getElementById('inv-weight');
     if (weightEl) {

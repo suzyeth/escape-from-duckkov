@@ -154,7 +154,7 @@ export class InventorySystem {
 
   /**
    * Find the best healing item in inventory (highest heals value).
-   * @returns {{ def: object, instanceId: string }|null}
+   * @returns {{ def: object, instanceId: number }|null}
    */
   getBestHealingItem() {
     let best = null;

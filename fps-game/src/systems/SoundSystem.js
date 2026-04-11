@@ -33,6 +33,7 @@ export class SoundSystem {
         0.2: this._bakeNoise(0.2),
         0.5: this._bakeNoise(0.5),
       };
+      this._clickBuf = this._bakeClick();
       this._ready  = true;
     } catch {
       // Web Audio API not supported — sounds simply won't play
@@ -352,20 +353,25 @@ export class SoundSystem {
     return src;
   }
 
+  /** Pre-bake a click AudioBuffer once at init */
+  _bakeClick() {
+    const sr  = this._ctx.sampleRate;
+    const len = Math.ceil(sr * 0.05);
+    const buf = this._ctx.createBuffer(1, len, sr);
+    const d   = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+    }
+    return buf;
+  }
+
   /** Single metallic transient click, starting `delay` seconds from now. */
   _click(delay = 0, vol = 0.25) {
     const ctx = this._ctx;
     const now = ctx.currentTime + delay;
 
-    const sr  = ctx.sampleRate;
-    const len = Math.ceil(sr * 0.05);
-    const buf = ctx.createBuffer(1, len, sr);
-    const d   = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) {
-      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
-    }
     const src = ctx.createBufferSource();
-    src.buffer = buf;
+    src.buffer = this._clickBuf;
 
     const hpf = ctx.createBiquadFilter();
     hpf.type  = 'highpass';

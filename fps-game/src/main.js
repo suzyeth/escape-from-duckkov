@@ -357,16 +357,7 @@ function handleLootPickup(dt) {
 // ── Healing (H key) ───────────────────────────────────────────────────────────
 
 function handleHealing() {
-  // Cancel healing if shooting
-  if (_healTimer > 0 && input.isDown('Mouse0')) {
-    _healTimer = 0;
-    player.isHealing = false;
-    hud.setHealChannel(-1);
-    hud.pushKillFeed('治疗中断');
-    return;
-  }
-
-  // Block H press during active channel (timer ticked by game loop with real dt)
+  // Block H press during active channel (cancel handled in game loop tick)
   if (_healTimer > 0) {
     return;
   }
