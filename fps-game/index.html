@@ -92,9 +92,10 @@
     /* Bottom-left: health + stamina */
     #health-display { position: absolute; bottom: 2rem; left: 2rem; color: #e0e0e0; }
     #health-label { font-size: .62rem; letter-spacing: .15em; color: #666; text-transform: uppercase; margin-bottom: .3rem; }
-    #health-bar-outer { width: 150px; height: 5px; background: #222; border-radius: 3px; overflow: hidden; }
+    #health-bar-outer { width: 150px; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
     #health-bar-inner { height: 100%; width: 100%; background: #4caf50; border-radius: 3px; transition: width .25s, background .25s; }
     #health-value { font-size: 1.3rem; margin-top: .3rem; }
+    #health-danger { font-size: .55rem; color: #f44336; margin-top: .15rem; display: none; animation: bleed-pulse .9s ease-in-out infinite; }
 
     /* Stamina bar (hidden when full) */
     #stamina-bar-wrap { width: 150px; margin-top: .4rem; display: none; }
@@ -139,7 +140,9 @@
     /* Bottom-right: weapon + ammo */
     #weapon-display { position: absolute; bottom: 2rem; right: 2rem; text-align: right; color: #e0e0e0; }
     #weapon-name    { font-size: .7rem; color: #888; letter-spacing: .12em; margin-bottom: .2rem; text-transform: uppercase; }
-    #ammo-current   { font-size: 2.5rem; font-weight: bold; line-height: 1; }
+    #ammo-current   { font-size: 2.5rem; font-weight: bold; line-height: 1; transition: color .15s; }
+    #ammo-current.low { animation: ammo-blink .6s ease-in-out infinite; }
+    @keyframes ammo-blink { 0%,100% { opacity:1; } 50% { opacity:.4; } }
     #ammo-reserve   { font-size: .85rem; color: #666; margin-top: .1rem; }
 
     /* Centre-bottom: pickup hint */
@@ -147,6 +150,18 @@
       position: absolute; bottom: 28%; left: 50%; transform: translateX(-50%);
       font-size: .78rem; color: #c8a96e; letter-spacing: .15em;
       background: rgba(0,0,0,.5); padding: .3rem .8rem; border-radius: 3px; display: none;
+    }
+
+    /* Bottom-center: key hints bar (fades out after 15s) */
+    #key-hints {
+      position: absolute; bottom: .8rem; left: 50%; transform: translateX(-50%);
+      font-size: .58rem; color: #555; letter-spacing: .08em;
+      background: rgba(0,0,0,.35); padding: .25rem 1rem; border-radius: 3px;
+      transition: opacity 2s;
+    }
+    #key-hints .kh-key {
+      color: #888; border: 1px solid #444; border-radius: 2px;
+      padding: 0 3px; margin: 0 1px; font-size: .55rem;
     }
 
     /* Centre: extraction progress bar */
@@ -443,6 +458,7 @@
       <div id="health-label">生命值</div>
       <div id="health-bar-outer"><div id="health-bar-inner"></div></div>
       <div id="health-value">100</div>
+      <div id="health-danger"></div>
       <div id="stamina-bar-wrap">
         <div id="stamina-bar-label">体力</div>
         <div id="stamina-bar-outer"><div id="stamina-bar-inner"></div></div>
@@ -484,6 +500,16 @@
     <div id="kill-feed"></div>
     <div id="bleed-indicator">● 流血中 — 按H止血</div>
 
+    <!-- Key hints bar -->
+    <div id="key-hints">
+      <span class="kh-key">Tab</span> 背包 &nbsp;
+      <span class="kh-key">H</span> 急救 &nbsp;
+      <span class="kh-key">R</span> 换弹 &nbsp;
+      <span class="kh-key">E</span> 拾取/撤离 &nbsp;
+      <span class="kh-key">F</span> 开门 &nbsp;
+      <span class="kh-key">1-5</span> 切武器
+    </div>
+
     <!-- Minimap (positioned top-right, overlaps kill-feed which moves down) -->
     <div id="minimap-wrap">
       <canvas id="minimap-canvas" width="140" height="140"></canvas>
@@ -495,9 +521,9 @@
   <div id="inventory-panel">
     <div id="inventory-box">
       <div id="inventory-title">
-        背包
+        背包 <span style="color:#444;font-size:.55rem;margin-left:.5rem">拖拽物品可换位</span>
         <span id="inv-weight">0.0 kg</span>
-        <span>TAB 关闭</span>
+        <span style="color:#666">TAB 关闭</span>
       </div>
       <div id="inventory-grid"></div>
     </div>
@@ -556,6 +582,13 @@
       _tipVisible = true;
       _nextTip();
       setInterval(_nextTip, 5000);
+
+      // Key hints: show on raid start, fade after 20s
+      const kh = document.getElementById('key-hints');
+      if (kh) {
+        kh.style.opacity = '1';
+        setTimeout(() => { kh.style.opacity = '0'; }, 20000);
+      }
     };
   </script>
 

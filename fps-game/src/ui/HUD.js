@@ -8,6 +8,7 @@ export class HUD {
     this._hud           = document.getElementById('hud');
     this._healthBar     = document.getElementById('health-bar-inner');
     this._healthValue   = document.getElementById('health-value');
+    this._healthDanger  = document.getElementById('health-danger');
     this._staminaBar    = document.getElementById('stamina-bar-inner');
     this._staminaWrap   = document.getElementById('stamina-bar-wrap');
     this._ammoCurrent   = document.getElementById('ammo-current');
@@ -109,6 +110,14 @@ export class HUD {
         pct > 50 ? '#4caf50' : pct > 25 ? '#ff9800' : '#f44336';
     }
     if (this._healthValue) this._healthValue.textContent = Math.ceil(hp);
+    if (this._healthDanger) {
+      if (pct <= 20 && pct > 0) {
+        this._healthDanger.textContent = '⚠ 危险 — 按H急救';
+        this._healthDanger.style.display = 'block';
+      } else {
+        this._healthDanger.style.display = 'none';
+      }
+    }
   }
 
   /** Pass mag = -1 to show RELOADING */
@@ -116,7 +125,8 @@ export class HUD {
     if (this._weaponName)  this._weaponName.textContent  = name;
     if (this._ammoCurrent) {
       this._ammoCurrent.textContent = mag < 0 ? '↺' : mag;
-      this._ammoCurrent.style.color = mag === 0 ? '#f44336' : '#e0e0e0';
+      this._ammoCurrent.style.color = mag === 0 ? '#f44336' : mag <= 5 && mag > 0 ? '#ff9800' : '#e0e0e0';
+      this._ammoCurrent.classList.toggle('low', mag >= 0 && mag <= 5);
     }
     if (this._ammoReserve) this._ammoReserve.textContent = `/ ${reserve}`;
   }
