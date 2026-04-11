@@ -71,6 +71,7 @@ export class Enemy {
     this._alertTimer   = 0;
     this._shootTimer   = Math.random() * (isElite ? ELITE_SHOOT_INTERVAL : SHOOT_INTERVAL);
     this._prevState    = STATE.PATROL; // track state transitions for alert events
+    this._hasAlerted   = false;        // elite: only alert once per raid
 
     // Search state: remembered last seen player position
     this._lastKnownPos  = null;
@@ -154,8 +155,10 @@ export class Enemy {
     // ── Behaviour ───────────────────────────────────────────────────────────
     // Detect elite transitioning into combat for the first time this cycle
     const justEnteredCombat = this.isElite
+      && !this._hasAlerted
       && this._prevState !== STATE.COMBAT
       && this.state === STATE.COMBAT;
+    if (justEnteredCombat) this._hasAlerted = true;
     this._prevState = this.state;
 
     let shot = { shot: false };

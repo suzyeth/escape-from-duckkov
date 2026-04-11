@@ -17,7 +17,7 @@ export class DoorSystem {
   constructor(scene, collidables) {
     this._scene       = scene;
     this._collidables = collidables;
-    /** @type {Array<{mesh:THREE.Mesh, pivot:THREE.Group, pos:THREE.Vector3, isOpen:boolean, _curAngle:number, _targetAngle:number}>} */
+    /** @type {Array<{mesh:THREE.Mesh, pivot:THREE.Group, pos:THREE.Vector3, isOpen:boolean, hasCollision:boolean, _curAngle:number, _targetAngle:number}>} */
     this._doors = [];
   }
 
@@ -48,10 +48,11 @@ export class DoorSystem {
     const door = {
       mesh,
       pivot,
-      pos:          new THREE.Vector3(cx, 0, cz),
-      isOpen:       false,
-      _curAngle:    0,
-      _targetAngle: 0,
+      pos:            new THREE.Vector3(cx, 0, cz),
+      isOpen:         false,
+      hasCollision:   true,
+      _curAngle:      0,
+      _targetAngle:   0,
     };
 
     this._collidables.push(mesh);
@@ -80,10 +81,14 @@ export class DoorSystem {
 
       d.pivot.rotation.y = d._curAngle;
 
-      // Remove collision once door has swung past 45° (clear path for player)
-      const colIdx = this._collidables.indexOf(d.mesh);
-      if (d.isOpen && colIdx !== -1 && d._curAngle <= -(Math.PI / 4)) {
-        this._collidables.splice(colIdx, 1);
+      // Remove collision once door has swung past 45° open
+      if (d.isOpen && d.hasCollision && d._curAngle <= -(Math.PI / 4)) {
+        this._removeCollision(d);
+      }
+
+      // Restore collision once door has closed back to 0
+      if (!d.isOpen && !d.hasCollision && Math.abs(d._curAngle) < 0.05) {
+        this._addCollision(d);
       }
     }
 
@@ -107,12 +112,27 @@ export class DoorSystem {
   // ── Private ─────────────────────────────────────────────────────────────────
 
   _toggle(door) {
-    door.isOpen      = !door.isOpen;
+    door.isOpen       = !door.isOpen;
     door._targetAngle = door.isOpen ? -(Math.PI / 2) : 0;
 
-    // Restore collision immediately when starting to close
-    if (!door.isOpen && !this._collidables.includes(door.mesh)) {
+    // When starting to close, re-add collision immediately
+    if (!door.isOpen && !door.hasCollision) {
+      this._addCollision(door);
+    }
+  }
+
+  _removeCollision(door) {
+    if (!door.hasCollision) return;
+    const idx = this._collidables.indexOf(door.mesh);
+    if (idx !== -1) this._collidables.splice(idx, 1);
+    door.hasCollision = false;
+  }
+
+  _addCollision(door) {
+    if (door.hasCollision) return;
+    if (!this._collidables.includes(door.mesh)) {
       this._collidables.push(door.mesh);
     }
+    door.hasCollision = true;
   }
 }

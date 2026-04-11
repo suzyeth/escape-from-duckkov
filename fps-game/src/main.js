@@ -368,8 +368,10 @@ function handleHealing() {
       return;
     }
     const { def, instanceId } = result;
-    // Duration by item type
-    _healDuration   = def.id === 'medkit' ? 3.0 : def.id === 'painkillers' ? 2.5 : 1.8;
+    // Validate item still exists in inventory
+    if (!inventory.items.has(instanceId)) return;
+    // Duration by item type (must be > 0)
+    _healDuration   = Math.max(0.1, def.id === 'medkit' ? 3.0 : def.id === 'painkillers' ? 2.5 : 1.8);
     _healTimer      = _healDuration;
     _healAmount     = def.heals;
     _healInstanceId = instanceId;
@@ -540,6 +542,16 @@ stash.onSelect((loadout) => {
   _xp                = 0;
   _raidStart         = performance.now();
   _lootedThisSession = false;
+
+  // Reset combat state
+  _recoilOffset      = 0;
+  _shakeX            = 0;
+  _shakeZ            = 0;
+  _shakeDecay        = 0;
+  _hitstopTimer      = 0;
+  _healTimer         = 0;
+  _healInstanceId    = null;
+  _extractTimer      = 0;
   const xpEl = document.getElementById('xp-value');
   if (xpEl) xpEl.textContent = '0';
 
@@ -635,7 +647,7 @@ const loop = new GameLoop(
     // Healing channel tick (uses real dt)
     if (_healTimer > 0) {
       _healTimer = Math.max(0, _healTimer - dt);
-      hud.setHealChannel(1 - _healTimer / _healDuration);
+      hud.setHealChannel(Math.max(0, Math.min(1, 1 - _healTimer / _healDuration)));
       if (input.isDown('Mouse0')) {
         // Cancel on shoot
         _healTimer = 0;
@@ -643,8 +655,10 @@ const loop = new GameLoop(
         hud.setHealChannel(-1);
         hud.pushKillFeed('治疗中断');
       } else if (_healTimer <= 0) {
-        // Complete
-        inventory.useHealing(_healInstanceId);
+        // Complete — validate item still exists before consuming
+        if (inventory.items.has(_healInstanceId)) {
+          inventory.useHealing(_healInstanceId);
+        }
         health.heal(_healAmount);
         const wasBleeding = health.isBleeding;
         health.stopBleeding();
@@ -707,12 +721,12 @@ const loop = new GameLoop(
       if (!health.isAlive) _onPlayerDied();
     }
 
-    // Recoil + shake decay
-    _recoilOffset *= 0.82;
+    // Recoil + shake decay (frame-rate independent)
+    _recoilOffset *= Math.pow(0.82, dt * 60);
     if (_shakeDecay > 0.01) {
       _shakeX = (Math.random() - 0.5) * _shakeDecay * 0.8;
       _shakeZ = (Math.random() - 0.5) * _shakeDecay * 0.8;
-      _shakeDecay *= 0.85;
+      _shakeDecay *= Math.pow(0.85, dt * 60);
     } else {
       _shakeX = 0;
       _shakeZ = 0;

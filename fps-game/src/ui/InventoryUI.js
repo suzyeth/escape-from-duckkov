@@ -188,6 +188,12 @@ export class InventoryUI {
     // Clear preview highlights
     this._clearDropPreview();
 
+    // Always restore source element opacity first
+    if (this._dragSourceEl) {
+      try { this._dragSourceEl.style.opacity = '1'; } catch { /* element may be gone */ }
+      this._dragSourceEl = null;
+    }
+
     // Calculate target cell from mouse position
     const gridRect = this._grid.getBoundingClientRect();
     const col = Math.floor((e.clientX - gridRect.left) / this._CELL);
@@ -195,12 +201,6 @@ export class InventoryUI {
 
     const item = this._dragItem;
     this._dragItem = null;
-
-    // Restore source element opacity
-    if (this._dragSourceEl) {
-      this._dragSourceEl.style.opacity = '1';
-      this._dragSourceEl = null;
-    }
 
     // Check if drop is within grid
     if (row < 0 || col < 0 || row >= this._inv.rows || col >= this._inv.cols) {
