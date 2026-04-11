@@ -33,6 +33,7 @@ export class HUD {
     this._flashTimer    = 0;
     this._onTimerExpire = null;
     this._killCountEl   = document.getElementById('kill-count');
+    this._lowHpVignette = document.getElementById('low-health-vignette');
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -131,6 +132,12 @@ export class HUD {
       } else {
         this._healthDanger.style.display = 'none';
       }
+    }
+    // Low health vignette
+    if (this._lowHpVignette) {
+      const vigOpacity = pct <= 40 ? (1 - pct / 40) * 0.8 : 0;
+      this._lowHpVignette.style.setProperty('--vig-opacity', vigOpacity);
+      this._lowHpVignette.style.opacity = vigOpacity;
     }
   }
 

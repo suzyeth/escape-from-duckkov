@@ -56,6 +56,18 @@
       opacity: 0;
       transition: opacity .12s; pointer-events: none;
     }
+    /* persistent low-health vignette */
+    #low-health-vignette {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(180,0,0,0.5) 100%);
+      opacity: 0;
+      transition: opacity .5s; pointer-events: none;
+      animation: pulse-vignette 2s ease-in-out infinite;
+    }
+    @keyframes pulse-vignette {
+      0%, 100% { opacity: var(--vig-opacity, 0); }
+      50% { opacity: calc(var(--vig-opacity, 0) * 0.6); }
+    }
 
     /* Top-left: status */
     #status-display {
@@ -452,6 +464,7 @@
   <!-- ── HUD ────────────────────────────────────── -->
   <div id="hud">
     <div id="damage-flash"></div>
+    <div id="low-health-vignette"></div>
     <div id="tips-ticker"></div>
     <div id="tutorial-hint"></div>
 

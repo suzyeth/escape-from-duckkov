@@ -48,8 +48,58 @@ export class AISystem {
       }
       if (result.eliteAlert) eliteAlerted = true;
     }
+
+    // Wave respawn: check every frame, spawn new enemies periodically
+    this._respawnTimer = (this._respawnTimer ?? 0) + dt;
+    if (this._respawnTimer >= 90) { // every 90 seconds
+      this._respawnTimer = 0;
+      this._spawnWave(playerPos);
+    }
+
     return { shots, eliteAlerted };
   }
+
+  /**
+   * Spawn a small wave of enemies far from the player.
+   * @param {THREE.Vector3} playerPos
+   */
+  _spawnWave(playerPos) {
+    const SPAWN_POINTS = [
+      new THREE.Vector3(-60, 0, -60),
+      new THREE.Vector3( 60, 0, -60),
+      new THREE.Vector3(-60, 0,  60),
+      new THREE.Vector3( 60, 0,  60),
+      new THREE.Vector3(  0, 0, -70),
+      new THREE.Vector3(  0, 0,  70),
+    ];
+
+    // Pick 2-3 spawn points far from player
+    const farPoints = SPAWN_POINTS
+      .filter(p => p.distanceTo(playerPos) > 30)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 2 + Math.floor(Math.random() * 2));
+
+    let spawned = 0;
+    for (const pos of farPoints) {
+      // Small patrol around spawn
+      const wp = [
+        pos.clone(),
+        new THREE.Vector3(pos.x + 8, 0, pos.z),
+        new THREE.Vector3(pos.x + 8, 0, pos.z + 8),
+        new THREE.Vector3(pos.x, 0, pos.z + 8),
+      ];
+      // 15% chance of elite in wave
+      const isElite = Math.random() < 0.15;
+      const enemy = new Enemy(this._scene, pos, wp, isElite);
+      this.enemies.push(enemy);
+      spawned++;
+    }
+    if (spawned > 0) {
+      this._waveCount = (this._waveCount ?? 0) + 1;
+    }
+  }
+
+  get waveCount() { return this._waveCount ?? 0; }
 
   /**
    * Check if a hitscan ray (from player shoot) hits any alive enemy.
