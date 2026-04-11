@@ -200,32 +200,90 @@ export class Player {
     this.mesh.rotation.y = this._facingAngle;
   }
 
-  /** Build a simple capsule-like character from primitives */
+  /** Build detailed PMC operator model from primitives */
   _buildMesh() {
     const group = new THREE.Group();
 
-    // Body
-    const bodyGeo = new THREE.CylinderGeometry(0.44, 0.44, 1.1, 8);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3a5f3a }); // dark green
+    // Legs (two cylinders)
+    const legMat = new THREE.MeshLambertMaterial({ color: 0x2a3a2a });
+    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 6), legMat);
+    leftLeg.position.set(-0.15, -0.35, 0);
+    leftLeg.castShadow = true;
+    group.add(leftLeg);
+    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 6), legMat);
+    rightLeg.position.set(0.15, -0.35, 0);
+    rightLeg.castShadow = true;
+    group.add(rightLeg);
+
+    // Boots
+    const bootMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.24), bootMat);
+    leftBoot.position.set(-0.15, -0.62, 0.04);
+    group.add(leftBoot);
+    const rightBoot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.24), bootMat);
+    rightBoot.position.set(0.15, -0.62, 0.04);
+    group.add(rightBoot);
+
+    // Body (torso — tactical vest shape)
+    const bodyGeo = new THREE.BoxGeometry(0.52, 0.65, 0.35);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3a5a3a });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0;
+    body.position.y = 0.05;
     body.castShadow = true;
     group.add(body);
 
+    // Vest plate (front)
+    const plateMat = new THREE.MeshLambertMaterial({ color: 0x4a6a4a });
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.06), plateMat);
+    plate.position.set(0, 0.08, 0.2);
+    group.add(plate);
+
+    // Arms
+    const armMat = new THREE.MeshLambertMaterial({ color: 0x3a5a3a });
+    const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.5, 6), armMat);
+    leftArm.position.set(-0.34, 0.0, 0.08);
+    leftArm.rotation.x = 0.3;
+    leftArm.castShadow = true;
+    group.add(leftArm);
+    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.5, 6), armMat);
+    rightArm.position.set(0.34, 0.0, 0.08);
+    rightArm.rotation.x = 0.3;
+    rightArm.castShadow = true;
+    group.add(rightArm);
+
     // Head
-    const headGeo = new THREE.SphereGeometry(0.32, 8, 6);
-    const headMat = new THREE.MeshLambertMaterial({ color: 0xf5c87a }); // skin tone
+    const headGeo = new THREE.SphereGeometry(0.22, 8, 6);
+    const headMat = new THREE.MeshLambertMaterial({ color: 0xf5c87a });
     const head = new THREE.Mesh(headGeo, headMat);
-    head.position.y = 0.75;
+    head.position.y = 0.58;
     head.castShadow = true;
     group.add(head);
 
-    // Direction indicator (small box in front — shows facing direction)
-    const noseGeo = new THREE.BoxGeometry(0.14, 0.14, 0.36);
-    const noseMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    const nose = new THREE.Mesh(noseGeo, noseMat);
-    nose.position.set(0, 0.28, 0.52);
-    group.add(nose);
+    // Helmet
+    const helmetGeo = new THREE.SphereGeometry(0.25, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.6);
+    const helmetMat = new THREE.MeshLambertMaterial({ color: 0x3a4a3a });
+    const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+    helmet.position.y = 0.62;
+    helmet.castShadow = true;
+    group.add(helmet);
+
+    // Weapon (gun barrel pointing forward)
+    const gunMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+    const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.55), gunMat);
+    gunBody.position.set(0.18, 0.0, 0.42);
+    group.add(gunBody);
+    // Magazine
+    const magMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.18, 0.06), magMat);
+    mag.position.set(0.18, -0.08, 0.30);
+    group.add(mag);
+
+    // Backpack
+    const bpMat = new THREE.MeshLambertMaterial({ color: 0x4a5a3a });
+    const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.18), bpMat);
+    backpack.position.set(0, 0.05, -0.26);
+    backpack.castShadow = true;
+    group.add(backpack);
 
     return group;
   }

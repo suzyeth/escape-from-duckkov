@@ -475,50 +475,77 @@ export class Enemy {
 
   _buildMesh() {
     const g = new THREE.Group();
+    const elite = this.isElite;
 
-    // Body — elite enemies are darker/bulkier looking
-    const bGeo = new THREE.CylinderGeometry(
-      this.isElite ? 0.50 : 0.42,
-      this.isElite ? 0.50 : 0.42,
-      this.isElite ? 1.25 : 1.1,
-      8
-    );
-    const bMat = new THREE.MeshLambertMaterial({ color: this.isElite ? 0x3a0a0a : 0x7a1e1e });
-    const body = new THREE.Mesh(bGeo, bMat);
-    body.castShadow = true;
-    g.add(body);
+    // Legs
+    const legMat = new THREE.MeshLambertMaterial({ color: elite ? 0x2a1a1a : 0x4a3a2a });
+    const ll = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.12, 0.45, 6), legMat);
+    ll.position.set(-0.12, -0.32, 0); ll.castShadow = true; g.add(ll);
+    const rl = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.12, 0.45, 6), legMat);
+    rl.position.set(0.12, -0.32, 0); rl.castShadow = true; g.add(rl);
+
+    // Body
+    const bodyW = elite ? 0.55 : 0.46;
+    const bodyH = elite ? 0.70 : 0.58;
+    const bMat = new THREE.MeshLambertMaterial({ color: elite ? 0x3a0a0a : 0x7a3a1e });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, 0.30), bMat);
+    body.position.y = 0.05; body.castShadow = true; g.add(body);
+
+    // Vest/armor (elite only)
+    if (elite) {
+      const vestMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+      const vest = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.45, 0.08), vestMat);
+      vest.position.set(0, 0.08, 0.18); g.add(vest);
+    }
+
+    // Arms with weapon
+    const armMat = new THREE.MeshLambertMaterial({ color: elite ? 0x3a0a0a : 0x7a3a1e });
+    const la = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.42, 6), armMat);
+    la.position.set(-(bodyW/2 + 0.06), 0.0, 0.06); la.rotation.x = 0.4; la.castShadow = true; g.add(la);
+    const ra = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.42, 6), armMat);
+    ra.position.set(bodyW/2 + 0.06, 0.0, 0.06); ra.rotation.x = 0.4; ra.castShadow = true; g.add(ra);
+
+    // Weapon
+    const gunMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, elite ? 0.50 : 0.40), gunMat);
+    gun.position.set(bodyW/2 + 0.06, -0.05, 0.35); g.add(gun);
 
     // Head
-    const hGeo = new THREE.SphereGeometry(this.isElite ? 0.34 : 0.30, 8, 6);
-    const hMat = new THREE.MeshLambertMaterial({ color: this.isElite ? 0xcc9944 : 0xf0c060 });
-    const head = new THREE.Mesh(hGeo, hMat);
-    head.position.y = this.isElite ? 0.85 : 0.75;
-    head.castShadow = true;
-    g.add(head);
+    const headR = elite ? 0.26 : 0.22;
+    const hMat = new THREE.MeshLambertMaterial({ color: elite ? 0xcc9944 : 0xf0c060 });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 8, 6), hMat);
+    head.position.y = elite ? 0.68 : 0.58; head.castShadow = true; g.add(head);
 
-    // Facing dot (red for scav, gold for elite)
-    const nGeo = new THREE.BoxGeometry(0.12, 0.12, 0.30);
-    const nMat = new THREE.MeshLambertMaterial({ color: this.isElite ? 0xffcc00 : 0xff2020 });
-    const nose = new THREE.Mesh(nGeo, nMat);
-    nose.position.set(0, this.isElite ? 0.38 : 0.28, 0.50);
-    g.add(nose);
+    // Headgear
+    if (elite) {
+      // Beret
+      const beretMat = new THREE.MeshLambertMaterial({ color: 0x8a0000 });
+      const beret = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.5), beretMat);
+      beret.position.y = 0.74; g.add(beret);
+      // Shoulder badge
+      const badgeMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+      const badge = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.02), badgeMat);
+      badge.position.set(bodyW/2 + 0.01, 0.22, 0.16); g.add(badge);
+    } else {
+      // Bandana
+      const bandMat = new THREE.MeshLambertMaterial({ color: 0x6a4a2a });
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.08, 8), bandMat);
+      band.position.y = 0.54; g.add(band);
+    }
 
-    const barY = this.isElite ? 1.55 : 1.35;
-    const barW = this.isElite ? 1.3  : 1.0;
+    // Facing indicator (gun barrel glow)
+    const nMat = new THREE.MeshBasicMaterial({ color: elite ? 0xffcc00 : 0xff4020 });
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.08), nMat);
+    nose.position.set(bodyW/2 + 0.06, -0.05, elite ? 0.62 : 0.52); g.add(nose);
 
-    // HP bar background
-    const bgGeo = new THREE.BoxGeometry(barW, 0.09, 0.05);
-    const bgMat = new THREE.MeshBasicMaterial({ color: this.isElite ? 0x1a0000 : 0x220000 });
-    const bg    = new THREE.Mesh(bgGeo, bgMat);
-    bg.position.set(0, barY, 0);
-    g.add(bg);
-
-    // HP bar fill — gold for elite
-    const fGeo = new THREE.BoxGeometry(barW, 0.09, 0.06);
-    const fMat = new THREE.MeshBasicMaterial({ color: this.isElite ? 0xffaa00 : 0xff3333 });
-    this._hpBar = new THREE.Mesh(fGeo, fMat);
-    this._hpBar.position.set(0, barY, 0);
-    g.add(this._hpBar);
+    // HP bar
+    const barY = elite ? 1.35 : 1.15;
+    const barW = elite ? 1.2 : 0.9;
+    const bgMat = new THREE.MeshBasicMaterial({ color: elite ? 0x1a0000 : 0x220000 });
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(barW, 0.08, 0.04), bgMat)).position.set(0, barY, 0);
+    const fMat = new THREE.MeshBasicMaterial({ color: elite ? 0xffaa00 : 0xff3333 });
+    this._hpBar = new THREE.Mesh(new THREE.BoxGeometry(barW, 0.08, 0.05), fMat);
+    this._hpBar.position.set(0, barY, 0); g.add(this._hpBar);
 
     return g;
   }

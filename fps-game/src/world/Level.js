@@ -62,6 +62,9 @@ export class Level {
     this._buildBasementZone();
     this._buildExtractionPoints();
 
+    this._buildEnvironmentProps();
+    this._buildDustParticles();
+
     scene.background = new THREE.Color(0x7a9aaa);   // overcast sky blue-grey
     scene.fog        = new THREE.FogExp2(0x7a9aaa, 0.004); // lighter, less dense fog
   }
@@ -448,6 +451,101 @@ export class Level {
     this._scene.add(mesh);
     this.collidables.push(mesh);
     return mesh;
+  }
+
+  // ── Environment props ─────────────────────────────────────────────────────
+
+  _buildEnvironmentProps() {
+    // Street lamps
+    const lampPosts = [
+      [-15, -15], [15, -15], [-15, 15], [15, 15],
+      [0, -35], [0, 35], [-35, 0], [35, 0],
+    ];
+    for (const [x, z] of lampPosts) {
+      // Pole
+      const poleMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.10, 4.5, 6), poleMat);
+      pole.position.set(x, 2.25, z);
+      pole.castShadow = true;
+      this._scene.add(pole);
+      // Light fixture
+      const fixMat = new THREE.MeshBasicMaterial({ color: 0xffeeaa });
+      const fix = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.4), fixMat);
+      fix.position.set(x, 4.5, z);
+      this._scene.add(fix);
+      // Point light (warm, dim)
+      const light = new THREE.PointLight(0xffddaa, 0.6, 12);
+      light.position.set(x, 4.2, z);
+      this._scene.add(light);
+    }
+
+    // Oil barrels (scattered around zones)
+    const barrelPositions = [
+      [-30, -28], [-32, -28], [22, -36], [24, -36],
+      [-50, 34], [48, 28], [50, 28], [-8, 56],
+      [30, 52], [-20, -50], [55, -42],
+    ];
+    const barrelColors = [0x3a5a3a, 0x5a3a2a, 0x4a4a4a, 0x2a4a5a];
+    for (const [x, z] of barrelPositions) {
+      const color = barrelColors[Math.floor(Math.random() * barrelColors.length)];
+      const mat = new THREE.MeshLambertMaterial({ color });
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.9, 8), mat);
+      barrel.position.set(x, 0.45, z);
+      barrel.castShadow = true;
+      this._scene.add(barrel);
+      this.collidables.push(barrel);
+    }
+
+    // Sandbag walls (tactical cover)
+    const sandbagPositions = [
+      { x: -5, z: -28, w: 3, d: 0.8 },
+      { x: 5,  z: -28, w: 3, d: 0.8 },
+      { x: 25, z: 18,  w: 0.8, d: 3 },
+      { x: -25, z: 18, w: 0.8, d: 3 },
+    ];
+    const sbMat = new THREE.MeshLambertMaterial({ color: 0x8a7a5a });
+    for (const sb of sandbagPositions) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sb.w, 0.7, sb.d), sbMat);
+      mesh.position.set(sb.x, 0.35, sb.z);
+      mesh.castShadow = true;
+      this._scene.add(mesh);
+      this.collidables.push(mesh);
+    }
+
+    // Wire fences
+    const fenceMat = new THREE.MeshLambertMaterial({ color: 0x666666, wireframe: true });
+    const fencePositions = [
+      { x: -30, z: 20, w: 12, h: 2 },
+      { x: 30,  z: -20, w: 8, h: 2 },
+    ];
+    for (const f of fencePositions) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(f.w, f.h, 0.1), fenceMat);
+      mesh.position.set(f.x, f.h / 2, f.z);
+      this._scene.add(mesh);
+    }
+  }
+
+  // ── Floating dust particles ──────────────────────────────────────────────
+
+  _buildDustParticles() {
+    const COUNT = 200;
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(COUNT * 3);
+    for (let i = 0; i < COUNT; i++) {
+      positions[i * 3]     = (Math.random() - 0.5) * 140;
+      positions[i * 3 + 1] = Math.random() * 6 + 0.5;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 140;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0xccbbaa,
+      size: 0.08,
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+    });
+    this._dustParticles = new THREE.Points(geo, mat);
+    this._scene.add(this._dustParticles);
   }
 
   _makeTextSprite(text, color = '#fff') {
