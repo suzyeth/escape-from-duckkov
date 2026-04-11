@@ -285,8 +285,9 @@
     #inventory-panel {
       position: fixed; inset: 0; background: rgba(0,0,0,.82);
       display: none; align-items: center; justify-content: center;
-      z-index: 80; cursor: default;
+      z-index: 80; cursor: default !important;
     }
+    #inventory-panel * { cursor: default !important; }
     #inventory-box {
       background: #1a1a1a; border: 1px solid #333; padding: 1.2rem;
       border-radius: 4px; min-width: 480px;
@@ -314,6 +315,16 @@
       z-index: 1;
     }
     .inv-item:hover { filter: brightness(1.3); }
+    .inv-item .inv-actions { display: none; position: absolute; top: 2px; right: 2px; gap: 2px; z-index: 2; }
+    .inv-item:hover .inv-actions { display: flex; }
+    .inv-btn {
+      width: 16px; height: 16px; font-size: .5rem; line-height: 16px; text-align: center;
+      background: rgba(0,0,0,.7); border: 1px solid #555; border-radius: 2px;
+      color: #ccc; cursor: pointer !important; padding: 0;
+    }
+    .inv-btn:hover { background: rgba(200,169,110,.3); border-color: #c8a96e; color: #fff; }
+    .inv-btn-use { color: #4caf50; }
+    .inv-btn-drop { color: #f44336; }
     .inv-item-name  { font-size: .55rem; color: #ccc; line-height: 1.2; }
     .inv-item-count { font-size: .65rem; color: #aaa; align-self: flex-end; }
     .inv-item-value { font-size: .5rem;  color: #88aa55; align-self: flex-end; }

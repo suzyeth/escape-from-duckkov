@@ -36,6 +36,21 @@ export class InventoryUI {
       e.preventDefault();
       this._onContextAction(e);
     });
+
+    // Click on action buttons (use/drop)
+    this._grid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.inv-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      const itemEl = btn.closest('.inv-item');
+      if (!itemEl) return;
+      const instanceId = Number(itemEl.dataset.instanceId);
+      if (btn.dataset.action === 'use' && this._onUseItem) {
+        this._onUseItem(instanceId);
+      } else if (btn.dataset.action === 'drop' && this._onDropItem) {
+        this._onDropItem(instanceId);
+      }
+    });
   }
 
   /** Set callback for using an item (right-click). @param {(instanceId:number)=>void} fn */
@@ -51,11 +66,12 @@ export class InventoryUI {
   toggle() {
     this._visible = !this._visible;
     this._panel.style.display = this._visible ? 'flex' : 'none';
+    document.body.style.cursor = this._visible ? 'default' : 'none';
     if (this._visible) this.refresh();
   }
 
-  open()  { this._visible = true;  this._panel.style.display = 'flex';  this.refresh(); }
-  close() { this._visible = false; this._panel.style.display = 'none'; }
+  open()  { this._visible = true;  this._panel.style.display = 'flex';  document.body.style.cursor = 'default'; this.refresh(); }
+  close() { this._visible = false; this._panel.style.display = 'none'; document.body.style.cursor = 'none'; }
 
   /** Re-render after inventory changes */
   refresh() {
@@ -94,7 +110,13 @@ export class InventoryUI {
       el.style.background = item.def.color;
       el.style.cursor     = 'grab';
 
+      // Action buttons (visible on hover)
+      const actions = item.def.heals
+        ? `<div class="inv-actions"><button class="inv-btn inv-btn-use" data-action="use" title="使用">✚</button><button class="inv-btn inv-btn-drop" data-action="drop" title="丢弃">✕</button></div>`
+        : `<div class="inv-actions"><button class="inv-btn inv-btn-drop" data-action="drop" title="丢弃">✕</button></div>`;
+
       el.innerHTML =
+        actions +
         `<span class="inv-item-name">${item.def.name}</span>` +
         (item.def.stackable ? `<span class="inv-item-count">×${item.count}</span>` : '') +
         (item.def.value     ? `<span class="inv-item-value">¥${item.def.value}</span>` : '');
@@ -262,6 +284,8 @@ export class InventoryUI {
   }
 
   _startDrag(e) {
+    // Don't start drag from action buttons
+    if (e.target.closest('.inv-btn')) return;
     const itemEl = e.target.closest('.inv-item');
     if (!itemEl) return;
 
