@@ -185,7 +185,26 @@ export class Enemy {
     if (this.state === STATE.PATROL || this.state === STATE.ALERT) {
       this.state = STATE.COMBAT;
     }
+    // Hit flash — briefly go white
+    this._flashHit();
     if (this.health <= 0) this._die();
+  }
+
+  /** Flash all mesh materials white for a brief moment */
+  _flashHit() {
+    const origColors = [];
+    this.mesh.traverse(child => {
+      if (child.isMesh && child !== this._hpBar) {
+        origColors.push({ mesh: child, color: child.material.color.getHex() });
+        child.material = child.material.clone();
+        child.material.color.set(0xffffff);
+      }
+    });
+    setTimeout(() => {
+      for (const { mesh, color } of origColors) {
+        if (mesh.material) mesh.material.color.set(color);
+      }
+    }, 80);
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────

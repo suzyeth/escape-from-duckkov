@@ -90,6 +90,9 @@ let _healInstanceId = null; // which inventory item is being consumed
 // ── Recoil ────────────────────────────────────────────────────────────────────
 
 let _recoilOffset = 0;   // camera Y kick (world units), decays per frame
+let _shakeX       = 0;   // camera X shake
+let _shakeZ       = 0;   // camera Z shake
+let _shakeDecay   = 0;   // shake intensity multiplier
 
 // ── Raid stats tracking ───────────────────────────────────────────────────────
 
@@ -114,6 +117,11 @@ let _firedRecentlyTimer   = 0;
 
 // ── Ambient sound timer ───────────────────────────────────────────────────────
 let _ambientTimer = 18 + Math.random() * 15; // first distant shot in 18-33s
+let _hitstopTimer = 0; // brief time freeze on kills
+
+function _addScreenShake(intensity) {
+  _shakeDecay = Math.min(_shakeDecay + intensity, 1.5);
+}
 
 function _gainXP(amount, reason) {
   _xp += amount;
@@ -147,12 +155,19 @@ function handlePlayerShoot() {
   _playerFiredRecently  = true;
   _firedRecentlyTimer   = 1.5;
 
-  // Recoil kick
-  const recoilStr = { rifle: 0.18, pistol: 0.10, shotgun: 0.30, vss: 0.35, mp5: 0.08 };
+  // Recoil kick + screen shake
+  const recoilStr = { rifle: 0.22, pistol: 0.12, shotgun: 0.45, vss: 0.40, mp5: 0.10 };
+  const shakeStr  = { rifle: 0.25, pistol: 0.12, shotgun: 0.55, vss: 0.30, mp5: 0.15 };
   _recoilOffset += recoilStr[weapons.current.def.id] ?? 0.15;
+  _addScreenShake(shakeStr[weapons.current.def.id] ?? 0.2);
 
-  // Gunshot sound
+  // Gunshot sound + crosshair bloom
   sound.playShot(weapons.current.def.id);
+  const crosshair = document.getElementById('crosshair');
+  if (crosshair) {
+    crosshair.classList.add('shoot');
+    setTimeout(() => crosshair.classList.remove('shoot'), 80);
+  }
 
   const def      = weapons.current.def;
   const angle    = player.mesh.rotation.y;
@@ -181,12 +196,23 @@ function handlePlayerShoot() {
       bullets.spawnTracer(muzzlePos, hitEnemy.position, def.tracerColor);
       bullets.spawnHitEffect(hitEnemy.position);
       sound.playHitMarker();
+      // Crosshair hit flash
+      const ch = document.getElementById('crosshair');
+      if (ch) {
+        ch.classList.remove('shoot');
+        ch.classList.add('hit');
+        setTimeout(() => ch.classList.remove('hit'), 120);
+      }
       if (!hitEnemy.isAlive) {
         _killCount++;
         const label = hitEnemy.isElite ? '★精英鸭卒' : '鸭卒';
         const xpGain = hitEnemy.isElite ? XP_REWARDS.eliteKill : XP_REWARDS.kill;
         hud.pushKillFeed(`击毙${label} [${_killCount}]`);
         _gainXP(xpGain, label);
+        bullets.spawnKillEffect(hitEnemy.position);
+        sound.playKillConfirm();
+        _addScreenShake(hitEnemy.isElite ? 0.5 : 0.3);
+        _hitstopTimer = hitEnemy.isElite ? 0.08 : 0.05;
         loot.dropLoot(hitEnemy.position, _randomEnemyDrop(hitEnemy.isElite));
       }
     } else {
@@ -256,6 +282,7 @@ function handleEnemyShots(shots) {
         player.speedMultiplier = health.speedMultiplier;
         hud.showDamageFlash();
         sound.playDamaged();
+        _addScreenShake(0.6);
         hud.pushKillFeed(`中弹！(${_partLabel(partHit)})`);
 
         if (!health.isAlive) _onPlayerDied();
@@ -561,6 +588,13 @@ const loop = new GameLoop(
   (dt) => {
     if (!gameStarted) return;
 
+    // Hitstop — brief freeze on kills
+    if (_hitstopTimer > 0) {
+      _hitstopTimer -= dt;
+      // Still render but skip game logic
+      return;
+    }
+
     // Inventory toggle (Tab)
     if (input.justPressed('Tab')) invUI.toggle();
 
@@ -673,8 +707,17 @@ const loop = new GameLoop(
       if (!health.isAlive) _onPlayerDied();
     }
 
-    // Recoil decay
+    // Recoil + shake decay
     _recoilOffset *= 0.82;
+    if (_shakeDecay > 0.01) {
+      _shakeX = (Math.random() - 0.5) * _shakeDecay * 0.8;
+      _shakeZ = (Math.random() - 0.5) * _shakeDecay * 0.8;
+      _shakeDecay *= 0.85;
+    } else {
+      _shakeX = 0;
+      _shakeZ = 0;
+      _shakeDecay = 0;
+    }
 
     // Roof-reveal: hide roof of building player is currently inside
     level.updateRoofs(player.position);
@@ -689,10 +732,12 @@ const loop = new GameLoop(
       loot.containers,
     );
 
-    // Camera follow + recoil
+    // Camera follow + recoil + shake
     const target = player.position.clone().add(CAM_OFFSET);
+    target.x += _shakeX;
     target.y += _recoilOffset;
-    camera.position.lerp(target, 0.1);
+    target.z += _shakeZ;
+    camera.position.lerp(target, 0.12);
     camera.lookAt(player.position);
 
     // HUD

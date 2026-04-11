@@ -60,6 +60,8 @@ export class SoundSystem {
       rifle:   { cutoff: 1800, vol: 0.70, decay: 0.18 },
       pistol:  { cutoff: 2400, vol: 0.55, decay: 0.13 },
       shotgun: { cutoff:  900, vol: 0.95, decay: 0.32 },
+      vss:     { cutoff: 1200, vol: 0.40, decay: 0.25 },  // suppressed — quiet, longer tail
+      mp5:     { cutoff: 2200, vol: 0.60, decay: 0.10 },  // fast, snappy
     }[weaponId] ?? { cutoff: 1800, vol: 0.7, decay: 0.18 };
 
     const src = this._noiseSource(0.5);
@@ -128,18 +130,65 @@ export class SoundSystem {
     const ctx = this._ctx;
     const now = ctx.currentTime;
 
-    const osc = ctx.createOscillator();
-    osc.type  = 'sine';
-    osc.frequency.value = 1400;
+    // Double tone — punchy metallic ding
+    const osc1 = ctx.createOscillator();
+    osc1.type  = 'sine';
+    osc1.frequency.value = 1600;
+    const osc2 = ctx.createOscillator();
+    osc2.type  = 'sine';
+    osc2.frequency.value = 2200;
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.12, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
 
-    osc.connect(gain);
+    osc1.connect(gain);
+    osc2.connect(gain);
     gain.connect(this._master);
-    osc.start(now);
-    osc.stop(now + 0.08);
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + 0.11);
+    osc2.stop(now + 0.11);
+  }
+
+  /**
+   * Satisfying kill confirm — descending two-note chime.
+   */
+  playKillConfirm() {
+    if (!this._ready) return;
+    const ctx = this._ctx;
+    const now = ctx.currentTime;
+
+    // Note 1 — high
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.value = 1800;
+    const g1 = ctx.createGain();
+    g1.gain.setValueAtTime(0.22, now);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc1.connect(g1); g1.connect(this._master);
+    osc1.start(now); osc1.stop(now + 0.16);
+
+    // Note 2 — lower, delayed
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.value = 1200;
+    const g2 = ctx.createGain();
+    g2.gain.setValueAtTime(0.18, now + 0.08);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+    osc2.connect(g2); g2.connect(this._master);
+    osc2.start(now + 0.08); osc2.stop(now + 0.30);
+
+    // Low thud
+    const src = this._noiseSource(0.2);
+    const lpf = ctx.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = 200;
+    const g3 = ctx.createGain();
+    g3.gain.setValueAtTime(0.35, now);
+    g3.gain.exponentialRampToValueAtTime(0.001, now + 0.20);
+    src.connect(lpf); lpf.connect(g3); g3.connect(this._master);
+    src.start(now); src.stop(now + 0.22);
   }
 
   /**
