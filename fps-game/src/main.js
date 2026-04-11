@@ -382,7 +382,16 @@ function handleLootPickup(dt) {
 // ── Healing (H key) ───────────────────────────────────────────────────────────
 
 function handleHealing() {
-  // Block H press during active channel (cancel handled in game loop tick)
+  // H during active heal = cancel
+  if (_healTimer > 0 && input.justPressed('KeyH')) {
+    _healTimer = 0;
+    player.isHealing = false;
+    hud.setHealChannel(-1);
+    hud.pushKillFeed('治疗中断');
+    return;
+  }
+
+  // Block H press during active channel
   if (_healTimer > 0) {
     return;
   }
@@ -629,7 +638,7 @@ const loop = new GameLoop(
     // Hitstop — brief freeze on kills
     if (_hitstopTimer > 0) {
       _hitstopTimer -= dt;
-      // Still render but skip game logic
+      input.endFrame(); // consume input to prevent stuck justPressed
       return;
     }
 

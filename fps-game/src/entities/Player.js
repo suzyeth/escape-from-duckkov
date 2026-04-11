@@ -149,7 +149,7 @@ export class Player {
     const baseSpeed = this._isCrouching ? CROUCH_SPEED
                     : this._isSprinting ? SPRINT_SPEED
                     : MOVE_SPEED;
-    const healPenalty = this.isHealing ? 0.45 : 1.0;
+    const healPenalty = this.isHealing ? 0.70 : 1.0;
     const speed = baseSpeed * this.speedMultiplier * healPenalty;
 
     this._moveDir.set(0, 0, 0);
