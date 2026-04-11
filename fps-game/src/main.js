@@ -649,8 +649,11 @@ const loop = new GameLoop(
     if (_healTimer > 0) {
       _healTimer = Math.max(0, _healTimer - dt);
       hud.setHealChannel(Math.max(0, Math.min(1, 1 - _healTimer / _healDuration)));
-      if (input.isDown('Mouse0')) {
-        // Cancel on shoot
+      const wantsCancel = input.isDown('Mouse0')
+        || input.isDown('KeyW') || input.isDown('KeyS')
+        || input.isDown('KeyA') || input.isDown('KeyD');
+      if (wantsCancel) {
+        // Cancel on shoot or move
         _healTimer = 0;
         player.isHealing = false;
         hud.setHealChannel(-1);
@@ -670,6 +673,12 @@ const loop = new GameLoop(
         if (invUI.isOpen) invUI.refresh();
         hud.pushKillFeed(wasBleeding ? `治疗完成 +${_healAmount}HP (已止血)` : `治疗完成 +${_healAmount}HP`);
       }
+    }
+
+    // Safety: ensure isHealing is reset if timer expired
+    if (player.isHealing && _healTimer <= 0) {
+      player.isHealing = false;
+      hud.setHealChannel(-1);
     }
 
     // Healing input
