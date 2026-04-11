@@ -278,7 +278,7 @@ function handleEnemyShots(shots) {
         // Route damage through HealthSystem (random body part)
         const partHit = health.takeDamage(shot.damage);
         // Sync simplified health to player for HUD bar
-        player.health    = health.isAlive ? Math.round(health.totalHp / health.totalMaxHp * player.maxHealth) : 0;
+        player.health    = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
         player.speedMultiplier = health.speedMultiplier;
         hud.showDamageFlash();
         sound.playDamaged();
@@ -648,7 +648,7 @@ const loop = new GameLoop(
         health.heal(_healAmount);
         const wasBleeding = health.isBleeding;
         health.stopBleeding();
-        player.health          = health.isAlive ? Math.round(health.totalHp / health.totalMaxHp * player.maxHealth) : 0;
+        player.health          = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
         player.speedMultiplier = health.speedMultiplier;
         player.isHealing       = false;
         hud.setHealChannel(-1);
@@ -702,7 +702,7 @@ const loop = new GameLoop(
     // Bleeding DOT
     if (health.isBleeding && health.isAlive) {
       health.tickBleeding(dt);
-      player.health          = health.isAlive ? Math.round(health.totalHp / health.totalMaxHp * player.maxHealth) : 0;
+      player.health          = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
       player.speedMultiplier = health.speedMultiplier;
       if (!health.isAlive) _onPlayerDied();
     }

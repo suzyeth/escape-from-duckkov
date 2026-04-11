@@ -102,7 +102,7 @@ export class HealthSystem {
     this._armorHeadOnly = def.headOnly ?? false;
   }
 
-  /** Aggregate HP across all parts (for HUD health bar). */
+  /** Aggregate HP across all parts. */
   get totalHp() {
     return Object.values(this._hp).reduce((s, v) => s + v, 0);
   }
@@ -110,6 +110,19 @@ export class HealthSystem {
   /** Sum of all part max HP */
   get totalMaxHp() {
     return Object.values(PART_DEFS).reduce((s, d) => s + d.maxHp, 0);
+  }
+
+  /**
+   * Effective HP fraction for the main health bar (0–1).
+   * Uses the LOWER of: overall HP% or critical part (torso/head) HP%.
+   * This way the bar always reflects how close you are to actual death.
+   */
+  get effectiveHpFraction() {
+    const overallPct = this.totalHp / this.totalMaxHp;
+    const torsoPct   = this._hp[PART.TORSO] / PART_DEFS[PART.TORSO].maxHp;
+    const headPct    = this._hp[PART.HEAD]  / PART_DEFS[PART.HEAD].maxHp;
+    const critPct    = Math.min(torsoPct, headPct);
+    return Math.min(overallPct, critPct);
   }
 
   /**
@@ -184,15 +197,33 @@ export class HealthSystem {
   }
 
   /**
-   * Apply bleed damage (2 HP/s to torso). Call every frame while alive.
+   * Apply bleed damage (2 HP/s distributed across body). Call every frame while alive.
+   * Damage is split: 50% torso, 50% spread to alive limbs.
    * @param {number} dt
    * @returns {number} damage dealt this tick (0 if not bleeding)
    */
   tickBleeding(dt) {
     if (!this._bleeding) return 0;
-    const dmg = 2.0 * dt;
-    this._hp[PART.TORSO] = Math.max(0, this._hp[PART.TORSO] - dmg);
-    return dmg;
+    const totalDmg = 2.0 * dt;
+
+    // 50% to torso
+    const torsoDmg = totalDmg * 0.5;
+    this._hp[PART.TORSO] = Math.max(0, this._hp[PART.TORSO] - torsoDmg);
+
+    // 50% spread to limbs that still have HP
+    const limbs = [PART.LEFT_ARM, PART.RIGHT_ARM, PART.LEFT_LEG, PART.RIGHT_LEG];
+    const aliveLimbs = limbs.filter(p => this._hp[p] > 0);
+    if (aliveLimbs.length > 0) {
+      const limbDmg = (totalDmg * 0.5) / aliveLimbs.length;
+      for (const p of aliveLimbs) {
+        this._hp[p] = Math.max(0, this._hp[p] - limbDmg);
+      }
+    } else {
+      // All limbs dead, extra damage goes to torso
+      this._hp[PART.TORSO] = Math.max(0, this._hp[PART.TORSO] - totalDmg * 0.5);
+    }
+
+    return totalDmg;
   }
 
   /** Stop the bleed (called by bandage / medkit use). */
