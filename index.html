@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>逃离鸭科夫</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; overflow: hidden; font-family: 'Courier New', monospace; cursor: none; }
+    #canvas-container { width: 100vw; height: 100vh; }
+
+    /* ── Crosshair ─────────────────────────────────── */
+    #crosshair {
+      position: fixed; width: 18px; height: 18px;
+      pointer-events: none; transform: translate(-50%, -50%); z-index: 200;
+    }
+    #crosshair::before, #crosshair::after {
+      content: ''; position: absolute; background: rgba(255,255,255,0.85);
+      transition: background 0.05s;
+    }
+    #crosshair::before { width: 1px; height: 100%; left: 50%; transform: translateX(-50%); }
+    #crosshair::after  { height: 1px; width: 100%; top: 50%;  transform: translateY(-50%); }
+    #crosshair.hit::before, #crosshair.hit::after { background: #ff3333; }
+    #crosshair.hit { transform: translate(-50%, -50%) scale(1.6); }
+    #crosshair.shoot { transform: translate(-50%, -50%) scale(1.3); }
+
+    /* ── Start screen ──────────────────────────────── */
+    #start-screen {
+      position: fixed; inset: 0; background: rgba(0,0,0,.88);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #c8a96e; z-index: 100;
+    }
+    #start-screen h1 { font-size: 3rem; letter-spacing: .25em; text-transform: uppercase; margin-bottom: .4rem; text-shadow: 0 0 24px #c8a96e55; }
+    #start-screen p  { font-size: .9rem; color: #666; margin-bottom: 1.6rem; letter-spacing: .1em; }
+    #start-controls  { font-size: .72rem; color: #555; margin-bottom: 2rem; line-height: 1.9; text-align: center; letter-spacing: .08em; }
+    #raid-stats {
+      font-size: .72rem; color: #888; margin-bottom: 1.6rem; line-height: 2.0;
+      text-align: center; letter-spacing: .08em; display: none;
+      border: 1px solid #333; padding: .8rem 2rem; border-radius: 4px;
+    }
+    #raid-stats span { color: #c8a96e; }
+    #start-btn {
+      padding: .72rem 2.6rem; font-size: 1rem; font-family: inherit;
+      letter-spacing: .2em; text-transform: uppercase;
+      background: transparent; border: 1px solid #c8a96e; color: #c8a96e;
+      cursor: pointer; transition: background .2s;
+    }
+    #start-btn:hover { background: #c8a96e22; }
+
+    /* ── HUD shell ─────────────────────────────────── */
+    #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
+
+    /* damage flash overlay — vignette style */
+    #damage-flash {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.8) 100%);
+      opacity: 0;
+      transition: opacity .12s; pointer-events: none;
+    }
+    /* persistent low-health vignette */
+    #low-health-vignette {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(180,0,0,0.5) 100%);
+      opacity: 0;
+      transition: opacity .5s; pointer-events: none;
+      animation: pulse-vignette 2s ease-in-out infinite;
+    }
+    @keyframes pulse-vignette {
+      0%, 100% { opacity: var(--vig-opacity, 0); }
+      50% { opacity: calc(var(--vig-opacity, 0) * 0.6); }
+    }
+
+    /* Top-left: status */
+    #status-display {
+      position: absolute; top: 1.4rem; left: 2rem;
+      font-size: .68rem; color: #555; letter-spacing: .1em; text-transform: uppercase;
+    }
+
+    /* XP display */
+    #xp-display {
+      position: absolute; top: 3.4rem; left: 2rem;
+      font-size: .62rem; color: #c8a96e; letter-spacing: .1em;
+    }
+    #xp-value { font-size: 1rem; display: block; margin-top: .1rem; }
+
+    /* XP popup */
+    .xp-popup {
+      position: fixed; pointer-events: none; z-index: 300;
+      font-size: 1rem; font-weight: bold; color: #ffd700;
+      text-shadow: 0 0 8px rgba(255,215,0,0.5);
+      animation: xpFloat 1.2s ease-out forwards;
+    }
+    @keyframes xpFloat {
+      0%   { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-40px); }
+    }
+
+    /* Top-right: timer */
+    #timer-display {
+      position: absolute; top: 1.4rem; right: 2rem; text-align: right;
+      font-size: .68rem; color: #666; letter-spacing: .15em;
+    }
+    #timer-value { display: block; font-size: 1.45rem; color: #c8a96e; margin-top: .1rem; }
+
+    /* Bottom-left: health + stamina */
+    #health-display { position: absolute; bottom: 2rem; left: 2rem; color: #e0e0e0; }
+    #health-label { font-size: .62rem; letter-spacing: .15em; color: #666; text-transform: uppercase; margin-bottom: .3rem; }
+    #health-bar-outer { width: 150px; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
+    #health-bar-inner { height: 100%; width: 100%; background: #4caf50; border-radius: 3px; transition: width .25s, background .25s; }
+    #health-value { font-size: 1.3rem; margin-top: .3rem; }
+    #health-danger { font-size: .55rem; color: #f44336; margin-top: .15rem; display: none; animation: bleed-pulse .9s ease-in-out infinite; }
+
+    /* Stamina bar (hidden when full) */
+    #stamina-bar-wrap { width: 150px; margin-top: .4rem; display: none; }
+    #stamina-bar-label { font-size: .55rem; letter-spacing: .15em; color: #44aaff; text-transform: uppercase; margin-bottom: .2rem; }
+    #stamina-bar-outer { height: 3px; background: #111; border-radius: 2px; overflow: hidden; }
+    #stamina-bar-inner { height: 100%; width: 100%; background: #44aaff; border-radius: 2px; transition: width .1s, background .2s; }
+
+    /* Armor bar (hidden when no armor) */
+    #armor-bar-wrap { width: 150px; margin-top: .4rem; display: none; }
+    #armor-bar-label { font-size: .55rem; letter-spacing: .15em; color: #88ccaa; text-transform: uppercase; margin-bottom: .2rem; }
+    #armor-bar-outer { height: 3px; background: #111; border-radius: 2px; overflow: hidden; }
+    #armor-bar-inner { height: 100%; width: 100%; background: #66bb88; border-radius: 2px; transition: width .15s, background .2s; }
+
+    /* Heal channel progress (shown while using medical item) */
+    #heal-channel-wrap {
+      position: absolute; bottom: 28%; left: 50%; transform: translateX(-50%);
+      width: 180px; display: none;
+    }
+    #heal-channel-label { font-size: .62rem; color: #cc4444; letter-spacing: .15em; text-align: center; margin-bottom: .3rem; }
+    #heal-channel-outer { height: 5px; background: #1a0a0a; border-radius: 3px; overflow: hidden; }
+    #heal-channel-inner { height: 100%; width: 0%; background: #cc4444; border-radius: 3px; transition: width .08s; }
+
+    /* Weapon slot bar — above weapon display */
+    #weapon-slots {
+      position: absolute; bottom: 8.4rem; right: 2rem;
+      display: flex; gap: .35rem; justify-content: flex-end;
+    }
+    .wslot {
+      width: 28px; height: 28px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: .65rem; letter-spacing: .06em;
+      border: 1px solid #333; color: #444; border-radius: 2px;
+      transition: border-color .15s, color .15s, background .15s;
+    }
+    .wslot.active {
+      border-color: #c8a96e; color: #c8a96e;
+      background: rgba(200,169,110,0.10);
+    }
+    .wslot-key   { font-size: .55rem; color: #555; }
+    .wslot.active .wslot-key { color: #9a7a4e; }
+
+    /* Bottom-right: weapon + ammo */
+    #weapon-display { position: absolute; bottom: 2rem; right: 2rem; text-align: right; color: #e0e0e0; }
+    #weapon-name    { font-size: .7rem; color: #888; letter-spacing: .12em; margin-bottom: .2rem; text-transform: uppercase; }
+    #ammo-current   { font-size: 2.5rem; font-weight: bold; line-height: 1; transition: color .15s; }
+    #ammo-current.low { animation: ammo-blink .6s ease-in-out infinite; }
+    @keyframes ammo-blink { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+    #ammo-reserve   { font-size: .85rem; color: #666; margin-top: .1rem; }
+
+    /* Centre-bottom: pickup hint */
+    #pickup-hint {
+      position: absolute; bottom: 28%; left: 50%; transform: translateX(-50%);
+      font-size: .78rem; color: #c8a96e; letter-spacing: .15em;
+      background: rgba(0,0,0,.5); padding: .3rem .8rem; border-radius: 3px; display: none;
+    }
+
+    /* Bottom-center: key hints bar (fades out after 15s) */
+    #key-hints {
+      position: absolute; bottom: .8rem; left: 50%; transform: translateX(-50%);
+      font-size: .58rem; color: #555; letter-spacing: .08em;
+      background: rgba(0,0,0,.35); padding: .25rem 1rem; border-radius: 3px;
+      transition: opacity 2s;
+    }
+    #key-hints .kh-key {
+      color: #888; border: 1px solid #444; border-radius: 2px;
+      padding: 0 3px; margin: 0 1px; font-size: .55rem;
+    }
+
+    /* Centre: extraction progress bar */
+    #extract-bar-wrap {
+      position: absolute; bottom: 24%; left: 50%; transform: translateX(-50%);
+      width: 200px; display: none;
+    }
+    #extract-bar-label { font-size: .65rem; color: #00ff80; letter-spacing: .15em; text-align: center; margin-bottom: .3rem; }
+    #extract-bar-outer { height: 6px; background: #1a3a1a; border-radius: 3px; overflow: hidden; }
+    #extract-bar-inner { height: 100%; width: 0%; background: #00ff80; border-radius: 3px; transition: width .1s; }
+
+    /* Kill feed — pushed below minimap (minimap is 140px + label ~16px + top 1.4rem≈22px) */
+    #kill-feed { position: absolute; top: 11rem; right: 2rem; text-align: right; font-size: .75rem; color: #e05050; }
+
+    /* ── Bleeding indicator ─────────────────── */
+    #bleed-indicator {
+      position: absolute; bottom: 5.5rem; left: 2rem;
+      font-size: .65rem; color: #ff3333; letter-spacing: .12em;
+      display: none; animation: bleed-pulse 0.9s ease-in-out infinite;
+    }
+    @keyframes bleed-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Minimap ────────────────────────────── */
+    #minimap-wrap {
+      position: absolute; top: 1.4rem; right: 2rem;
+      border: 1px solid rgba(200,169,110,0.3); border-radius: 2px;
+    }
+    #minimap-canvas { display: block; width: 140px; height: 140px; }
+    #minimap-label {
+      text-align: center; font-size: .52rem; color: #555;
+      letter-spacing: .12em; padding: 2px 0; background: rgba(0,0,0,0.6);
+    }
+
+    /* ── Tips ticker — rolling hints at top center ─────── */
+    #tips-ticker {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.65); border-bottom: 1px solid rgba(200,169,110,0.25);
+      padding: .22rem 1.4rem; font-size: .62rem; color: #888;
+      letter-spacing: .12em; white-space: nowrap; pointer-events: none;
+      display: flex; align-items: center; gap: .6rem;
+    }
+    #tips-ticker .tip-key { color: #c8a96e; }
+
+    /* ── Tutorial hint banner ─────────────────────── */
+    #tutorial-hint {
+      position: absolute; top: 1.6rem; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,.75); border: 1px solid #c8a96e; border-radius: 4px;
+      padding: .4rem 1.2rem; font-size: .82rem; color: #c8a96e;
+      letter-spacing: .08em; white-space: nowrap; display: none;
+      pointer-events: none;
+    }
+
+    /* ── Body parts panel ─────────────────────────── */
+    #body-parts {
+      position: absolute; top: 4.5rem; left: 2rem;
+      font-size: .62rem; color: #888; width: 120px;
+    }
+    .bp-row { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
+    .bp-label { width: 26px; color: #666; text-align: right; flex-shrink: 0; }
+    .bp-bar-outer { flex: 1; height: 4px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+    .bp-bar-inner { height: 100%; border-radius: 2px; transition: width .2s, background .2s; }
+    .bp-val { width: 20px; color: #555; text-align: right; flex-shrink: 0; }
+
+    /* ── Rules screen ────────────────────────────── */
+    #rules-screen {
+      position: fixed; inset: 0; background: rgba(0,0,0,.94);
+      display: none; flex-direction: column; align-items: center; justify-content: flex-start;
+      color: #c8a96e; z-index: 110; overflow-y: auto; padding: 3rem 2rem 3rem;
+    }
+    #rules-screen h2 { font-size: 1.6rem; letter-spacing: .25em; text-transform: uppercase; margin-bottom: 2rem; border-bottom: 1px solid #333; padding-bottom: .8rem; width: 100%; max-width: 700px; text-align: center; }
+    .rules-section { width: 100%; max-width: 700px; margin-bottom: 1.6rem; }
+    .rules-section h3 { font-size: .85rem; letter-spacing: .2em; text-transform: uppercase; color: #c8a96e; margin-bottom: .7rem; border-left: 2px solid #c8a96e; padding-left: .6rem; }
+    .rules-table { width: 100%; border-collapse: collapse; font-size: .72rem; }
+    .rules-table tr { border-bottom: 1px solid #1e1e1e; }
+    .rules-table tr:last-child { border-bottom: none; }
+    .rules-table td { padding: .35rem .5rem; color: #888; line-height: 1.6; }
+    .rules-table td:first-child { color: #c8a96e; width: 160px; font-family: 'Courier New', monospace; white-space: nowrap; }
+    .rules-desc { font-size: .72rem; color: #666; line-height: 1.7; margin-top: .4rem; }
+    #rules-close-btn {
+      margin-top: 2rem; padding: .6rem 2.4rem; font-size: .8rem; font-family: inherit;
+      letter-spacing: .2em; text-transform: uppercase;
+      background: transparent; border: 1px solid #c8a96e; color: #c8a96e;
+      cursor: pointer; transition: background .2s; border-radius: 2px;
+    }
+    #rules-close-btn:hover { background: #c8a96e22; }
+
+    /* ── Stash screen ─────────────────────────────── */
+    #stash-screen {
+      position: fixed; inset: 0; background: rgba(0,0,0,.92);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      color: #c8a96e; z-index: 100;
+    }
+    .stash-header { text-align: center; margin-bottom: 2rem; }
+    .stash-header h2 { font-size: 1.8rem; letter-spacing: .2em; text-transform: uppercase; margin-bottom: .4rem; }
+    .stash-header p  { font-size: .8rem; color: #555; letter-spacing: .1em; }
+    .stash-grid { display: flex; gap: 1.4rem; }
+    .stash-card {
+      background: #111; border: 1px solid #333; border-radius: 4px;
+      padding: 1.4rem 1.2rem; width: 200px; cursor: default;
+      display: flex; flex-direction: column; gap: .5rem;
+      transition: border-color .2s;
+    }
+    .stash-card:hover { border-color: #c8a96e; }
+    .stash-card-name { font-size: 1.1rem; letter-spacing: .15em; text-transform: uppercase; color: #c8a96e; }
+    .stash-card-sub  { font-size: .68rem; color: #888; letter-spacing: .1em; }
+    .stash-card-desc { font-size: .7rem; color: #555; line-height: 1.5; margin: .3rem 0; }
+    .stash-card-items { font-size: .68rem; color: #666; padding-left: 1rem; margin: 0; }
+    .stash-card-items li { margin-bottom: 2px; }
+    .stash-select-btn {
+      margin-top: auto; padding: .5rem 0; font-size: .75rem; font-family: inherit;
+      letter-spacing: .18em; text-transform: uppercase;
+      background: transparent; border: 1px solid #c8a96e66; color: #c8a96e;
+      cursor: pointer; border-radius: 3px; transition: background .2s, border-color .2s;
+    }
+    .stash-select-btn:hover { background: #c8a96e22; border-color: #c8a96e; }
+
+    /* ── Inventory panel ───────────────────────────── */
+    #inventory-panel {
+      position: fixed; inset: 0; background: rgba(0,0,0,.82);
+      display: none; align-items: center; justify-content: center;
+      z-index: 80; cursor: default !important;
+    }
+    #inventory-panel * { cursor: default !important; }
+    #inventory-box {
+      background: #1a1a1a; border: 1px solid #333; padding: 1.2rem;
+      border-radius: 4px; min-width: 480px;
+    }
+    #inventory-title {
+      font-size: .75rem; letter-spacing: .2em; color: #888; text-transform: uppercase;
+      margin-bottom: .8rem; display: flex; justify-content: space-between; align-items: center;
+    }
+    #inventory-title span { color: #555; }
+    #inv-weight { font-size: .65rem; color: #888; letter-spacing: .1em; }
+    #inv-weight.heavy { color: #ff9800; }
+    #inv-weight.overloaded { color: #f44336; }
+    #inventory-grid {
+      position: relative; gap: 2px;
+    }
+    .inv-cell {
+      background: #222; border: 1px solid #2a2a2a; border-radius: 2px;
+      width: 46px; height: 46px;
+    }
+    .inv-item {
+      background: #3a5a3a; border: 1px solid #4a7a4a; border-radius: 2px;
+      padding: 2px 4px; cursor: grab; display: flex; flex-direction: column;
+      justify-content: space-between; overflow: hidden;
+      transition: filter .15s;
+      z-index: 1;
+    }
+    .inv-item:hover { filter: brightness(1.3); }
+    .inv-item .inv-actions { display: none; position: absolute; top: 2px; right: 2px; gap: 2px; z-index: 2; }
+    .inv-item:hover .inv-actions { display: flex; }
+    .inv-btn {
+      width: 16px; height: 16px; font-size: .5rem; line-height: 16px; text-align: center;
+      background: rgba(0,0,0,.7); border: 1px solid #555; border-radius: 2px;
+      color: #ccc; cursor: pointer !important; padding: 0;
+    }
+    .inv-btn:hover { background: rgba(200,169,110,.3); border-color: #c8a96e; color: #fff; }
+    .inv-btn-use { color: #4caf50; }
+    .inv-btn-drop { color: #f44336; }
+    .inv-item-name  { font-size: .55rem; color: #ccc; line-height: 1.2; }
+    .inv-item-count { font-size: .65rem; color: #aaa; align-self: flex-end; }
+    .inv-item-value { font-size: .5rem;  color: #88aa55; align-self: flex-end; }
+
+    /* Drag & Drop */
+    .inv-drop-target {
+      background: #3a5a3a !important;
+      border-color: #6a9a6a !important;
+    }
+    .inv-drag-ghost .inv-item-name {
+      font-size: .55rem; color: #ccc; line-height: 1.2;
+    }
+
+    /* Tooltip */
+    #inv-tooltip {
+      position: fixed; background: #111; border: 1px solid #444; border-radius: 3px;
+      padding: .4rem .7rem; font-size: .72rem; color: #ccc;
+      pointer-events: none; display: none; z-index: 90; white-space: nowrap;
+    }
+  </style>
+  <script type="module" crossorigin src="/escape-from-duckkov/assets/index-D3AXah5m.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="crosshair"></div>
+
+  <!-- ── Rules screen ─────────────────────────── -->
+  <div id="rules-screen">
+    <h2>游戏说明 · 逃离鸭科夫</h2>
+
+    <div class="rules-section">
+      <h3>基本操作</h3>
+      <table class="rules-table">
+        <tr><td>WASD</td><td>移动角色</td></tr>
+        <tr><td>鼠标移动</td><td>瞄准方向（角色面向鼠标）</td></tr>
+        <tr><td>左键</td><td>开枪射击</td></tr>
+        <tr><td>Shift + 移动</td><td>冲刺（消耗体力条）</td></tr>
+        <tr><td>Ctrl + 移动</td><td>蹲伏（降低移动速度，快速恢复体力）</td></tr>
+      </table>
+    </div>
+
+    <div class="rules-section">
+      <h3>武器 &amp; 物品</h3>
+      <table class="rules-table">
+        <tr><td>1 / 2 / 3 / 4 / 5</td><td>切换武器槽（仅当前装备包的武器有弹药）</td></tr>
+        <tr><td>R</td><td>手动换弹（弹匣打空时自动触发）</td></tr>
+        <tr><td>H</td><td>使用最佳急救物品（止血 + 回血）</td></tr>
+        <tr><td>E（靠近物品）</td><td>拾取散落物品 / 开启战利品箱</td></tr>
+        <tr><td>F（靠近门）</td><td>开门 / 关门</td></tr>
+        <tr><td>Tab</td><td>打开/关闭背包（暂停移动）</td></tr>
+      </table>
+    </div>
+
+    <div class="rules-section">
+      <h3>伤害 &amp; 生存</h3>
+      <p class="rules-desc">
+        角色拥有6个部位独立血量（头/躯干/左臂/右臂/左腿/右腿）。<br>
+        <strong style="color:#c8a96e">头部或躯干归零 = 阵亡</strong>，四肢归零 = 骨折（腿折无法冲刺，臂折散布增大）。<br>
+        中弹有30%概率触发 <strong style="color:#cc4444">流血</strong>，每秒持续掉血。按 H 使用绷带/急救包即可止血并回血。<br>
+        拾取 <strong style="color:#c8a96e">防弹衣</strong> 可减少40%-60%来袭伤害（护甲有耐久，耗尽后失效）。
+      </p>
+    </div>
+
+    <div class="rules-section">
+      <h3>重量 &amp; 负重</h3>
+      <p class="rules-desc">
+        背包中物品有重量。超过 <strong style="color:#ffaa44">25 kg</strong> 时无法冲刺；超过 <strong style="color:#f44336">35 kg</strong> 时行走速度降低20%。<br>
+        打开背包（Tab）可查看当前负重（右上角显示 kg，黄色=偏重，红色=超载）。
+      </p>
+    </div>
+
+    <div class="rules-section">
+      <h3>敌人 (鸭卒)</h3>
+      <p class="rules-desc">
+        地图上共有约20名鸭卒，按区域巡逻。进入视野范围（约18m）或听到枪声（12m）后进入战斗状态。<br>
+        <strong style="color:#ffaa00">★ 精英鸭卒</strong>（深红体型更大）：HP=160，伤害=16，视野=24m，击毙后必掉高级战利品。<br>
+        精英发现你时会触发 <strong style="color:#ffaa00">警报音</strong> 并在击杀信息栏提示。
+      </p>
+    </div>
+
+    <div class="rules-section">
+      <h3>地图 &amp; 撤离</h3>
+      <p class="rules-desc">
+        地图分6个区域：工厂(NW) / 仓库(NE) / 中央广场 / 公寓废墟(SW) / 停车场(SE) / 地下室入口(S)。<br>
+        每个区域有战利品箱（木箱/金属箱），靠近后按 E 开箱。<br>
+        <strong style="color:#00ff80">撤离点</strong>（绿色区域）：进入后 <em>按住 E 键 10 秒</em> 即可成功撤离并带走所有战利品。<br>
+        <strong style="color:#ffaa00">地下室撤离点</strong>（橙色）：需要先找到 <strong style="color:#d4a017">地下室钥匙</strong>（南部区域有散落）才能使用。<br>
+        突袭时间限制 <strong style="color:#c8a96e">45分钟</strong>，倒计时归零前必须撤离，否则阵亡处理。
+      </p>
+    </div>
+
+    <div class="rules-section">
+      <h3>武器一览</h3>
+      <table class="rules-table">
+        <tr><td>AK-74 (槽1)</td><td>全自动步枪 — 28伤害 / 65m射程 / 30发弹匣</td></tr>
+        <tr><td>格洛克17 (槽2)</td><td>手枪 — 38伤害 / 28m射程 / 17发弹匣（快速备用）</td></tr>
+        <tr><td>MP-133 (槽3)</td><td>霰弹枪 — 8×16伤害 / 16m射程 / 8发（室内清场）</td></tr>
+        <tr><td>VSS Vintorez (槽4)</td><td>狙击步枪 — 88伤害 / 95m射程 / 10发（爆头利器）</td></tr>
+        <tr><td>MP5 (槽5)</td><td>冲锋枪 — 22伤害 / 38m射程 / 30发（800RPM，高DPS）</td></tr>
+      </table>
+    </div>
+
+    <button id="rules-close-btn">返回主界面</button>
+  </div>
+
+  <!-- ── Stash screen ──────────────────────────── -->
+  <div id="stash-screen">
+    <!-- populated by StashScreen.js -->
+  </div>
+
+  <!-- ── Start screen ───────────────────────────── -->
+  <div id="start-screen">
+    <h1>逃离鸭科夫</h1>
+    <p>生存 · 掠夺 · 撤离</p>
+    <div id="start-controls">
+      WASD 移动 &nbsp;|&nbsp; 鼠标 瞄准 &nbsp;|&nbsp; 左键 射击<br>
+      1~5 切换武器 &nbsp;|&nbsp; R 换弹 &nbsp;|&nbsp; H 使用急救<br>
+      Shift 冲刺（消耗体力）&nbsp;|&nbsp; E 拾取 / 开箱 &nbsp;|&nbsp; F 开/关门<br>
+      Tab 背包 &nbsp;|&nbsp; 绿区按住 E 撤离
+    </div>
+    <div id="raid-stats"></div>
+    <button id="start-btn">进入突袭</button>
+    <button id="rules-btn" style="margin-top:.8rem;padding:.4rem 1.6rem;font-size:.72rem;font-family:inherit;letter-spacing:.18em;text-transform:uppercase;background:transparent;border:1px solid #444;color:#555;cursor:pointer;transition:color .2s,border-color .2s;" onmouseover="this.style.color='#c8a96e';this.style.borderColor='#c8a96e'" onmouseout="this.style.color='#555';this.style.borderColor='#444'">游戏说明</button>
+  </div>
+
+  <!-- ── HUD ────────────────────────────────────── -->
+  <div id="hud">
+    <div id="damage-flash"></div>
+    <div id="low-health-vignette"></div>
+    <div id="tips-ticker"></div>
+    <div id="tutorial-hint"></div>
+
+    <div id="status-display">突袭中</div>
+    <div id="xp-display">
+      <span>XP</span>
+      <span id="xp-value">0</span>
+      <span style="margin-left:.8rem;color:#555">击杀</span>
+      <span id="kill-count" style="color:#e05050">0</span>
+    </div>
+    <div id="timer-display">
+      剩余时间
+      <span id="timer-value">45:00</span>
+    </div>
+
+    <div id="health-display">
+      <div id="health-label">生命值</div>
+      <div id="health-bar-outer"><div id="health-bar-inner"></div></div>
+      <div id="health-value">100</div>
+      <div id="health-danger"></div>
+      <div id="stamina-bar-wrap">
+        <div id="stamina-bar-label">体力</div>
+        <div id="stamina-bar-outer"><div id="stamina-bar-inner"></div></div>
+      </div>
+      <div id="armor-bar-wrap">
+        <div id="armor-bar-label">护甲</div>
+        <div id="armor-bar-outer"><div id="armor-bar-inner"></div></div>
+      </div>
+    </div>
+
+    <div id="heal-channel-wrap">
+      <div id="heal-channel-label">治疗中…</div>
+      <div id="heal-channel-outer"><div id="heal-channel-inner"></div></div>
+    </div>
+
+    <div id="body-parts"></div>
+
+    <div id="weapon-slots">
+      <div class="wslot active" id="wslot-0"><span class="wslot-key">1</span></div>
+      <div class="wslot"        id="wslot-1"><span class="wslot-key">2</span></div>
+      <div class="wslot"        id="wslot-2"><span class="wslot-key">3</span></div>
+      <div class="wslot"        id="wslot-3"><span class="wslot-key">4</span></div>
+      <div class="wslot"        id="wslot-4"><span class="wslot-key">5</span></div>
+    </div>
+
+    <div id="weapon-display">
+      <div id="weapon-name">AK-74</div>
+      <div id="ammo-current">30</div>
+      <div id="ammo-reserve">/ 90</div>
+    </div>
+
+    <div id="pickup-hint"></div>
+
+    <div id="extract-bar-wrap">
+      <div id="extract-bar-label">撤离中…</div>
+      <div id="extract-bar-outer"><div id="extract-bar-inner"></div></div>
+    </div>
+
+    <div id="kill-feed"></div>
+    <div id="bleed-indicator">● 流血中 — 按H止血</div>
+
+    <!-- Key hints bar -->
+    <div id="key-hints">
+      <span class="kh-key">Tab</span> 背包 &nbsp;
+      <span class="kh-key">H</span> 急救 &nbsp;
+      <span class="kh-key">R</span> 换弹 &nbsp;
+      <span class="kh-key">E</span> 拾取/撤离 &nbsp;
+      <span class="kh-key">F</span> 开门 &nbsp;
+      <span class="kh-key">1-5</span> 切武器
+    </div>
+
+    <!-- Minimap (positioned top-right, overlaps kill-feed which moves down) -->
+    <div id="minimap-wrap">
+      <canvas id="minimap-canvas" width="140" height="140"></canvas>
+      <div id="minimap-label">突袭区域</div>
+    </div>
+  </div>
+
+  <!-- ── Inventory ──────────────────────────────── -->
+  <div id="inventory-panel">
+    <div id="inventory-box">
+      <div id="inventory-title">
+        背包 <span style="color:#444;font-size:.55rem;margin-left:.5rem">拖拽换位 | 右键使用/丢弃 | Shift+点击丢弃</span>
+        <span id="inv-weight">0.0 kg</span>
+        <span style="color:#666">TAB 关闭</span>
+      </div>
+      <div id="inventory-grid"></div>
+    </div>
+  </div>
+  <div id="inv-tooltip"></div>
+
+  <!-- Crosshair tracking -->
+  <script>
+    const ch = document.getElementById('crosshair');
+    document.addEventListener('mousemove', e => {
+      ch.style.left = e.clientX + 'px';
+      ch.style.top  = e.clientY + 'px';
+    });
+    // Prevent Tab from switching browser focus
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Tab') e.preventDefault();
+    });
+
+    // ── Rules screen ──────────────────────────────────────────────────────────
+    document.getElementById('rules-btn').addEventListener('click', () => {
+      document.getElementById('rules-screen').style.display = 'flex';
+    });
+    document.getElementById('rules-close-btn').addEventListener('click', () => {
+      document.getElementById('rules-screen').style.display = 'none';
+    });
+
+    // ── Tips ticker ───────────────────────────────────────────────────────────
+    const TIPS = [
+      ['WASD', '移动 · Shift冲刺消耗体力 · Ctrl蹲伏快速回复体力'],
+      ['1~5', '切换武器槽 · R换弹 · 弹匣打空自动换弹'],
+      ['H', '使用急救物品（止血+回血）· 射击会中断治疗'],
+      ['E', '拾取散落物品 · 靠近箱子开箱 · 绿区按住10秒撤离'],
+      ['F', '靠近建筑门时按F开门/关门'],
+      ['Tab', '打开背包 · 查看物品和当前负重'],
+      ['★ 精英', '深红大体型鸭卒 · HP=160 · 发现你时触发警报'],
+      ['流血', '中弹30%触发流血DOT · 按H使用绷带止血'],
+      ['骨折', '腿部HP=0→无法冲刺 · 臂部HP=0→瞄准散布增大'],
+      ['护甲', '拾取防弹衣自动装备 · 减伤40-60% · 耐久耗尽失效'],
+      ['战利品', '击毙鸭卒掉落物资 · 精英必掉高级装备'],
+      ['负重', '超25kg禁冲刺 · 超35kg走路减速 · Tab查看背包重量'],
+      ['地下室', '找到地下室钥匙才能使用橙色撤离点'],
+    ];
+    let _tipIdx = 0;
+    let _tipVisible = false;
+
+    function _nextTip() {
+      const ticker = document.getElementById('tips-ticker');
+      if (!ticker || !_tipVisible) return;
+      const [key, desc] = TIPS[_tipIdx % TIPS.length];
+      ticker.innerHTML = `<span class="tip-key">[${key}]</span><span>${desc}</span>`;
+      _tipIdx++;
+    }
+
+    // Show ticker only during game (called from module)
+    window._showTipsTicker = () => {
+      _tipVisible = true;
+      _nextTip();
+      setInterval(_nextTip, 5000);
+
+      // Key hints: show on raid start, fade after 20s
+      const kh = document.getElementById('key-hints');
+      if (kh) {
+        kh.style.opacity = '1';
+        setTimeout(() => { kh.style.opacity = '0'; }, 20000);
+      }
+    };
+  </script>
+
+</body>
+</html>
