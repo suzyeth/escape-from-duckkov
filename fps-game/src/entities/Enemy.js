@@ -518,13 +518,13 @@ export class Enemy {
 
     // Headgear
     if (elite) {
-      // Beret
-      const beretMat = new THREE.MeshLambertMaterial({ color: 0x8a0000 });
-      const beret = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.5), beretMat);
+      // Beret — bright red for visibility
+      const beretMat = new THREE.MeshLambertMaterial({ color: 0xcc0000 });
+      const beret = new THREE.Mesh(new THREE.SphereGeometry(0.30, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.5), beretMat);
       beret.position.y = 0.74; g.add(beret);
-      // Shoulder badge
+      // Shoulder badge — larger
       const badgeMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-      const badge = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.02), badgeMat);
+      const badge = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.02), badgeMat);
       badge.position.set(bodyW/2 + 0.01, 0.22, 0.16); g.add(badge);
     } else {
       // Bandana
@@ -533,9 +533,22 @@ export class Enemy {
       band.position.y = 0.54; g.add(band);
     }
 
-    // Facing indicator (gun barrel glow)
+    // Red armbands (scav) or white stripe (elite) — visual distinctiveness
+    if (elite) {
+      const stripeMat = new THREE.MeshBasicMaterial({ color: 0xeeeeee });
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.35, 0.02), stripeMat);
+      stripe.position.set(0, 0.08, 0.19); g.add(stripe);
+    } else {
+      const bandMat2 = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+      const lBand = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.06, 6), bandMat2);
+      lBand.position.set(-(bodyW/2 + 0.06), 0.15, 0); g.add(lBand);
+      const rBand = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.06, 6), bandMat2);
+      rBand.position.set(bodyW/2 + 0.06, 0.15, 0); g.add(rBand);
+    }
+
+    // Facing indicator (gun barrel glow) — larger for readability
     const nMat = new THREE.MeshBasicMaterial({ color: elite ? 0xffcc00 : 0xff4020 });
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.08), nMat);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.12), nMat);
     nose.position.set(bodyW/2 + 0.06, -0.05, elite ? 0.62 : 0.52); g.add(nose);
 
     // HP bar

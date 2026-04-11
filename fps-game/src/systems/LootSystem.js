@@ -201,14 +201,56 @@ export class LootSystem {
   }
 
   _spawnItem(defId, count, pos) {
-    const def   = ITEM_DEFS[defId];
-    const color = def ? parseInt(def.color.replace('#', '0x')) : 0xffffff;
+    const def = ITEM_DEFS[defId];
 
-    const geo  = new THREE.BoxGeometry(0.35, 0.35, 0.35);
-    const mat  = new THREE.MeshBasicMaterial({ color });
+    // Per-type visual customization
+    const ITEM_VISUALS = {
+      rifle_ammo:   { color: 0x88dd33, size: 0.22, shape: 'cylinder' },
+      pistol_ammo:  { color: 0xaacc44, size: 0.18, shape: 'cylinder' },
+      shotgun_ammo: { color: 0xdd8833, size: 0.20, shape: 'cylinder' },
+      vss_ammo:     { color: 0x44ccaa, size: 0.22, shape: 'cylinder' },
+      mp5_ammo:     { color: 0xbbaa44, size: 0.18, shape: 'cylinder' },
+      bandage:      { color: 0xff6644, size: 0.25, shape: 'box' },
+      medkit:       { color: 0xff2222, size: 0.45, shape: 'box', glow: true },
+      painkillers:  { color: 0xffaa44, size: 0.28, shape: 'box' },
+      dogtag:       { color: 0xdddddd, size: 0.25, shape: 'box', glow: true },
+      cash:         { color: 0xffdd00, size: 0.20, shape: 'box' },
+      key_basement: { color: 0xffdd44, size: 0.30, shape: 'box', glow: true },
+      vest_light:   { color: 0x4a8a5a, size: 0.40, shape: 'box', glow: true },
+      vest_heavy:   { color: 0x3a6040, size: 0.45, shape: 'box', glow: true },
+      helmet:       { color: 0x5a5a6a, size: 0.35, shape: 'sphere', glow: true },
+    };
+    const vis = ITEM_VISUALS[defId] ?? { color: 0xffffff, size: 0.30, shape: 'box' };
+
+    let geo;
+    if (vis.shape === 'cylinder') {
+      geo = new THREE.CylinderGeometry(vis.size * 0.5, vis.size * 0.5, vis.size, 6);
+    } else if (vis.shape === 'sphere') {
+      geo = new THREE.SphereGeometry(vis.size * 0.5, 6, 5);
+    } else {
+      geo = new THREE.BoxGeometry(vis.size, vis.size, vis.size);
+    }
+
+    const mat = new THREE.MeshLambertMaterial({ color: vis.color });
+    if (vis.glow) {
+      mat.emissive = new THREE.Color(vis.color);
+      mat.emissiveIntensity = 0.3;
+    }
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(pos.x, 0.25, pos.z);
+    mesh.position.set(pos.x, vis.size * 0.5 + 0.05, pos.z);
+    mesh.castShadow = true;
     this._scene.add(mesh);
+
+    // Medkit: add white cross
+    if (defId === 'medkit') {
+      const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const h = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.06, 0.06), crossMat);
+      h.position.set(pos.x, vis.size * 0.5 + 0.05, pos.z);
+      this._scene.add(h);
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.30), crossMat);
+      v.position.set(pos.x, vis.size * 0.5 + 0.05, pos.z);
+      this._scene.add(v);
+    }
 
     this._items.push({ mesh, defId, count, pos: pos.clone() });
   }
@@ -244,14 +286,31 @@ export class LootSystem {
       const h = isRich ? 0.50 : 0.70;
       const d = isRich ? 0.55 : 0.70;
 
+      const containerColor = isRich ? 0x3a5a6a : color;
       const geo  = new THREE.BoxGeometry(w, h, d);
-      const mat  = new THREE.MeshLambertMaterial({ color });
+      const mat  = new THREE.MeshLambertMaterial({ color: containerColor });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(x, h / 2, z);
       mesh.castShadow    = true;
       mesh.receiveShadow = true;
       mesh.name = name;
       this._scene.add(mesh);
+
+      if (isRich) {
+        // Padlock icon on front
+        const lockMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+        const lock = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.04), lockMat);
+        lock.position.set(x, h * 0.4, z + d / 2 + 0.02);
+        this._scene.add(lock);
+      } else {
+        // Crate slat lines
+        const slatMat = new THREE.MeshLambertMaterial({ color: 0x5a4a3a });
+        for (let sy = 0.15; sy < h - 0.1; sy += 0.22) {
+          const slat = new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, 0.04, d + 0.02), slatMat);
+          slat.position.set(x, sy, z);
+          this._scene.add(slat);
+        }
+      }
 
       this._containers.push({
         mesh,

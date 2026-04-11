@@ -113,12 +113,12 @@ export class Level {
 
     // Zone floor tints
     const zones = [
-      { x: -35, z: -45, w: 40, d: 50, c: 0x35312a }, // Factory
-      { x:  40, z: -45, w: 50, d: 50, c: 0x2a2e35 }, // Warehouse
-      { x:   0, z:   0, w: 40, d: 40, c: 0x383832 }, // Central
-      { x: -40, z:  45, w: 50, d: 50, c: 0x332e28 }, // Apartments
-      { x:  37, z:  42, w: 55, d: 45, c: 0x2e3028 }, // Parking
-      { x:  -5, z:  65, w: 30, d: 20, c: 0x1e1e22 }, // Basement entrance
+      { x: -35, z: -45, w: 40, d: 50, c: 0x35312a }, // Factory — dark steel
+      { x:  40, z: -45, w: 50, d: 50, c: 0x1a2228 }, // Warehouse — dark blue-grey
+      { x:   0, z:   0, w: 40, d: 40, c: 0x4a4a3a }, // Central — lighter tan
+      { x: -40, z:  45, w: 50, d: 50, c: 0x332e28 }, // Apartments — dark brown
+      { x:  37, z:  42, w: 55, d: 45, c: 0x5a5a4a }, // Parking — light grey concrete
+      { x:  -5, z:  65, w: 30, d: 20, c: 0x1e1e22 }, // Basement entrance — very dark
     ];
     zones.forEach(({ x, z, w, d, c }) => {
       const g = new THREE.PlaneGeometry(w, d);
@@ -473,8 +473,15 @@ export class Level {
       const fix = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.4), fixMat);
       fix.position.set(x, 4.5, z);
       this._scene.add(fix);
-      // Point light (warm, dim)
-      const light = new THREE.PointLight(0xffddaa, 0.6, 12);
+      // Glow halo sphere
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xffdd99, transparent: true, opacity: 0.2, depthWrite: false,
+      });
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), glowMat);
+      glow.position.set(x, 4.5, z);
+      this._scene.add(glow);
+      // Point light (warm, brighter)
+      const light = new THREE.PointLight(0xffcc88, 1.8, 14);
       light.position.set(x, 4.2, z);
       this._scene.add(light);
     }

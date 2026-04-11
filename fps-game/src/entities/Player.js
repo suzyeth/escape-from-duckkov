@@ -274,9 +274,14 @@ export class Player {
     group.add(gunBody);
     // Magazine
     const magMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
-    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.18, 0.06), magMat);
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.20, 0.08), magMat);
     mag.position.set(0.18, -0.08, 0.30);
     group.add(mag);
+    // Scope glint (barrel tip glow)
+    const scopeMat = new THREE.MeshBasicMaterial({ color: 0xccdd44 });
+    const scope = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), scopeMat);
+    scope.position.set(0.18, 0.04, 0.70);
+    group.add(scope);
 
     // Backpack
     const bpMat = new THREE.MeshLambertMaterial({ color: 0x4a5a3a });
