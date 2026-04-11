@@ -47,6 +47,31 @@ const doors     = new DoorSystem(scene, level.collidables);
 for (const slot of level.doorSlots) doors.addDoor(slot);
 
 const invUI     = new InventoryUI(inventory);
+
+// Right-click: use healing item from inventory
+invUI.onUse((instanceId) => {
+  const item = inventory.items.get(instanceId);
+  if (!item || !item.def.heals) return;
+  if (_healTimer > 0) return; // already healing
+
+  const def = item.def;
+  _healDuration   = Math.max(0.1, def.id === 'medkit' ? 3.0 : def.id === 'painkillers' ? 2.5 : 1.8);
+  _healTimer      = _healDuration;
+  _healAmount     = def.heals;
+  _healInstanceId = instanceId;
+  player.isHealing = true;
+  hud.pushKillFeed(`使用 ${def.name}…`);
+  invUI.close();
+});
+
+// Shift+click or right-click non-healing: drop item
+invUI.onDrop((instanceId) => {
+  const def = inventory.dropItem(instanceId);
+  if (def) {
+    hud.pushKillFeed(`丢弃: ${def.name}`);
+    invUI.refresh();
+  }
+});
 const stash     = new StashScreen(document.getElementById('stash-screen'));
 const minimap   = new MinimapUI(document.getElementById('minimap-canvas'));
 

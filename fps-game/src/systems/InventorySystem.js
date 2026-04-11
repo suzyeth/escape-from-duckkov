@@ -153,6 +153,20 @@ export class InventorySystem {
   }
 
   /**
+   * Drop (remove) an item by instance id. Returns the item def or null.
+   * @param {number} instanceId
+   * @returns {object|null}
+   */
+  dropItem(instanceId) {
+    const item = this.items.get(instanceId);
+    if (!item) return null;
+    const def = item.def;
+    this._fill(item.row, item.col, def.w, def.h, null);
+    this.items.delete(instanceId);
+    return def;
+  }
+
+  /**
    * Find the best healing item in inventory (highest heals value).
    * @returns {{ def: object, instanceId: number }|null}
    */

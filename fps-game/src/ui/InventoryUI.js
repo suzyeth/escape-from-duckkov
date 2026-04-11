@@ -20,13 +20,29 @@ export class InventoryUI {
     this._dragOffsetY = 0;
     this._CELL        = 46;     // px per cell
 
+    // Callbacks for use/drop actions (set by main.js)
+    this._onUseItem  = null;
+    this._onDropItem = null;
+
     if (!this._panel) {
       console.warn('InventoryUI: #inventory-panel not found in DOM');
       return;
     }
     this._setupGrid();
     this._setupDragListeners();
+
+    // Right-click context menu
+    this._grid.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this._onContextAction(e);
+    });
   }
+
+  /** Set callback for using an item (right-click). @param {(instanceId:number)=>void} fn */
+  onUse(fn) { this._onUseItem = fn; }
+
+  /** Set callback for dropping an item (Shift+click). @param {(instanceId:number)=>void} fn */
+  onDrop(fn) { this._onDropItem = fn; }
 
   // ── Public ─────────────────────────────────────────────────────────────────
 
@@ -131,52 +147,6 @@ export class InventoryUI {
     document.addEventListener('mouseup',   (e) => this._onDragEnd(e));
   }
 
-  _onDragStart(e) {
-    const itemEl = e.target.closest('.inv-item');
-    if (!itemEl) return;
-
-    e.preventDefault();
-    const instanceId = Number(itemEl.dataset.instanceId);
-    const item = this._inv.items.get(instanceId);
-    if (!item) return;
-
-    this._dragItem = item;
-
-    // Hide the original
-    itemEl.style.opacity = '0.3';
-    this._dragSourceEl = itemEl;
-
-    // Create ghost element
-    const ghost = document.createElement('div');
-    ghost.className        = 'inv-item inv-drag-ghost';
-    ghost.style.position   = 'fixed';
-    ghost.style.width      = `${item.def.w * this._CELL}px`;
-    ghost.style.height     = `${item.def.h * this._CELL}px`;
-    ghost.style.background = item.def.color;
-    ghost.style.opacity    = '0.8';
-    ghost.style.zIndex     = '9999';
-    ghost.style.pointerEvents = 'none';
-    ghost.style.border     = '2px solid #fff';
-    ghost.style.boxSizing  = 'border-box';
-    ghost.innerHTML        = `<span class="inv-item-name">${item.def.name}</span>`;
-
-    document.body.appendChild(ghost);
-    this._dragEl = ghost;
-
-    // Offset so the ghost is centered on cursor
-    this._dragOffsetX = (item.def.w * this._CELL) / 2;
-    this._dragOffsetY = (item.def.h * this._CELL) / 2;
-
-    ghost.style.left = `${e.clientX - this._dragOffsetX}px`;
-    ghost.style.top  = `${e.clientY - this._dragOffsetY}px`;
-
-    // Highlight valid drop cells
-    this._showDropPreview(e);
-
-    // Hide tooltip
-    if (this._tooltip) this._tooltip.style.display = 'none';
-  }
-
   _onDragMove(e) {
     if (!this._dragItem || !this._dragEl) return;
     this._dragEl.style.left = `${e.clientX - this._dragOffsetX}px`;
@@ -253,5 +223,82 @@ export class InventoryUI {
     this._grid.querySelectorAll('.inv-drop-target').forEach(el => {
       el.classList.remove('inv-drop-target');
     });
+  }
+
+  /** Handle right-click on item: use if healable, otherwise show drop option */
+  _onContextAction(e) {
+    const itemEl = e.target.closest('.inv-item');
+    if (!itemEl) return;
+    const instanceId = Number(itemEl.dataset.instanceId);
+    const item = this._inv.items.get(instanceId);
+    if (!item) return;
+
+    // If item has heals property, use it
+    if (item.def.heals && this._onUseItem) {
+      this._onUseItem(instanceId);
+      return;
+    }
+
+    // Otherwise drop it
+    if (this._onDropItem) {
+      this._onDropItem(instanceId);
+    }
+  }
+
+  /** Handle shift+left-click on item: always drop */
+  _onDragStart(e) {
+    // Shift+click = drop item
+    if (e.shiftKey) {
+      const itemEl = e.target.closest('.inv-item');
+      if (!itemEl) return;
+      e.preventDefault();
+      const instanceId = Number(itemEl.dataset.instanceId);
+      if (this._onDropItem) this._onDropItem(instanceId);
+      return;
+    }
+
+    // Normal drag
+    this._startDrag(e);
+  }
+
+  _startDrag(e) {
+    const itemEl = e.target.closest('.inv-item');
+    if (!itemEl) return;
+
+    e.preventDefault();
+    const instanceId = Number(itemEl.dataset.instanceId);
+    const item = this._inv.items.get(instanceId);
+    if (!item) return;
+
+    this._dragItem = item;
+
+    // Hide the original
+    itemEl.style.opacity = '0.3';
+    this._dragSourceEl = itemEl;
+
+    // Create ghost element
+    const ghost = document.createElement('div');
+    ghost.className        = 'inv-item inv-drag-ghost';
+    ghost.style.position   = 'fixed';
+    ghost.style.width      = `${item.def.w * this._CELL}px`;
+    ghost.style.height     = `${item.def.h * this._CELL}px`;
+    ghost.style.background = item.def.color;
+    ghost.style.opacity    = '0.8';
+    ghost.style.zIndex     = '9999';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.border     = '2px solid #fff';
+    ghost.style.boxSizing  = 'border-box';
+    ghost.innerHTML        = `<span class="inv-item-name">${item.def.name}</span>`;
+
+    document.body.appendChild(ghost);
+    this._dragEl = ghost;
+
+    this._dragOffsetX = (item.def.w * this._CELL) / 2;
+    this._dragOffsetY = (item.def.h * this._CELL) / 2;
+    ghost.style.left = `${e.clientX - this._dragOffsetX}px`;
+    ghost.style.top  = `${e.clientY - this._dragOffsetY}px`;
+
+    this._showDropPreview(e);
+    if (this._tooltip) this._tooltip.style.display = 'none';
   }
 }
