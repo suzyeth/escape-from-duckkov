@@ -31,6 +31,8 @@ export class HUD {
 
     this._raidSeconds   = 45 * 60;
     this._flashTimer    = 0;
+    this._onTimerExpire = null;
+    this._killCountEl   = document.getElementById('kill-count');
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -43,10 +45,22 @@ export class HUD {
     this._raidSeconds = seconds;
   }
 
+  /** Set callback for when raid timer hits zero */
+  onTimerExpire(fn) { this._onTimerExpire = fn; }
+
+  /** Update kill counter display */
+  setKillCount(count) {
+    if (this._killCountEl) this._killCountEl.textContent = count;
+  }
+
   // ── Per-frame ─────────────────────────────────────────────────────────────
 
   update(dt) {
+    const wasTicking = this._raidSeconds > 0;
     this._raidSeconds = Math.max(0, this._raidSeconds - dt);
+    if (wasTicking && this._raidSeconds <= 0 && this._onTimerExpire) {
+      this._onTimerExpire();
+    }
     this._updateTimer();
     if (this._flashTimer > 0) {
       this._flashTimer -= dt;

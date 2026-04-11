@@ -247,6 +247,7 @@ function handlePlayerShoot() {
         const label = hitEnemy.isElite ? '★精英鸭卒' : '鸭卒';
         const xpGain = hitEnemy.isElite ? XP_REWARDS.eliteKill : XP_REWARDS.kill;
         hud.pushKillFeed(`击毙${label} [${_killCount}]`);
+        hud.setKillCount(_killCount);
         _gainXP(xpGain, label);
         bullets.spawnKillEffect(hitEnemy.position);
         sound.playKillConfirm();
@@ -528,16 +529,31 @@ function _showEndScreen(survived) {
   ss.querySelector('p').textContent  = survived ? '你带着战利品活下来了！' : '你的战利品已遗失在战场上';
   document.getElementById('start-btn').textContent = '再次进入';
 
+  const rating = _getRaidRating(survived, _killCount, _lootValue, survivedSec);
   statsEl.innerHTML = `
     存活时间 &nbsp;<span>${_formatTime(survivedSec)}</span>&nbsp;&nbsp;
     击杀数 &nbsp;<span>${_killCount}</span>&nbsp;&nbsp;
     战利品价值 &nbsp;<span>${_lootValue} 鸭元</span>&nbsp;&nbsp;
-    经验值 &nbsp;<span>${_xp} XP</span>
+    经验值 &nbsp;<span>${_xp} XP</span><br>
+    <span style="font-size:1.2rem;margin-top:.5rem;display:inline-block">${rating}</span>
   `;
   statsEl.style.display   = 'block';
   controlsEl.style.display = 'none';
 
   ss.style.display = 'flex';
+}
+
+function _getRaidRating(survived, kills, loot, seconds) {
+  if (!survived) return '评级: F — 阵亡';
+  let score = 0;
+  score += Math.min(kills * 10, 60);        // max 60 from kills
+  score += Math.min(loot / 50, 30);         // max 30 from loot value
+  score += Math.min(seconds / 60, 10);      // max 10 from survival time
+  if (score >= 80) return '评级: S — 完美突袭！';
+  if (score >= 60) return '评级: A — 出色表现';
+  if (score >= 40) return '评级: B — 稳扎稳打';
+  if (score >= 20) return '评级: C — 勉强过关';
+  return '评级: D — 需要加强';
 }
 
 function _onExtracted() {
@@ -598,6 +614,7 @@ stash.onSelect((loadout) => {
   _extractTimer      = 0;
   const xpEl = document.getElementById('xp-value');
   if (xpEl) xpEl.textContent = '0';
+  hud.setKillCount(0);
 
   // Restore controls hint for next end screen
   const controlsEl = document.getElementById('start-controls');
@@ -611,6 +628,10 @@ stash.onSelect((loadout) => {
 
   // Reset raid timer
   hud.resetRaid(45 * 60);
+  hud.onTimerExpire(() => {
+    hud.pushKillFeed('⚠ 时间耗尽！突袭失败');
+    _onPlayerDied();
+  });
 
   stash.hide();
   document.getElementById('start-screen').style.display = 'none';
