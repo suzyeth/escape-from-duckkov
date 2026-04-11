@@ -58,6 +58,25 @@
       font-size: .68rem; color: #555; letter-spacing: .1em; text-transform: uppercase;
     }
 
+    /* XP display */
+    #xp-display {
+      position: absolute; top: 3.4rem; left: 2rem;
+      font-size: .62rem; color: #c8a96e; letter-spacing: .1em;
+    }
+    #xp-value { font-size: 1rem; display: block; margin-top: .1rem; }
+
+    /* XP popup */
+    .xp-popup {
+      position: fixed; pointer-events: none; z-index: 300;
+      font-size: 1rem; font-weight: bold; color: #ffd700;
+      text-shadow: 0 0 8px rgba(255,215,0,0.5);
+      animation: xpFloat 1.2s ease-out forwards;
+    }
+    @keyframes xpFloat {
+      0%   { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-40px); }
+    }
+
     /* Top-right: timer */
     #timer-display {
       position: absolute; top: 1.4rem; right: 2rem; text-align: right;
@@ -279,6 +298,15 @@
     .inv-item-count { font-size: .65rem; color: #aaa; align-self: flex-end; }
     .inv-item-value { font-size: .5rem;  color: #88aa55; align-self: flex-end; }
 
+    /* Drag & Drop */
+    .inv-drop-target {
+      background: #3a5a3a !important;
+      border-color: #6a9a6a !important;
+    }
+    .inv-drag-ghost .inv-item-name {
+      font-size: .55rem; color: #ccc; line-height: 1.2;
+    }
+
     /* Tooltip */
     #inv-tooltip {
       position: fixed; background: #111; border: 1px solid #444; border-radius: 3px;
@@ -397,6 +425,10 @@
     <div id="tutorial-hint"></div>
 
     <div id="status-display">突袭中</div>
+    <div id="xp-display">
+      <span>XP</span>
+      <span id="xp-value">0</span>
+    </div>
     <div id="timer-display">
       剩余时间
       <span id="timer-value">45:00</span>

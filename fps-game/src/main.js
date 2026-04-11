@@ -96,6 +96,15 @@ let _recoilOffset = 0;   // camera Y kick (world units), decays per frame
 let _killCount    = 0;
 let _lootValue    = 0;
 let _raidStart    = 0;   // performance.now() at raid begin
+let _xp           = 0;   // accumulated XP this raid
+
+const XP_REWARDS = {
+  kill:       50,
+  eliteKill: 200,
+  loot:       10,
+  container:  25,
+  extract:   500,
+};
 
 // ── Shoot state ───────────────────────────────────────────────────────────────
 
@@ -105,6 +114,21 @@ let _firedRecentlyTimer   = 0;
 
 // ── Ambient sound timer ───────────────────────────────────────────────────────
 let _ambientTimer = 18 + Math.random() * 15; // first distant shot in 18-33s
+
+function _gainXP(amount, reason) {
+  _xp += amount;
+  const xpEl = document.getElementById('xp-value');
+  if (xpEl) xpEl.textContent = _xp;
+
+  // Floating XP popup
+  const popup = document.createElement('div');
+  popup.className   = 'xp-popup';
+  popup.textContent = `+${amount} XP`;
+  popup.style.left  = `${innerWidth / 2 - 30}px`;
+  popup.style.top   = `${innerHeight / 2 - 60}px`;
+  document.body.appendChild(popup);
+  setTimeout(() => popup.remove(), 1300);
+}
 
 function handlePlayerShoot() {
   _playerFiredThisFrame = false;
@@ -160,7 +184,9 @@ function handlePlayerShoot() {
       if (!hitEnemy.isAlive) {
         _killCount++;
         const label = hitEnemy.isElite ? '★精英鸭卒' : '鸭卒';
+        const xpGain = hitEnemy.isElite ? XP_REWARDS.eliteKill : XP_REWARDS.kill;
         hud.pushKillFeed(`击毙${label} [${_killCount}]`);
+        _gainXP(xpGain, label);
         loot.dropLoot(hitEnemy.position, _randomEnemyDrop(hitEnemy.isElite));
       }
     } else {
@@ -268,6 +294,7 @@ function handleLootPickup(dt) {
         sound.playDryFire();
         if (invUI.isOpen) invUI.refresh();
         hud.pushKillFeed(`开箱: ${names.join(' / ')}`);
+        _gainXP(XP_REWARDS.container, '开箱');
       }
     } else {
       const added = inventory.addItem(pickup.defId, pickup.count);
@@ -281,6 +308,7 @@ function handleLootPickup(dt) {
           hud.pushKillFeed(`装备: ${def.name} (${Math.round(def.armor.reduce * 100)}%减伤)`);
         } else {
           hud.pushKillFeed(`拾取: ${def?.name ?? pickup.defId}`);
+          _gainXP(XP_REWARDS.loot, '拾取');
         }
         if (invUI.isOpen) invUI.refresh();
         sound.playDryFire();
@@ -430,7 +458,8 @@ function _showEndScreen(survived) {
   statsEl.innerHTML = `
     存活时间 &nbsp;<span>${_formatTime(survivedSec)}</span>&nbsp;&nbsp;
     击杀数 &nbsp;<span>${_killCount}</span>&nbsp;&nbsp;
-    战利品价值 &nbsp;<span>${_lootValue} 鸭元</span>
+    战利品价值 &nbsp;<span>${_lootValue} 鸭元</span>&nbsp;&nbsp;
+    经验值 &nbsp;<span>${_xp} XP</span>
   `;
   statsEl.style.display   = 'block';
   controlsEl.style.display = 'none';
@@ -439,6 +468,7 @@ function _showEndScreen(survived) {
 }
 
 function _onExtracted() {
+  _gainXP(XP_REWARDS.extract, '撤离');
   _showEndScreen(true);
 }
 
@@ -480,8 +510,11 @@ stash.onSelect((loadout) => {
   // Reset raid stats
   _killCount         = 0;
   _lootValue         = 0;
+  _xp                = 0;
   _raidStart         = performance.now();
   _lootedThisSession = false;
+  const xpEl = document.getElementById('xp-value');
+  if (xpEl) xpEl.textContent = '0';
 
   // Restore controls hint for next end screen
   const controlsEl = document.getElementById('start-controls');

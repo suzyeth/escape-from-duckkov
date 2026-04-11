@@ -239,22 +239,61 @@ export class Level {
   // ── S: Basement Entrance ──────────────────────────────────────────────────
 
   _buildBasementZone() {
+    const C = 0x3a3a40;
+
     // Stairway walls leading down
-    this._wall(-5, 60, 0.5, 12, 2.5, 0x3a3a40, 'BasN_W');
-    this._wall( 5, 60, 0.5, 12, 2.5, 0x3a3a40, 'BasN_E');
-    this._wall( 0, 66, 12, 0.5, 2.5, 0x3a3a40, 'BasS');
+    this._wall(-5, 60, 0.5, 12, 2.5, C, 'BasN_W');
+    this._wall( 5, 60, 0.5, 12, 2.5, C, 'BasN_E');
+    this._wall( 0, 66, 12, 0.5, 2.5, C, 'BasS');
+
     // Locked door marker (darker)
     const dGeo = new THREE.BoxGeometry(3, 2.5, 0.2);
     const dMat = new THREE.MeshLambertMaterial({ color: 0x1a1a2a });
     const door = new THREE.Mesh(dGeo, dMat);
     door.position.set(0, 1.25, 54.5);
     this._scene.add(door);
+
     // Key lock icon (small orange box)
     const lGeo = new THREE.BoxGeometry(0.3, 0.3, 0.1);
     const lMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
     const lock = new THREE.Mesh(lGeo, lMat);
     lock.position.set(0.8, 1.2, 54.4);
     this._scene.add(lock);
+
+    // ── Basement Interior (underground bunker) ────────────────────────────
+    // L-shaped bunker south of the stairway entrance
+    // Main hall: -15 to 15, z: 68 to 88
+    // Side room: -15 to -5, z: 82 to 96
+
+    // Main hall
+    this._building(-0, 78, 30, 20, 2.5, 0x2a2a32, 'BasMain');
+
+    // Side room (storage)
+    this._building(-10, 92, 14, 10, 2.5, 0x28282e, 'BasStorage');
+
+    // Connecting corridor between main hall and side room
+    this._wall(-17, 85, 0.5, 6, 2.5, C, 'BasCorrW');
+    this._wall( -3, 85, 0.5, 6, 2.5, C, 'BasCorrE');
+
+    // Interior details — main hall
+    // Operating tables / workbenches
+    this._box(-8, 74, 4, 0.8, 1.5, 0x4a4a50, 'BasTable1');
+    this._box( 8, 74, 4, 0.8, 1.5, 0x4a4a50, 'BasTable2');
+    // Filing cabinets along wall
+    this._box(-12, 70, 1.5, 1.8, 1.2, 0x3a4a3a, 'BasCabinet1');
+    this._box(-12, 73, 1.5, 1.8, 1.2, 0x3a4a3a, 'BasCabinet2');
+    // Crate stack
+    this._box(12, 82, 2, 2, 2, 0x6a5a3a, 'BasCrate1');
+    this._box(10, 84, 1.5, 1.5, 1.5, 0x7a6a4a, 'BasCrate2');
+
+    // Interior details — side room (high-value loot area)
+    // Weapon rack
+    this._box(-14, 90, 1, 2.2, 3, 0x3a3a3a, 'BasWeaponRack');
+    // Safe (small, valuable)
+    this._box(-6, 94, 1.2, 1.2, 1.2, 0x2a2a2a, 'BasSafe');
+    // Ammo boxes
+    this._box(-12, 96, 1.5, 0.8, 1, 0x5a6a3a, 'BasAmmo1');
+    this._box(-10, 96, 1.5, 0.8, 1, 0x5a6a3a, 'BasAmmo2');
   }
 
   // ── Extraction points ────────────────────────────────────────────────────

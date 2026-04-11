@@ -184,6 +184,82 @@ export class InventorySystem {
     return heals;
   }
 
+  /**
+   * Move an item to a new grid position. Returns true if successful.
+   * @param {number} instanceId
+   * @param {number} toRow
+   * @param {number} toCol
+   */
+  moveItem(instanceId, toRow, toCol) {
+    const item = this.items.get(instanceId);
+    if (!item) return false;
+
+    const { w, h } = item.def;
+
+    // Bounds check
+    if (toRow < 0 || toCol < 0 || toRow + h > ROWS || toCol + w > COLS) return false;
+
+    // Clear old position
+    this._fill(item.row, item.col, w, h, null);
+
+    // Check if new position is free
+    if (!this._canPlace(toRow, toCol, w, h)) {
+      // Restore old position
+      this._fill(item.row, item.col, w, h, instanceId);
+      return false;
+    }
+
+    // Place at new position
+    this._fill(toRow, toCol, w, h, instanceId);
+    item.row = toRow;
+    item.col = toCol;
+    return true;
+  }
+
+  /**
+   * Swap two items' positions. Returns true if successful.
+   * @param {number} idA
+   * @param {number} idB
+   */
+  swapItems(idA, idB) {
+    const a = this.items.get(idA);
+    const b = this.items.get(idB);
+    if (!a || !b) return false;
+
+    // Clear both
+    this._fill(a.row, a.col, a.def.w, a.def.h, null);
+    this._fill(b.row, b.col, b.def.w, b.def.h, null);
+
+    // Try placing A where B was and B where A was
+    const canPlaceA = this._canPlace(b.row, b.col, a.def.w, a.def.h);
+    const canPlaceB = this._canPlace(a.row, a.col, b.def.w, b.def.h);
+
+    if (canPlaceA && canPlaceB) {
+      const oldARow = a.row, oldACol = a.col;
+      a.row = b.row; a.col = b.col;
+      b.row = oldARow; b.col = oldACol;
+      this._fill(a.row, a.col, a.def.w, a.def.h, idA);
+      this._fill(b.row, b.col, b.def.w, b.def.h, idB);
+      return true;
+    }
+
+    // Restore both
+    this._fill(a.row, a.col, a.def.w, a.def.h, idA);
+    this._fill(b.row, b.col, b.def.w, b.def.h, idB);
+    return false;
+  }
+
+  /**
+   * Get the item instance id at a given grid cell.
+   * @param {number} row
+   * @param {number} col
+   * @returns {number|null}
+   */
+  getItemAt(row, col) {
+    if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return null;
+    return this._grid[row][col];
+  }
+
   // ── Private ────────────────────────────────────────────────────────────────
 
   _findSpace(w, h) {
