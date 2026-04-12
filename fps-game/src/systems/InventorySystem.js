@@ -7,38 +7,38 @@
 export const ITEM_DEFS = {
   rifle_ammo: {
     id: 'rifle_ammo', name: '5.45mm弹药', w: 1, h: 2,
-    color: '#6a7a6a', stackable: true,  maxStack: 60, value: 80,  weight: 0.01, // kg per round
+    color: '#6a7a6a', stackable: true,  maxStack: 60, value: 80,  weight: 0.05,
   },
   pistol_ammo: {
     id: 'pistol_ammo', name: '9mm弹药', w: 1, h: 1,
-    color: '#6a6a7a', stackable: true,  maxStack: 50, value: 50,  weight: 0.008,
+    color: '#6a6a7a', stackable: true,  maxStack: 50, value: 50,  weight: 0.04,
   },
   shotgun_ammo: {
     id: 'shotgun_ammo', name: '12号弹壳', w: 1, h: 1,
-    color: '#8a6a3a', stackable: true,  maxStack: 20, value: 60,  weight: 0.04,
+    color: '#8a6a3a', stackable: true,  maxStack: 20, value: 60,  weight: 0.08,
   },
   bandage: {
     id: 'bandage', name: '绷带', w: 1, h: 1,
-    color: '#c8b89a', stackable: true,  maxStack: 5,  value: 200, weight: 0.10,
+    color: '#c8b89a', stackable: true,  maxStack: 5,  value: 200, weight: 0.3,
     heals: 15,
   },
   medkit: {
     id: 'medkit', name: '急救包', w: 2, h: 2,
-    color: '#cc4444', stackable: false, value: 900,  weight: 0.95,
+    color: '#cc4444', stackable: false, value: 900,  weight: 2.0,
     heals: 60,
   },
   painkillers: {
     id: 'painkillers', name: '止痛药', w: 1, h: 2,
-    color: '#aaaa44', stackable: false, value: 400,  weight: 0.15,
+    color: '#aaaa44', stackable: false, value: 400,  weight: 0.5,
     heals: 30,
   },
   dogtag: {
     id: 'dogtag', name: '狗牌', w: 1, h: 1,
-    color: '#aaaaaa', stackable: false, value: 500,  weight: 0.05,
+    color: '#aaaaaa', stackable: false, value: 500,  weight: 0.2,
   },
   cash: {
     id: 'cash', name: '鸭元', w: 1, h: 1,
-    color: '#88aa55', stackable: true,  maxStack: 999, value: 1,  weight: 0.0,
+    color: '#88aa55', stackable: true,  maxStack: 999, value: 1,  weight: 0.01,
   },
   vss_ammo: {
     id: 'vss_ammo', name: 'SP-6弹药', w: 1, h: 2,

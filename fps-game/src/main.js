@@ -409,7 +409,7 @@ function handleLootPickup(dt) {
         if (def) _lootValue += def.value * pickup.count;
         // Auto-equip armor items
         if (def?.armor) {
-          health.equipArmor(def.armor);
+          health.equipArmor(def.armor, talentSystem.getStats().armorBonus);
           hud.pushKillFeed(`装备: ${def.name} (${Math.round(def.armor.reduce * 100)}%减伤)`);
         } else {
           hud.pushKillFeed(`拾取: ${def?.name ?? pickup.defId}`);
@@ -672,7 +672,7 @@ stash.onSelect((loadout) => {
     inventory.addItem(item.defId, item.count);
     // Auto-equip armor from starting loadout
     const def = ITEM_DEFS[item.defId];
-    if (def?.armor) health.equipArmor(def.armor);
+    if (def?.armor) health.equipArmor(def.armor, talentSystem.getStats().armorBonus);
   }
 
   // Random spawn point
@@ -686,8 +686,8 @@ stash.onSelect((loadout) => {
   player.maxHealth  = 100 + talentStats.hpBonus;
   player.maxStamina = 100 + talentStats.staminaBonus;
 
-  // Reset health & stamina
-  health.reset();
+  // Reset health & stamina (pass talent HP bonus to increase body part HP)
+  health.reset(talentStats.hpBonus);
   player.health          = player.maxHealth;
   player.stamina         = player.maxStamina;
   player.speedMultiplier = talentStats.speedMult;

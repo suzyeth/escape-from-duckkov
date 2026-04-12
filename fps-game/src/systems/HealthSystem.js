@@ -56,13 +56,24 @@ export class HealthSystem {
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-  /** Restore all body parts to full HP and clear bleeding. Does NOT reset armor. */
-  reset() {
+  /**
+   * Restore all body parts to full HP and clear bleeding.
+   * @param {number} hpBonus  extra HP distributed proportionally (from talents)
+   */
+  reset(hpBonus = 0) {
+    // Distribute bonus HP proportionally across parts
+    const baseTotal = Object.values(PART_DEFS).reduce((s, d) => s + d.maxHp, 0);
     for (const [key, def] of Object.entries(PART_DEFS)) {
-      this._hp[key] = def.maxHp;
+      const bonus = Math.round((def.maxHp / baseTotal) * hpBonus);
+      this._hp[key] = def.maxHp + bonus;
+      this._maxHp = this._maxHp || {};
+      this._maxHp[key] = def.maxHp + bonus;
     }
     this._bleeding = false;
   }
+
+  /** Get actual max HP for a part (including talent bonus) */
+  getPartMax(key) { return this._maxHp?.[key] ?? PART_DEFS[key]?.maxHp ?? 0; }
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -95,10 +106,14 @@ export class HealthSystem {
    * Equip or replace armor.
    * @param {{ armorHp: number, reduce: number }} def
    */
-  equipArmor(def) {
+  /**
+   * @param {{ armorHp: number, reduce: number }} def
+   * @param {number} armorBonus  extra reduction from talents (e.g., 0.20)
+   */
+  equipArmor(def, armorBonus = 0) {
     this._armorHp       = def.armorHp;
     this._armorMax      = def.armorHp;
-    this._armorReduce   = def.reduce;
+    this._armorReduce   = Math.min(0.85, def.reduce + armorBonus); // cap at 85%
     this._armorHeadOnly = def.headOnly ?? false;
   }
 
@@ -107,20 +122,22 @@ export class HealthSystem {
     return Object.values(this._hp).reduce((s, v) => s + v, 0);
   }
 
-  /** Sum of all part max HP */
+  /** Sum of all part max HP (including talent bonus) */
   get totalMaxHp() {
+    if (this._maxHp) return Object.values(this._maxHp).reduce((s, v) => s + v, 0);
     return Object.values(PART_DEFS).reduce((s, d) => s + d.maxHp, 0);
   }
 
   /**
    * Effective HP fraction for the main health bar (0–1).
    * Uses the LOWER of: overall HP% or critical part (torso/head) HP%.
-   * This way the bar always reflects how close you are to actual death.
    */
   get effectiveHpFraction() {
     const overallPct = this.totalHp / this.totalMaxHp;
-    const torsoPct   = this._hp[PART.TORSO] / PART_DEFS[PART.TORSO].maxHp;
-    const headPct    = this._hp[PART.HEAD]  / PART_DEFS[PART.HEAD].maxHp;
+    const torsoMax   = this.getPartMax(PART.TORSO);
+    const headMax    = this.getPartMax(PART.HEAD);
+    const torsoPct   = torsoMax > 0 ? this._hp[PART.TORSO] / torsoMax : 0;
+    const headPct    = headMax  > 0 ? this._hp[PART.HEAD]  / headMax  : 0;
     const critPct    = Math.min(torsoPct, headPct);
     return Math.min(overallPct, critPct);
   }
@@ -162,7 +179,7 @@ export class HealthSystem {
       key,
       label:  def.label,
       hp:     this._hp[key],
-      maxHp:  def.maxHp,
+      maxHp:  this.getPartMax(key),
     }));
   }
 

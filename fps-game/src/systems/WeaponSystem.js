@@ -11,29 +11,29 @@ export const WEAPON_DEFS = {
     id:          'rifle',
     name:        'AK-74',
     slot:        0,
-    damage:      28,
-    fireRate:    0.09,
+    damage:      24,           // nerfed from 28
+    fireRate:    0.10,          // nerfed from 0.09 (slower)
     magSize:     30,
     reserveMax:  90,
-    range:       65,
-    spread:      0.006,
-    reloadTime:  2.4,
+    range:       55,            // nerfed from 65
+    spread:      0.018,         // nerfed from 0.006 (much less accurate hip)
+    reloadTime:  2.6,           // nerfed from 2.4
     pellets:     1,
     tracerColor: 0xffdd44,
-    bulletSpeed: 120,         // m/s — fast rifle round
-    falloffStart: 0.5,       // damage starts dropping at 50% of range
+    bulletSpeed: 110,
+    falloffStart: 0.5,
   },
   pistol: {
     id:          'pistol',
     name:        '格洛克17',
     slot:        1,
-    damage:      38,
-    fireRate:    0.32,
+    damage:      32,            // nerfed from 38 but still high per-shot
+    fireRate:    0.18,          // buffed from 0.32 (much faster fire rate)
     magSize:     17,
     reserveMax:  51,
-    range:       28,
-    spread:      0.022,
-    reloadTime:  1.7,
+    range:       30,            // buffed from 28
+    spread:      0.015,         // buffed from 0.022
+    reloadTime:  1.2,           // buffed from 1.7 (fast reload is niche)
     pellets:     1,
     tracerColor: 0xffee88,
     bulletSpeed: 70,
@@ -59,17 +59,17 @@ export const WEAPON_DEFS = {
     id:          'vss',
     name:        'VSS Vintorez',
     slot:        3,
-    damage:      88,
-    fireRate:    0.70,
+    damage:      95,            // buffed from 88 (true 2-shot kill on most enemies)
+    fireRate:    0.55,          // buffed from 0.70 (faster follow-up)
     magSize:     10,
     reserveMax:  30,
     range:       95,
     spread:      0.002,
-    reloadTime:  3.0,
+    reloadTime:  2.6,           // buffed from 3.0
     pellets:     1,
     tracerColor: 0x66ffcc,
-    bulletSpeed: 90,          // subsonic round (suppressed)
-    falloffStart: 0.6,
+    bulletSpeed: 90,
+    falloffStart: 0.65,
   },
   mp5: {
     id:          'mp5',
