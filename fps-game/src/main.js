@@ -979,9 +979,11 @@ const loop = new GameLoop(
     camera.position.lerp(_scratchCamTarget, 0.12);
     camera.lookAt(player.position);
 
-    // Fog of war — player screen position is roughly center-bottom of viewport
-    // because camera looks down at player from behind
-    fogOfWar.update(0.5, 0.55, player.facingAngle);
+    // Fog of war — project player world position to screen coordinates
+    const _fogProj = player.position.clone().project(camera);
+    const fogScreenX = (_fogProj.x + 1) / 2;
+    const fogScreenY = (-_fogProj.y + 1) / 2;
+    fogOfWar.update(fogScreenX, fogScreenY, player.facingAngle);
 
     // HUD
     hud.update(dt);

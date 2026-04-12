@@ -60,10 +60,10 @@ export class FogOfWar {
     // Cut out vision cone using compositing
     ctx.globalCompositeOperation = 'destination-out';
 
-    // Convert facing angle to screen space
-    // In top-down view: +Z is down on screen, +X is right
-    // facingAngle: 0 = +Z (down), PI/2 = +X (right)
-    const screenAngle = -facingAngle + Math.PI;
+    // Convert facing angle to Canvas arc angle
+    // facingAngle: atan2(dx,dz) — 0=+Z(down), PI/2=+X(right)
+    // Canvas arc: 0=+X(right), PI/2=+Y(down)
+    const screenAngle = -facingAngle + Math.PI / 2;
 
     // Draw vision cone as a filled arc
     const halfFov = this._fovAngle / 2;
