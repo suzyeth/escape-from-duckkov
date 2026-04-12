@@ -48,6 +48,7 @@ export class BulletSystem {
       color: 0xffdd44,
       transparent: true,
       opacity: 0.9,
+      toneMapped: false, // bypass tone mapping so bloom picks it up
     });
     const outer = new THREE.Mesh(outerGeo, outerMat);
     outer.position.set(pos.x, 0.5, pos.z);
@@ -60,6 +61,7 @@ export class BulletSystem {
       color: 0xffffff,
       transparent: true,
       opacity: 1.0,
+      toneMapped: false,
     });
     const inner = new THREE.Mesh(innerGeo, innerMat);
     inner.position.set(pos.x, 0.5, pos.z);
@@ -104,6 +106,7 @@ export class BulletSystem {
       transparent: true,
       opacity: 0.8,
       side: THREE.DoubleSide,
+      toneMapped: false,
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.x = -Math.PI / 2;

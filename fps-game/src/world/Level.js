@@ -469,13 +469,13 @@ export class Level {
       pole.castShadow = true;
       this._scene.add(pole);
       // Light fixture
-      const fixMat = new THREE.MeshBasicMaterial({ color: 0xffeeaa });
+      const fixMat = new THREE.MeshBasicMaterial({ color: 0xffeeaa, toneMapped: false });
       const fix = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.4), fixMat);
       fix.position.set(x, 4.5, z);
       this._scene.add(fix);
       // Glow halo sphere
       const glowMat = new THREE.MeshBasicMaterial({
-        color: 0xffdd99, transparent: true, opacity: 0.2, depthWrite: false,
+        color: 0xffdd99, transparent: true, opacity: 0.25, depthWrite: false, toneMapped: false,
       });
       const glow = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), glowMat);
       glow.position.set(x, 4.5, z);

@@ -911,6 +911,9 @@ const loop = new GameLoop(
   () => renderer.render(scene, camera)
 );
 
+// Post-processing
+renderer.initPostProcessing(scene, camera);
+
 // Initial camera snap
 camera.position.copy(player.position).add(CAM_OFFSET);
 camera.lookAt(player.position);
