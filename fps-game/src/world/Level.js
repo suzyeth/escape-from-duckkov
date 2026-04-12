@@ -198,9 +198,6 @@ export class Level {
     this._box(5, -5, 4, 1.2, 2, 0x2a2a2a, 'BurntCar1');
     this._box(-6, 6, 4, 1.2, 2, 0x2a2a2a, 'BurntCar2');
 
-    // Zone connector walls (corridors to other zones)
-    // N corridor to factory/warehouse
-    this._wall(-10, -20, 0.4, 0, 0, 0, ''); // gap is open
     // Sandbag wall
     [[-16,-16],[-16,-12],[-16,-8]].forEach(([x,z],i)=>this._box(x,z,0.6,0.8,2,0x9a8a6a,`Sand${i}`));
   }
@@ -366,24 +363,24 @@ export class Level {
     const winCount = Math.max(1, Math.floor(d / 6));
     for (let wi = 0; wi < winCount; wi++) {
       const wz = cz - hd + (wi + 1) * (d / (winCount + 1));
-      // Left wall windows
+      // Left wall windows (flush with outer face)
       const wl = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.8, 0.7), winMat);
-      wl.position.set(cx - hw - 0.04, h * 0.55, wz);
+      wl.position.set(cx - hw - 0.26, h * 0.5, wz);
       this._scene.add(wl);
       // Right wall windows
       const wr = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.8, 0.7), winMat);
-      wr.position.set(cx + hw + 0.04, h * 0.55, wz);
+      wr.position.set(cx + hw + 0.26, h * 0.5, wz);
       this._scene.add(wr);
     }
 
     // Wall trim / baseboard (darker stripe at bottom)
-    const trimMat = new THREE.MeshLambertMaterial({ color: color - 0x111111 });
+    const trimMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color).multiplyScalar(0.8) });
     const trimBack = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.15, 0.55), trimMat);
     trimBack.position.set(cx, 0.075, cz - hd);
     this._scene.add(trimBack);
 
     // Roof edge trim (lighter color)
-    const edgeMat = new THREE.MeshLambertMaterial({ color: color + 0x0a0a0a });
+    const edgeMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color).multiplyScalar(1.15) });
     const edgeBack = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.12, 0.12), edgeMat);
     edgeBack.position.set(cx, h + 0.06, cz - hd);
     this._scene.add(edgeBack);
@@ -541,9 +538,9 @@ export class Level {
       }
 
       // Lid detail (top ring)
-      const lidMat = new THREE.MeshLambertMaterial({ color: color + 0x111111 });
+      const lidMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color).multiplyScalar(1.2) });
       const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 8), lidMat);
-      lid.position.y = 0.43;
+      lid.position.y = 0.45;
       barrel.add(lid);
 
       barrel.castShadow = true;

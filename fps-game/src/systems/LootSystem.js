@@ -103,7 +103,7 @@ export class LootSystem {
       item.mesh.rotation.y = t * 0.001 + i;
 
       // Pulse scale when near
-      const scale = dist < PICKUP_RANGE ? 1.0 + Math.sin(t * 0.005) * 0.12 : 1.0;
+      const scale = dist < PICKUP_RANGE ? 1.0 + Math.sin(t * 0.005 + i * 0.7) * 0.12 : 1.0;
       item.mesh.scale.setScalar(scale);
 
       // Sync extra meshes (medkit cross)
@@ -116,9 +116,14 @@ export class LootSystem {
 
       if (ePressed && dist < PICKUP_RANGE && !pickup) {
         pickup = { defId: item.defId, count: item.count };
+        // Dispose mesh (may be Group or Mesh)
         this._scene.remove(item.mesh);
-        item.mesh.geometry.dispose();
-        item.mesh.material.dispose();
+        item.mesh.traverse(child => {
+          if (child.isMesh) {
+            child.geometry.dispose();
+            child.material.dispose();
+          }
+        });
         // Clean up extra meshes (e.g., medkit cross)
         if (item.extraMeshes) {
           for (const m of item.extraMeshes) {
@@ -257,17 +262,8 @@ export class LootSystem {
     mesh.castShadow = true;
     this._scene.add(mesh);
 
-    // Extra detail meshes (tracked for cleanup)
+    // Extra meshes array (medkit cross is now built inside _buildItemMesh)
     const extraMeshes = [];
-    if (defId === 'medkit') {
-      const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const h = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.06, 0.06), crossMat);
-      h.position.set(pos.x, vis.size * 0.5 + 0.1, pos.z);
-      this._scene.add(h); extraMeshes.push(h);
-      const v = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.30), crossMat);
-      v.position.set(pos.x, vis.size * 0.5 + 0.1, pos.z);
-      this._scene.add(v); extraMeshes.push(v);
-    }
 
     this._items.push({ mesh, defId, count, pos: pos.clone(), extraMeshes });
   }
@@ -373,7 +369,8 @@ export class LootSystem {
         const body = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.8, s * 0.3), vestMat);
         g.add(body);
         // Shoulder straps
-        const strapMat = new THREE.MeshLambertMaterial({ color: vestColor - 0x111111 });
+        const strapColor = new THREE.Color(vestColor).multiplyScalar(0.8);
+        const strapMat = new THREE.MeshLambertMaterial({ color: strapColor });
         const ls = new THREE.Mesh(new THREE.BoxGeometry(s * 0.15, 0.06, s * 0.6), strapMat);
         ls.position.set(-s * 0.3, s * 0.42, 0); g.add(ls);
         const rs = new THREE.Mesh(new THREE.BoxGeometry(s * 0.15, 0.06, s * 0.6), strapMat);
