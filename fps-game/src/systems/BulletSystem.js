@@ -11,6 +11,7 @@ export class BulletSystem {
     this._tracers  = [];   // { line, mat, life, maxLife }
     this._particles = [];  // { mesh, vel, life, maxLife }
     this._flashes  = [];   // { mesh, life }
+    this._projectiles = []; // { mesh, pos, dir, speed, damage, range, traveled, def, owner }
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
@@ -156,6 +157,109 @@ export class BulletSystem {
     );
     this._scene.add(mesh);
     this._flashes.push({ mesh, mat, life: 0.12 });
+  }
+
+  /**
+   * Spawn a physical projectile bullet.
+   * @param {THREE.Vector3} origin  start position
+   * @param {THREE.Vector3} dir     normalized direction (XZ plane)
+   * @param {object} weaponDef      weapon definition (damage, bulletSpeed, range, etc.)
+   * @param {string} owner          'player' or 'enemy'
+   * @param {number} color          tracer color
+   */
+  spawnProjectile(origin, dir, weaponDef, owner = 'player', color = 0xffdd44) {
+    const speed = weaponDef.bulletSpeed || 100;
+    const range = weaponDef.range || 50;
+
+    // Bullet visual — small elongated box
+    const geo = new THREE.BoxGeometry(0.06, 0.06, 0.25);
+    const mat = new THREE.MeshBasicMaterial({ color, toneMapped: false });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(origin.x, 0.5, origin.z);
+    // Rotate to face direction
+    mesh.rotation.y = Math.atan2(dir.x, dir.z);
+    this._scene.add(mesh);
+
+    this._projectiles.push({
+      mesh,
+      mat,
+      pos: new THREE.Vector3(origin.x, 0.5, origin.z),
+      dir: new THREE.Vector3(dir.x, 0, dir.z).normalize(),
+      speed,
+      damage: weaponDef.damage || 10,
+      range,
+      falloffStart: weaponDef.falloffStart || 0.5,
+      traveled: 0,
+      owner,
+    });
+  }
+
+  /**
+   * Update projectiles — move them, check collisions.
+   * @param {number} dt
+   * @param {import('./AISystem').AISystem} aiSystem  for enemy hit detection
+   * @param {THREE.Object3D[]} collidables  for wall hit detection
+   * @param {import('../entities/Player').Player} player  for enemy bullet → player hit
+   * @returns {{ hits: { target: string, enemy?: object, damage: number, pos: THREE.Vector3 }[] }}
+   */
+  updateProjectiles(dt, aiSystem, collidables, player) {
+    const hits = [];
+
+    for (let i = this._projectiles.length - 1; i >= 0; i--) {
+      const p = this._projectiles[i];
+      const step = p.speed * dt;
+      p.pos.addScaledVector(p.dir, step);
+      p.traveled += step;
+      p.mesh.position.copy(p.pos);
+
+      // Calculate damage with falloff
+      let dmg = p.damage;
+      const rangeFrac = p.traveled / p.range;
+      if (rangeFrac > p.falloffStart) {
+        // Linear falloff from full damage to 50% at max range
+        const falloffFrac = (rangeFrac - p.falloffStart) / (1.0 - p.falloffStart);
+        dmg = p.damage * (1.0 - falloffFrac * 0.5);
+      }
+
+      let hit = false;
+
+      if (p.owner === 'player') {
+        // Check enemy hits
+        const enemy = aiSystem.checkPlayerHit(p.pos, p.dir, 0.8);
+        if (enemy) {
+          hits.push({ target: 'enemy', enemy, damage: Math.round(dmg), pos: p.pos.clone() });
+          hit = true;
+        }
+      } else {
+        // Enemy bullet → check player hit
+        const dx = player.position.x - p.pos.x;
+        const dz = player.position.z - p.pos.z;
+        if (Math.sqrt(dx * dx + dz * dz) < 0.65) {
+          hits.push({ target: 'player', damage: Math.round(dmg), pos: p.pos.clone() });
+          hit = true;
+        }
+      }
+
+      // Check wall hits
+      if (!hit) {
+        const ray = new THREE.Raycaster(p.pos, p.dir, 0, step + 0.3);
+        const wallHits = ray.intersectObjects(collidables, false);
+        if (wallHits.length > 0 && wallHits[0].object.name !== 'Floor') {
+          this.spawnHitEffect(wallHits[0].point);
+          hit = true;
+        }
+      }
+
+      // Remove if hit or out of range
+      if (hit || p.traveled >= p.range) {
+        this._scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        p.mat.dispose();
+        this._projectiles.splice(i, 1);
+      }
+    }
+
+    return { hits };
   }
 
   // ── Per-frame update ───────────────────────────────────────────────────────

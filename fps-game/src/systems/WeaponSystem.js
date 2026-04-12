@@ -12,14 +12,16 @@ export const WEAPON_DEFS = {
     name:        'AK-74',
     slot:        0,
     damage:      28,
-    fireRate:    0.09,   // seconds between shots (full-auto)
+    fireRate:    0.09,
     magSize:     30,
     reserveMax:  90,
     range:       65,
-    spread:      0.006,  // radians of random deviation
+    spread:      0.006,
     reloadTime:  2.4,
     pellets:     1,
     tracerColor: 0xffdd44,
+    bulletSpeed: 120,         // m/s — fast rifle round
+    falloffStart: 0.5,       // damage starts dropping at 50% of range
   },
   pistol: {
     id:          'pistol',
@@ -34,6 +36,8 @@ export const WEAPON_DEFS = {
     reloadTime:  1.7,
     pellets:     1,
     tracerColor: 0xffee88,
+    bulletSpeed: 70,
+    falloffStart: 0.4,
   },
   shotgun: {
     id:          'shotgun',
@@ -48,27 +52,31 @@ export const WEAPON_DEFS = {
     reloadTime:  3.2,
     pellets:     8,
     tracerColor: 0xff8844,
+    bulletSpeed: 60,
+    falloffStart: 0.3,
   },
   vss: {
     id:          'vss',
     name:        'VSS Vintorez',
     slot:        3,
-    damage:      88,          // high alpha — one-shots head, two-shots torso
-    fireRate:    0.70,        // semi-auto feel
+    damage:      88,
+    fireRate:    0.70,
     magSize:     10,
     reserveMax:  30,
-    range:       95,          // longest range
-    spread:      0.002,       // very precise
+    range:       95,
+    spread:      0.002,
     reloadTime:  3.0,
     pellets:     1,
     tracerColor: 0x66ffcc,
+    bulletSpeed: 90,          // subsonic round (suppressed)
+    falloffStart: 0.6,
   },
   mp5: {
     id:          'mp5',
     name:        'MP5',
     slot:        4,
     damage:      22,
-    fireRate:    0.075,       // fast full-auto (800 RPM)
+    fireRate:    0.075,
     magSize:     30,
     reserveMax:  90,
     range:       38,
@@ -76,6 +84,8 @@ export const WEAPON_DEFS = {
     reloadTime:  1.9,
     pellets:     1,
     tracerColor: 0xffdd88,
+    bulletSpeed: 80,
+    falloffStart: 0.45,
   },
 };
 

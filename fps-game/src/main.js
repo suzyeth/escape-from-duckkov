@@ -295,41 +295,8 @@ function handlePlayerShoot() {
       Math.cos(angle) + (Math.random() - 0.5) * spread
     ).normalize();
 
-    const hitEnemy = aiSystem.checkPlayerHit(muzzlePos, dir, def.range);
-    if (hitEnemy) {
-      hitEnemy.takeDamage(def.damage);
-      bullets.spawnTracer(muzzlePos, hitEnemy.position, def.tracerColor);
-      bullets.spawnHitEffect(hitEnemy.position);
-      sound.playHitMarker();
-      // Crosshair hit flash
-      if (_crosshairEl) {
-        _crosshairEl.classList.remove('shoot');
-        _crosshairEl.classList.add('hit');
-        setTimeout(() => _crosshairEl.classList.remove('hit'), 120);
-      }
-      if (!hitEnemy.isAlive) {
-        _killCount++;
-        const label = hitEnemy.isElite ? '★精英鸭卒' : '鸭卒';
-        const xpGain = hitEnemy.isElite ? XP_REWARDS.eliteKill : XP_REWARDS.kill;
-        hud.pushKillFeed(`击毙${label} [${_killCount}]`);
-        hud.setKillCount(_killCount);
-        _gainXP(xpGain, label);
-        bullets.spawnKillEffect(hitEnemy.position);
-        sound.playKillConfirm();
-        _addScreenShake(hitEnemy.isElite ? 0.5 : 0.3);
-        _hitstopTimer = hitEnemy.isElite ? 0.08 : 0.05;
-        loot.dropLoot(hitEnemy.position, _randomEnemyDrop(hitEnemy.isElite));
-      }
-    } else {
-      const ray  = new THREE.Raycaster(muzzlePos, dir, 0, def.range);
-      const hits = ray.intersectObjects(level.collidables, false);
-      const endPt = hits.length > 0
-        ? hits[0].point
-        : muzzlePos.clone().addScaledVector(dir, def.range);
-
-      bullets.spawnTracer(muzzlePos, endPt, def.tracerColor);
-      if (hits.length > 0) bullets.spawnHitEffect(hits[0].point);
-    }
+    // Spawn physical projectile instead of hitscan
+    bullets.spawnProjectile(muzzlePos, dir, def, 'player', def.tracerColor);
   }
 }
 
@@ -357,42 +324,20 @@ function _randomEnemyDrop(isElite = false) {
 
 const _enemyShotRay = new THREE.Raycaster();
 
+// Enemy shot definition for projectile system
+const ENEMY_BULLET_DEF = {
+  damage: 10,
+  bulletSpeed: 55,
+  range: 30,
+  falloffStart: 0.5,
+};
+
 function handleEnemyShots(shots) {
   for (const shot of shots) {
-    _enemyShotRay.set(shot.origin, shot.dir);
-    _enemyShotRay.near = 0;
-    _enemyShotRay.far  = 30;
-    const wallHits = _enemyShotRay.intersectObjects(level.collidables, false);
-    const wallDist = wallHits.length > 0 && wallHits[0].object.name !== 'Floor'
-      ? wallHits[0].distance
-      : 30;
-
-    const endPt = shot.origin.clone().addScaledVector(shot.dir, wallDist);
-    bullets.spawnTracer(shot.origin, endPt, 0xff4444);
-
-    const toPlayer = new THREE.Vector3(
-      player.position.x - shot.origin.x, 0,
-      player.position.z - shot.origin.z
-    );
-    const t = toPlayer.dot(shot.dir);
-    if (t > 0 && t < wallDist) {
-      const closest    = shot.origin.clone().addScaledVector(shot.dir, t);
-      closest.y        = 0;
-      const playerFlat = new THREE.Vector3(player.position.x, 0, player.position.z);
-      if (closest.distanceTo(playerFlat) < 0.65) {
-        // Route damage through HealthSystem (random body part)
-        const partHit = health.takeDamage(shot.damage);
-        // Sync simplified health to player for HUD bar
-        player.health    = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
-        player.speedMultiplier = health.speedMultiplier;
-        hud.showDamageFlash();
-        sound.playDamaged();
-        _addScreenShake(0.6);
-        hud.pushKillFeed(`中弹！(${_partLabel(partHit)})`);
-
-        if (!health.isAlive) _onPlayerDied();
-      }
-    }
+    // Spawn enemy projectile (red tracer, slower than player bullets)
+    const enemyDef = { ...ENEMY_BULLET_DEF, damage: shot.damage };
+    bullets.spawnProjectile(shot.origin, shot.dir, enemyDef, 'enemy', 0xff4444);
+    bullets.spawnMuzzleFlash(shot.origin);
   }
 }
 
@@ -827,8 +772,45 @@ const loop = new GameLoop(
     // Shooting
     handlePlayerShoot();
 
-    // Bullets
+    // Bullets — visual effects
     bullets.update(dt);
+
+    // Projectiles — physical bullet movement + collision
+    const projResult = bullets.updateProjectiles(dt, aiSystem, level.collidables, player);
+    for (const hit of projResult.hits) {
+      if (hit.target === 'enemy' && hit.enemy) {
+        hit.enemy.takeDamage(hit.damage);
+        bullets.spawnHitEffect(hit.pos);
+        sound.playHitMarker();
+        if (_crosshairEl) {
+          _crosshairEl.classList.remove('shoot');
+          _crosshairEl.classList.add('hit');
+          setTimeout(() => _crosshairEl.classList.remove('hit'), 120);
+        }
+        if (!hit.enemy.isAlive) {
+          _killCount++;
+          const label = hit.enemy.isElite ? '★精英鸭卒' : '鸭卒';
+          const xpGain = hit.enemy.isElite ? XP_REWARDS.eliteKill : XP_REWARDS.kill;
+          hud.pushKillFeed(`击毙${label} [${_killCount}]`);
+          hud.setKillCount(_killCount);
+          _gainXP(xpGain, label);
+          bullets.spawnKillEffect(hit.enemy.position);
+          sound.playKillConfirm();
+          _addScreenShake(hit.enemy.isElite ? 0.5 : 0.3);
+          _hitstopTimer = hit.enemy.isElite ? 0.08 : 0.05;
+          loot.dropLoot(hit.enemy.position, _randomEnemyDrop(hit.enemy.isElite));
+        }
+      } else if (hit.target === 'player') {
+        const partHit = health.takeDamage(hit.damage);
+        player.health = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
+        player.speedMultiplier = health.speedMultiplier;
+        hud.showDamageFlash();
+        sound.playDamaged();
+        _addScreenShake(0.4);
+        hud.pushKillFeed(`中弹！(${_partLabel(partHit)}) -${hit.damage}HP`);
+        if (!health.isAlive) _onPlayerDied();
+      }
+    }
 
     // AI
     _firedRecentlyTimer = Math.max(0, _firedRecentlyTimer - dt);
