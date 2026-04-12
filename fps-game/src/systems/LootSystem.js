@@ -117,13 +117,17 @@ export class LootSystem {
    * @param {{ defId:string, count:number }[]} drops
    */
   dropLoot(pos, drops) {
+    // Merge same-type drops before spawning
+    const merged = new Map();
     for (const drop of drops) {
-      const offset = new THREE.Vector3(
-        (Math.random() - 0.5) * 1.2,
-        0,
-        (Math.random() - 0.5) * 1.2
-      );
-      this._spawnItem(drop.defId, drop.count, pos.clone().add(offset));
+      merged.set(drop.defId, (merged.get(drop.defId) || 0) + drop.count);
+    }
+    let i = 0;
+    for (const [defId, count] of merged) {
+      const angle = (i / merged.size) * Math.PI * 2;
+      const offset = new THREE.Vector3(Math.cos(angle) * 0.8, 0, Math.sin(angle) * 0.8);
+      this._spawnItem(defId, count, pos.clone().add(offset));
+      i++;
     }
   }
 

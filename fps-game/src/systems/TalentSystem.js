@@ -4,57 +4,31 @@
  * Unlocked talents persist in SaveSystem.
  */
 
+/**
+ * Talent categories — each category has 3 levels, progressively more expensive.
+ * Only need to unlock sequentially within each category. No XP cost, just currency.
+ * Simpler, clearer progression than the old system.
+ */
 export const TALENTS = [
-  {
-    id: 'backpack_1',    name: '背包扩容 I',    desc: '负重上限 +5kg',
-    cost: 300,  xpCost: 100,  tier: 1,
-    effect: { weightBonus: 5 },
-  },
-  {
-    id: 'backpack_2',    name: '背包扩容 II',   desc: '负重上限 +10kg',
-    cost: 800,  xpCost: 300,  tier: 2, requires: 'backpack_1',
-    effect: { weightBonus: 10 },
-  },
-  {
-    id: 'vitality_1',   name: '体能训练 I',     desc: '最大生命值 +15',
-    cost: 200,  xpCost: 50,   tier: 1,
-    effect: { hpBonus: 15 },
-  },
-  {
-    id: 'vitality_2',   name: '体能训练 II',    desc: '最大生命值 +30',
-    cost: 600,  xpCost: 200,  tier: 2, requires: 'vitality_1',
-    effect: { hpBonus: 30 },
-  },
-  {
-    id: 'endurance_1',  name: '耐力训练 I',     desc: '体力上限 +20，恢复速度 +30%',
-    cost: 250,  xpCost: 80,   tier: 1,
-    effect: { staminaBonus: 20, staminaRegen: 1.3 },
-  },
-  {
-    id: 'aim_1',        name: '战术瞄准 I',     desc: '射击散布 -15%',
-    cost: 400,  xpCost: 150,  tier: 1,
-    effect: { spreadMult: 0.85 },
-  },
-  {
-    id: 'aim_2',        name: '战术瞄准 II',    desc: '射击散布 -30%',
-    cost: 1000, xpCost: 400,  tier: 2, requires: 'aim_1',
-    effect: { spreadMult: 0.70 },
-  },
-  {
-    id: 'speed_1',      name: '轻量化训练',     desc: '移动速度 +10%',
-    cost: 350,  xpCost: 120,  tier: 1,
-    effect: { speedMult: 1.10 },
-  },
-  {
-    id: 'reload_1',     name: '快速换弹',       desc: '换弹速度 +20%',
-    cost: 500,  xpCost: 200,  tier: 1,
-    effect: { reloadMult: 0.80 },
-  },
-  {
-    id: 'armor_1',      name: '护甲精通',       desc: '护甲减伤效率 +15%',
-    cost: 600,  xpCost: 250,  tier: 1,
-    effect: { armorBonus: 0.15 },
-  },
+  // ── 生存 ──
+  { id: 'hp_1', name: '生命强化 I',   desc: '+20 最大生命',     cost: 200,  category: '生存', effect: { hpBonus: 20 } },
+  { id: 'hp_2', name: '生命强化 II',  desc: '+40 最大生命',     cost: 500,  category: '生存', requires: 'hp_1', effect: { hpBonus: 40 } },
+  { id: 'hp_3', name: '生命强化 III', desc: '+60 最大生命',     cost: 1200, category: '生存', requires: 'hp_2', effect: { hpBonus: 60 } },
+
+  // ── 机动 ──
+  { id: 'spd_1', name: '轻量化 I',   desc: '+8% 移速',         cost: 200,  category: '机动', effect: { speedMult: 1.08 } },
+  { id: 'spd_2', name: '轻量化 II',  desc: '+15% 移速',        cost: 500,  category: '机动', requires: 'spd_1', effect: { speedMult: 1.15 } },
+  { id: 'sta_1', name: '耐力强化',   desc: '+30 体力上限',      cost: 300,  category: '机动', effect: { staminaBonus: 30 } },
+
+  // ── 战斗 ──
+  { id: 'aim_1', name: '精准射击 I',  desc: '-20% 散布',        cost: 300,  category: '战斗', effect: { spreadMult: 0.80 } },
+  { id: 'aim_2', name: '精准射击 II', desc: '-35% 散布',        cost: 800,  category: '战斗', requires: 'aim_1', effect: { spreadMult: 0.65 } },
+  { id: 'rld_1', name: '快速换弹',   desc: '-25% 换弹时间',     cost: 400,  category: '战斗', effect: { reloadMult: 0.75 } },
+
+  // ── 负重 ──
+  { id: 'bag_1', name: '背包扩容 I',  desc: '+8kg 负重上限',    cost: 250,  category: '负重', effect: { weightBonus: 8 } },
+  { id: 'bag_2', name: '背包扩容 II', desc: '+15kg 负重上限',   cost: 600,  category: '负重', requires: 'bag_1', effect: { weightBonus: 15 } },
+  { id: 'arm_1', name: '护甲精通',   desc: '+20% 护甲效率',     cost: 500,  category: '负重', effect: { armorBonus: 0.20 } },
 ];
 
 export class TalentSystem {
@@ -87,7 +61,6 @@ export class TalentSystem {
     if (this.isUnlocked(id)) return false;
     if (talent.requires && !this.isUnlocked(talent.requires)) return false;
     if (this._save.currency < talent.cost) return false;
-    if ((this._save.stats.totalXP || 0) < talent.xpCost) return false;
     return true;
   }
 

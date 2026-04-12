@@ -12,7 +12,8 @@ export class FogOfWar {
     this._canvas.id = 'fog-of-war';
     this._canvas.style.cssText = `
       position: fixed; inset: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 5; opacity: 0.85;
+      pointer-events: none; z-index: 5; opacity: 0.72;
+      mix-blend-mode: multiply;
     `;
     document.body.appendChild(this._canvas);
     this._ctx = this._canvas.getContext('2d');

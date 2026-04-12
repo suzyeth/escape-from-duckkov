@@ -176,43 +176,69 @@ export class BaseScreen {
     talTitle.textContent = '天赋升级 (PerkPalace)';
     content.appendChild(talTitle);
 
-    const talGrid = document.createElement('div');
-    talGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:.6rem';
+    // Group talents by category
+    const categories = new Map();
     for (const t of TALENTS) {
-      const unlocked = this._talents.isUnlocked(t.id);
-      const canBuy   = this._talents.canUnlock(t.id);
+      if (!categories.has(t.category)) categories.set(t.category, []);
+      categories.get(t.category).push(t);
+    }
 
-      const card = document.createElement('div');
-      card.style.cssText = `background:#111;border:1px solid ${unlocked ? '#4caf50' : canBuy ? '#c8a96e' : '#333'};border-radius:4px;padding:.6rem;width:150px;opacity:${unlocked ? '0.6' : '1'}`;
+    const talGrid = document.createElement('div');
+    talGrid.style.cssText = 'display:flex;flex-direction:column;gap:1rem';
 
-      const name = document.createElement('div');
-      name.style.cssText = 'font-size:.7rem;color:#c8a96e;margin-bottom:.3rem';
-      name.textContent = t.name + (unlocked ? ' ✓' : '');
-      card.appendChild(name);
+    for (const [catName, catTalents] of categories) {
+      const catDiv = document.createElement('div');
 
-      const desc = document.createElement('div');
-      desc.style.cssText = 'font-size:.55rem;color:#888;margin-bottom:.3rem';
-      desc.textContent = t.desc;
-      card.appendChild(desc);
+      const catLabel = document.createElement('div');
+      catLabel.style.cssText = 'font-size:.65rem;color:#666;letter-spacing:.15em;margin-bottom:.4rem';
+      catLabel.textContent = catName;
+      catDiv.appendChild(catLabel);
 
-      if (!unlocked) {
-        const cost = document.createElement('div');
-        cost.style.cssText = 'font-size:.55rem;color:#666';
-        cost.textContent = `${t.cost} 鸭元 / ${t.xpCost} XP`;
-        card.appendChild(cost);
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:.5rem;flex-wrap:wrap';
 
-        if (canBuy) {
-          const btn = document.createElement('button');
-          btn.className = 'level-start-btn';
-          btn.style.cssText = 'margin-top:.4rem;font-size:.6rem;padding:.25rem 0';
-          btn.textContent = '解锁';
-          btn.addEventListener('click', () => {
-            if (this._talents.unlock(t.id)) this._render();
-          });
-          card.appendChild(btn);
+      for (const t of catTalents) {
+        const unlocked = this._talents.isUnlocked(t.id);
+        const canBuy   = this._talents.canUnlock(t.id);
+        const locked   = t.requires && !this._talents.isUnlocked(t.requires);
+
+        const card = document.createElement('div');
+        card.style.cssText = `background:${unlocked ? '#1a2a1a' : '#111'};border:1px solid ${unlocked ? '#4caf50' : canBuy ? '#c8a96e' : '#2a2a2a'};border-radius:4px;padding:.5rem .6rem;width:140px;opacity:${locked ? '0.35' : '1'}`;
+
+        const name = document.createElement('div');
+        name.style.cssText = `font-size:.65rem;color:${unlocked ? '#4caf50' : '#c8a96e'};margin-bottom:.2rem`;
+        name.textContent = (unlocked ? '✓ ' : '') + t.name;
+        card.appendChild(name);
+
+        const desc = document.createElement('div');
+        desc.style.cssText = 'font-size:.5rem;color:#777;margin-bottom:.3rem';
+        desc.textContent = t.desc;
+        card.appendChild(desc);
+
+        if (!unlocked && !locked) {
+          const cost = document.createElement('div');
+          cost.style.cssText = `font-size:.55rem;color:${canBuy ? '#88aa55' : '#555'}`;
+          cost.textContent = `${t.cost} 鸭元`;
+          card.appendChild(cost);
+
+          if (canBuy) {
+            const btn = document.createElement('button');
+            btn.className = 'level-start-btn';
+            btn.style.cssText = 'margin-top:.3rem;font-size:.55rem;padding:.2rem 0';
+            btn.textContent = '解锁';
+            btn.addEventListener('click', () => {
+              if (this._talents.unlock(t.id)) {
+                this._checkUnlocks();
+                this._render();
+              }
+            });
+            card.appendChild(btn);
+          }
         }
+        row.appendChild(card);
       }
-      talGrid.appendChild(card);
+      catDiv.appendChild(row);
+      talGrid.appendChild(catDiv);
     }
     content.appendChild(talGrid);
 
