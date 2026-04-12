@@ -335,10 +335,22 @@ const ENEMY_BULLET_DEF = {
 
 function handleEnemyShots(shots) {
   for (const shot of shots) {
-    // Spawn enemy projectile (red tracer, slower than player bullets)
-    const enemyDef = { ...ENEMY_BULLET_DEF, damage: shot.damage };
-    bullets.spawnProjectile(shot.origin, shot.dir, enemyDef, 'enemy', 0xff4444);
-    bullets.spawnMuzzleFlash(shot.origin);
+    if (shot.isMelee) {
+      // Melee: instant damage, no projectile
+      const partHit = health.takeDamage(shot.damage);
+      player.health = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
+      player.speedMultiplier = health.speedMultiplier;
+      hud.showDamageFlash();
+      sound.playDamaged();
+      _addScreenShake(0.8);
+      hud.pushKillFeed(`被近战攻击！(${_partLabel(partHit)}) -${shot.damage}HP`);
+      if (!health.isAlive) _onPlayerDied();
+    } else {
+      // Ranged: spawn enemy projectile
+      const enemyDef = { ...ENEMY_BULLET_DEF, damage: shot.damage };
+      bullets.spawnProjectile(shot.origin, shot.dir, enemyDef, 'enemy', 0xff4444);
+      bullets.spawnMuzzleFlash(shot.origin);
+    }
   }
 }
 
@@ -790,8 +802,10 @@ const loop = new GameLoop(
         }
         if (!hit.enemy.isAlive) {
           _killCount++;
-          const label = hit.enemy.isElite ? '★精英鸭卒' : '鸭卒';
-          const xpGain = hit.enemy.isElite ? XP_REWARDS.eliteKill : XP_REWARDS.kill;
+          const LABELS = { normal: '鸭卒', elite: '★精英鸭卒', rusher: '暴走鸭', tank: '重甲鸭', boss: 'BOSS 鸭王' };
+          const label = LABELS[hit.enemy.enemyType] ?? '鸭卒';
+          const XP_BY_TYPE = { normal: 50, elite: 200, rusher: 75, tank: 150, boss: 500 };
+          const xpGain = XP_BY_TYPE[hit.enemy.enemyType] ?? XP_REWARDS.kill;
           hud.pushKillFeed(`击毙${label} [${_killCount}]`);
           hud.setKillCount(_killCount);
           _gainXP(xpGain, label);

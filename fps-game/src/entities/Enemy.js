@@ -20,6 +20,18 @@ const ELITE_SHOOT_DAMAGE   = 16;
 const ELITE_VISION_RANGE   = 24;
 const ELITE_SHOOT_RANGE    = 22;
 
+/**
+ * Enemy archetypes — define stats and behavior per type.
+ * 'normal' and 'elite' are legacy types; new types extend the system.
+ */
+export const ENEMY_TYPES = {
+  normal:  { hp: 80,  speed: 3.8, damage: 10, interval: 1.3,  range: 16, vision: 18, melee: false, color: 0x7a3a1e, headColor: 0xf0c060, label: '鸭卒' },
+  elite:   { hp: 160, speed: 3.8, damage: 16, interval: 0.85, range: 22, vision: 24, melee: false, color: 0x3a0a0a, headColor: 0xcc9944, label: '★精英鸭卒' },
+  rusher:  { hp: 60,  speed: 6.5, damage: 25, interval: 0.8,  range: 2,  vision: 20, melee: true,  color: 0x8a2a1a, headColor: 0xee8844, label: '暴走鸭' },
+  tank:    { hp: 300, speed: 2.0, damage: 20, interval: 1.0,  range: 18, vision: 16, melee: false, color: 0x2a2a3a, headColor: 0x8888aa, label: '重甲鸭' },
+  boss:    { hp: 600, speed: 3.0, damage: 30, interval: 0.6,  range: 25, vision: 30, melee: false, color: 0x1a0a1a, headColor: 0xff4444, label: 'BOSS 鸭王' },
+};
+
 const WALL_DIRS = [
   new THREE.Vector3( 1, 0,  0),
   new THREE.Vector3(-1, 0,  0),
@@ -47,25 +59,36 @@ export class Enemy {
    * @param {THREE.Scene}     scene
    * @param {THREE.Vector3}   spawnPos
    * @param {THREE.Vector3[]} waypoints
-   * @param {boolean}         isElite    — stronger, tougher, better drops
+   * @param {boolean|string}  typeOrElite — enemy type key or boolean (legacy: true=elite)
    */
-  constructor(scene, spawnPos, waypoints = [], isElite = false) {
+  constructor(scene, spawnPos, waypoints = [], typeOrElite = false) {
     this._scene     = scene;
     this.position   = spawnPos.clone();
     this.position.y = 0;
     this.waypoints  = waypoints;
     this._wpIdx     = 0;
-    this.isElite    = isElite;
 
+    // Resolve type
+    let typeKey = 'normal';
+    if (typeOrElite === true) typeKey = 'elite';
+    else if (typeof typeOrElite === 'string' && ENEMY_TYPES[typeOrElite]) typeKey = typeOrElite;
+    this.enemyType  = typeKey;
+    this.isElite    = typeKey === 'elite' || typeKey === 'boss';
+    this.isMelee    = ENEMY_TYPES[typeKey].melee;
+    this.isBoss     = typeKey === 'boss';
+
+    const t = ENEMY_TYPES[typeKey];
     this.state      = STATE.PATROL;
-    this.health     = isElite ? ELITE_HP : 80;
-    this.maxHealth  = isElite ? ELITE_HP : 80;
+    this.health     = t.hp;
+    this.maxHealth  = t.hp;
 
-    // Per-instance overrides for elite stats
-    this._shootRange    = isElite ? ELITE_SHOOT_RANGE    : SHOOT_RANGE;
-    this._shootInterval = isElite ? ELITE_SHOOT_INTERVAL : SHOOT_INTERVAL;
-    this._shootDamage   = isElite ? ELITE_SHOOT_DAMAGE   : SHOOT_DAMAGE;
-    this._visionRange   = isElite ? ELITE_VISION_RANGE   : VISION_RANGE;
+    this._shootRange    = t.range;
+    this._shootInterval = t.interval;
+    this._shootDamage   = t.damage;
+    this._visionRange   = t.vision;
+    this._chaseSpeed    = t.speed;
+    this._bodyColor     = t.color;
+    this._headColor     = t.headColor;
 
     this._facing       = 0;          // Y-axis angle (radians)
     this._alertTimer   = 0;
@@ -247,10 +270,13 @@ export class Enemy {
   _doCombat(dt, playerPos, collidables) {
     const dist = this.position.distanceTo(playerPos);
     this._facePos(playerPos);
-    if (dist > this._shootRange * 0.55) {
-      this._moveTo(playerPos, CHASE_SPEED, dt, collidables);
+
+    if (this.isMelee) {
+      // Melee: always charge toward player
+      this._moveTo(playerPos, this._chaseSpeed, dt, collidables);
+    } else if (dist > this._shootRange * 0.55) {
+      this._moveTo(playerPos, this._chaseSpeed, dt, collidables);
     } else if (dist < this._shootRange * 0.25) {
-      // Back away — use _v2 as scratch target (not _v1, which _moveTo uses internally)
       this._v2.subVectors(this.position, playerPos).normalize().add(this.position);
       this._moveTo(this._v2, PATROL_SPEED, dt, collidables);
     }
@@ -259,15 +285,25 @@ export class Enemy {
   _tryShoot(dt, playerPos, collidables) {
     this._shootTimer = Math.max(0, this._shootTimer - dt);
     if (this._shootTimer > 0) return { shot: false };
-    if (this.position.distanceTo(playerPos) > this._shootRange) return { shot: false };
+    const dist = this.position.distanceTo(playerPos);
+    if (dist > this._shootRange) return { shot: false };
+
+    // Melee attack — direct damage when close enough
+    if (this.isMelee) {
+      if (dist < 2.0) {
+        this._shootTimer = this._shootInterval;
+        return { shot: true, origin: this.position.clone(), dir: this._v1.clone(), damage: this._shootDamage, isMelee: true };
+      }
+      return { shot: false };
+    }
 
     // Wall occlusion check before firing — reuse scratch vectors
     this._origin05.set(this.position.x, 0.5, this.position.z);
     this._v1.set(playerPos.x - this._origin05.x, 0, playerPos.z - this._origin05.z);
-    const dist = this._v1.length();
+    const wallDist = this._v1.length();
     this._v1.normalize();
     this._visionRay.set(this._origin05, this._v1);
-    this._visionRay.far = dist - 0.2;
+    this._visionRay.far = wallDist - 0.2;
     const wallHits = this._visionRay.intersectObjects(collidables, false);
     if (wallHits.some(h => h.object.name !== 'Floor')) return { shot: false };
 
@@ -476,6 +512,9 @@ export class Enemy {
   _buildMesh() {
     const g = new THREE.Group();
     const elite = this.isElite;
+    const bodyC = this._bodyColor;
+    const headC = this._headColor;
+    const isBoss = this.isBoss;
 
     // Legs
     const legMat = new THREE.MeshLambertMaterial({ color: elite ? 0x2a1a1a : 0x4a3a2a });
@@ -487,7 +526,7 @@ export class Enemy {
     // Body
     const bodyW = elite ? 0.55 : 0.46;
     const bodyH = elite ? 0.70 : 0.58;
-    const bMat = new THREE.MeshLambertMaterial({ color: elite ? 0x3a0a0a : 0x7a3a1e });
+    const bMat = new THREE.MeshLambertMaterial({ color: bodyC });
     const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, 0.30), bMat);
     body.position.y = 0.05; body.castShadow = true; g.add(body);
 
@@ -499,20 +538,38 @@ export class Enemy {
     }
 
     // Arms with weapon
-    const armMat = new THREE.MeshLambertMaterial({ color: elite ? 0x3a0a0a : 0x7a3a1e });
+    const armMat = new THREE.MeshLambertMaterial({ color: bodyC });
     const la = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.42, 6), armMat);
     la.position.set(-(bodyW/2 + 0.06), 0.0, 0.06); la.rotation.x = 0.4; la.castShadow = true; g.add(la);
     const ra = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.42, 6), armMat);
     ra.position.set(bodyW/2 + 0.06, 0.0, 0.06); ra.rotation.x = 0.4; ra.castShadow = true; g.add(ra);
 
-    // Weapon
-    const gunMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
-    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, elite ? 0.50 : 0.40), gunMat);
-    gun.position.set(bodyW/2 + 0.06, -0.05, 0.35); g.add(gun);
+    // Weapon — melee types get a blade, ranged get a gun
+    if (this.isMelee) {
+      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.45), bladeMat);
+      blade.position.set(bodyW/2 + 0.06, -0.05, 0.35); g.add(blade);
+      // Red glow on blade tip (attack indicator)
+      const tipMat = new THREE.MeshBasicMaterial({ color: 0xff2222, toneMapped: false });
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), tipMat);
+      tip.position.set(bodyW/2 + 0.06, -0.05, 0.60); g.add(tip);
+    } else {
+      const gunMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+      const gun = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, elite ? 0.50 : 0.40), gunMat);
+      gun.position.set(bodyW/2 + 0.06, -0.05, 0.35); g.add(gun);
+    }
+
+    // Boss crown
+    if (isBoss) {
+      const crownMat = new THREE.MeshBasicMaterial({ color: 0xffdd00, toneMapped: false });
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.28, 0.15, 5), crownMat);
+      crown.position.y = (elite ? 0.68 : 0.58) + headR + 0.1;
+      g.add(crown);
+    }
 
     // Head
     const headR = elite ? 0.26 : 0.22;
-    const hMat = new THREE.MeshLambertMaterial({ color: elite ? 0xcc9944 : 0xf0c060 });
+    const hMat = new THREE.MeshLambertMaterial({ color: headC });
     const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 8, 6), hMat);
     head.position.y = elite ? 0.68 : 0.58; head.castShadow = true; g.add(head);
 

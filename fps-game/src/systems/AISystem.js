@@ -88,9 +88,14 @@ export class AISystem {
         new THREE.Vector3(pos.x + 8, 0, pos.z + 8),
         new THREE.Vector3(pos.x, 0, pos.z + 8),
       ];
-      // 15% chance of elite in wave
-      const isElite = Math.random() < 0.15;
-      const enemy = new Enemy(this._scene, pos, wp, isElite);
+      // Random enemy type in wave
+      const roll = Math.random();
+      let type = 'normal';
+      if (roll < 0.05)      type = 'boss';
+      else if (roll < 0.15) type = 'elite';
+      else if (roll < 0.30) type = 'rusher';
+      else if (roll < 0.40) type = 'tank';
+      const enemy = new Enemy(this._scene, pos, wp, type);
       this.enemies.push(enemy);
       spawned++;
     }
@@ -296,6 +301,73 @@ export class AISystem {
         ],
       },
 
+      // ── Rushers (melee chargers) ───────────────────────────────────────────
+      {
+        type: 'rusher',
+        pos: new THREE.Vector3(-16, 0, -35),
+        waypoints: [
+          new THREE.Vector3(-16, 0, -35),
+          new THREE.Vector3(-10, 0, -35),
+          new THREE.Vector3(-10, 0, -28),
+          new THREE.Vector3(-16, 0, -28),
+        ],
+      },
+      {
+        type: 'rusher',
+        pos: new THREE.Vector3(14, 0, 32),
+        waypoints: [
+          new THREE.Vector3(14, 0, 32),
+          new THREE.Vector3(22, 0, 32),
+          new THREE.Vector3(22, 0, 40),
+          new THREE.Vector3(14, 0, 40),
+        ],
+      },
+      {
+        type: 'rusher',
+        pos: new THREE.Vector3(-38, 0, 52),
+        waypoints: [
+          new THREE.Vector3(-38, 0, 52),
+          new THREE.Vector3(-30, 0, 52),
+          new THREE.Vector3(-30, 0, 58),
+          new THREE.Vector3(-38, 0, 58),
+        ],
+      },
+
+      // ── Tanks (heavy armor) ───────────────────────────────────────────────
+      {
+        type: 'tank',
+        pos: new THREE.Vector3(0, 0, -4),
+        waypoints: [
+          new THREE.Vector3(0, 0, -4),
+          new THREE.Vector3(6, 0, -4),
+          new THREE.Vector3(6, 0, 4),
+          new THREE.Vector3(0, 0, 4),
+        ],
+      },
+      {
+        type: 'tank',
+        pos: new THREE.Vector3(50, 0, -50),
+        waypoints: [
+          new THREE.Vector3(50, 0, -50),
+          new THREE.Vector3(56, 0, -50),
+          new THREE.Vector3(56, 0, -42),
+          new THREE.Vector3(50, 0, -42),
+        ],
+      },
+
+      // ── Boss (地下室守卫) ─────────────────────────────────────────────────
+      {
+        type: 'boss',
+        pos: new THREE.Vector3(0, 0, 78),
+        waypoints: [
+          new THREE.Vector3(0, 0, 78),
+          new THREE.Vector3(-8, 0, 78),
+          new THREE.Vector3(-8, 0, 85),
+          new THREE.Vector3(8, 0, 85),
+          new THREE.Vector3(8, 0, 78),
+        ],
+      },
+
       // ── Elite Bosses (1 per main zone) ────────────────────────────────────
       {
         isElite: true,
@@ -340,7 +412,8 @@ export class AISystem {
     ];
 
     for (const cfg of configs) {
-      this.enemies.push(new Enemy(this._scene, cfg.pos, cfg.waypoints, cfg.isElite ?? false));
+      const type = cfg.type ?? (cfg.isElite ? 'elite' : 'normal');
+      this.enemies.push(new Enemy(this._scene, cfg.pos, cfg.waypoints, type));
     }
   }
 
