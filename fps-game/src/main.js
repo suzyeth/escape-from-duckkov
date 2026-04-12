@@ -19,6 +19,7 @@ import { StashScreen }       from './ui/StashScreen.js';
 import { MinimapUI }         from './ui/MinimapUI.js';
 import { SaveSystem }        from './systems/SaveSystem.js';
 import { FogOfWar }          from './systems/FogOfWar.js';
+import { TalentSystem }      from './systems/TalentSystem.js';
 import { BaseScreen }        from './ui/BaseScreen.js';
 import { NetworkSystem }     from './systems/NetworkSystem.js';
 import { LobbyScreen }       from './ui/LobbyScreen.js';
@@ -54,7 +55,8 @@ for (const slot of level.doorSlots) doors.addDoor(slot);
 
 const saveSystem = new SaveSystem();
 const fogOfWar   = new FogOfWar();
-const baseScreen = new BaseScreen(saveSystem);
+const talentSystem = new TalentSystem(saveSystem);
+const baseScreen = new BaseScreen(saveSystem, talentSystem);
 const network    = new NetworkSystem();
 const lobbyScreen = new LobbyScreen();
 const invUI     = new InventoryUI(inventory);
@@ -286,7 +288,7 @@ function handlePlayerShoot() {
   // Apply spread penalty from arm injuries
   // ADS reduces spread by 70%
   const adsMult    = player.isAiming ? 0.3 : 1.0;
-  const spreadMult = health.spreadMultiplier * adsMult;
+  const spreadMult = health.spreadMultiplier * adsMult * talentSystem.getStats().spreadMult;
 
   for (let p = 0; p < def.pellets; p++) {
     const spread = def.spread * spreadMult;
@@ -657,11 +659,16 @@ stash.onSelect((loadout) => {
   player.position.copy(spawn);
   player.position.y = 0;
 
+  // Apply talent bonuses
+  const talentStats = talentSystem.getStats();
+  player.maxHealth  = 100 + talentStats.hpBonus;
+  player.maxStamina = 100 + talentStats.staminaBonus;
+
   // Reset health & stamina
   health.reset();
   player.health          = player.maxHealth;
   player.stamina         = player.maxStamina;
-  player.speedMultiplier = 1.0;
+  player.speedMultiplier = talentStats.speedMult;
 
   // Reset raid stats
   _killCount         = 0;

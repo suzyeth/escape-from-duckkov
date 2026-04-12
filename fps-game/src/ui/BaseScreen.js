@@ -3,6 +3,7 @@
  * Hub between raids — shows stash, currency, stats, and level select.
  */
 import { ITEM_DEFS } from '../systems/InventorySystem.js';
+import { TALENTS } from '../systems/TalentSystem.js';
 
 const LEVELS = [
   { id: 0, name: '工业区',   desc: '废弃工厂与仓库，中等难度',   enemies: 20, unlockDesc: '初始解锁',       unlockFn: () => true },
@@ -14,8 +15,13 @@ export class BaseScreen {
   /**
    * @param {import('../systems/SaveSystem').SaveSystem} save
    */
-  constructor(save) {
+  /**
+   * @param {import('../systems/SaveSystem').SaveSystem} save
+   * @param {import('../systems/TalentSystem').TalentSystem} talents
+   */
+  constructor(save, talents) {
     this._save = save;
+    this._talents = talents;
     this._el = document.getElementById('base-screen');
     this._onStartRaid = null;
   }
@@ -154,6 +160,52 @@ export class BaseScreen {
       }
     }
     content.appendChild(stashGrid);
+
+    // Talents
+    const talTitle = document.createElement('h2');
+    talTitle.className = 'base-subtitle';
+    talTitle.textContent = '天赋升级 (PerkPalace)';
+    content.appendChild(talTitle);
+
+    const talGrid = document.createElement('div');
+    talGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:.6rem';
+    for (const t of TALENTS) {
+      const unlocked = this._talents.isUnlocked(t.id);
+      const canBuy   = this._talents.canUnlock(t.id);
+
+      const card = document.createElement('div');
+      card.style.cssText = `background:#111;border:1px solid ${unlocked ? '#4caf50' : canBuy ? '#c8a96e' : '#333'};border-radius:4px;padding:.6rem;width:150px;opacity:${unlocked ? '0.6' : '1'}`;
+
+      const name = document.createElement('div');
+      name.style.cssText = 'font-size:.7rem;color:#c8a96e;margin-bottom:.3rem';
+      name.textContent = t.name + (unlocked ? ' ✓' : '');
+      card.appendChild(name);
+
+      const desc = document.createElement('div');
+      desc.style.cssText = 'font-size:.55rem;color:#888;margin-bottom:.3rem';
+      desc.textContent = t.desc;
+      card.appendChild(desc);
+
+      if (!unlocked) {
+        const cost = document.createElement('div');
+        cost.style.cssText = 'font-size:.55rem;color:#666';
+        cost.textContent = `${t.cost} 鸭元 / ${t.xpCost} XP`;
+        card.appendChild(cost);
+
+        if (canBuy) {
+          const btn = document.createElement('button');
+          btn.className = 'level-start-btn';
+          btn.style.cssText = 'margin-top:.4rem;font-size:.6rem;padding:.25rem 0';
+          btn.textContent = '解锁';
+          btn.addEventListener('click', () => {
+            if (this._talents.unlock(t.id)) this._render();
+          });
+          card.appendChild(btn);
+        }
+      }
+      talGrid.appendChild(card);
+    }
+    content.appendChild(talGrid);
 
     this._el.appendChild(content);
   }
