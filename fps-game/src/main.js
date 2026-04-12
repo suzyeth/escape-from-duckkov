@@ -18,6 +18,7 @@ import { InventoryUI }       from './ui/InventoryUI.js';
 import { StashScreen }       from './ui/StashScreen.js';
 import { MinimapUI }         from './ui/MinimapUI.js';
 import { SaveSystem }        from './systems/SaveSystem.js';
+import { FogOfWar }          from './systems/FogOfWar.js';
 import { BaseScreen }        from './ui/BaseScreen.js';
 import { NetworkSystem }     from './systems/NetworkSystem.js';
 import { LobbyScreen }       from './ui/LobbyScreen.js';
@@ -52,6 +53,7 @@ const doors     = new DoorSystem(scene, level.collidables);
 for (const slot of level.doorSlots) doors.addDoor(slot);
 
 const saveSystem = new SaveSystem();
+const fogOfWar   = new FogOfWar();
 const baseScreen = new BaseScreen(saveSystem);
 const network    = new NetworkSystem();
 const lobbyScreen = new LobbyScreen();
@@ -169,10 +171,13 @@ renderer.domElement.addEventListener('mousemove', (e) => {
 
 renderer.domElement.addEventListener('mousedown', (e) => {
   if (e.button === 0) input.keys['Mouse0'] = true;
+  if (e.button === 2) input.keys['Mouse2'] = true;
 });
 renderer.domElement.addEventListener('mouseup', (e) => {
   if (e.button === 0) input.keys['Mouse0'] = false;
+  if (e.button === 2) input.keys['Mouse2'] = false;
 });
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ── Shooting ──────────────────────────────────────────────────────────────────
 
@@ -278,7 +283,9 @@ function handlePlayerShoot() {
   bullets.spawnMuzzleFlash(muzzlePos);
 
   // Apply spread penalty from arm injuries
-  const spreadMult = health.spreadMultiplier;
+  // ADS reduces spread by 70%
+  const adsMult    = player.isAiming ? 0.3 : 1.0;
+  const spreadMult = health.spreadMultiplier * adsMult;
 
   for (let p = 0; p < def.pellets; p++) {
     const spread = def.spread * spreadMult;
@@ -654,9 +661,21 @@ function _onPlayerDied() {
 
 // ── Stash screen flow ─────────────────────────────────────────────────────────
 
+let _difficulty = 1; // 0=easy, 1=normal, 2=hard
+
 stash.onSelect((loadout) => {
   // Clean up previous raid state
   _cleanupRemotePlayers();
+  _difficulty = loadout.difficulty ?? 1;
+
+  // Apply difficulty scaling to enemies
+  const hpMult  = [0.5, 1.0, 1.5][_difficulty];
+  const dmgMult = [0.5, 1.0, 1.5][_difficulty];
+  for (const enemy of aiSystem.enemies) {
+    enemy.maxHealth = Math.round(enemy.maxHealth * hpMult);
+    enemy.health    = enemy.maxHealth;
+    enemy._shootDamage = Math.round(enemy._shootDamage * dmgMult);
+  }
 
   // Init audio on first user interaction
   sound.init();
@@ -787,6 +806,7 @@ const loop = new GameLoop(
     if (input.justPressed('Tab')) {
       invUI.toggle();
       if (_crosshairEl) _crosshairEl.style.display = invUI.isOpen ? 'none' : 'block';
+      if (invUI.isOpen) fogOfWar.hide(); else fogOfWar.show();
     }
 
     // Pause movement when inventory is open
@@ -959,6 +979,10 @@ const loop = new GameLoop(
     camera.position.lerp(_scratchCamTarget, 0.12);
     camera.lookAt(player.position);
 
+    // Fog of war — player screen position is roughly center-bottom of viewport
+    // because camera looks down at player from behind
+    fogOfWar.update(0.5, 0.55, player.facingAngle);
+
     // HUD
     hud.update(dt);
     hud.setHealth(player.health, player.maxHealth);
@@ -973,6 +997,7 @@ const loop = new GameLoop(
     );
     hud.setActiveWeaponSlot(weapons.activeSlot);
     hud.setFractureState(health.legFractured, health.armFractured);
+    if (_crosshairEl) _crosshairEl.classList.toggle('ads', player.isAiming && !invUI.isOpen);
 
     input.endFrame();
 

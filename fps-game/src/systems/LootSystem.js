@@ -154,50 +154,53 @@ export class LootSystem {
   // ── Private ────────────────────────────────────────────────────────────────
 
   _spawnItems() {
-    // [defId, count, x, z]
-    const placements = [
-
-      // ── Zone 1: Factory NW (around -25~-45, -25~-50) ──────────────────────
-      ['rifle_ammo',   30, -36, -42],
-      ['rifle_ammo',   20, -26, -30],
-      ['bandage',       2, -32, -36],
-      ['cash',        150, -40, -26],
-
-      // ── Zone 2: Warehouse NE (around 20~50, -20~-50) ──────────────────────
-      ['rifle_ammo',   30,  32, -44],
-      ['pistol_ammo',  17,  42, -30],
-      ['medkit',        1,  36, -36],
-      ['cash',        250,  46, -22],
-
-      // ── Zone 3: Central Square (around -15~15, -15~15) ────────────────────
-      ['pistol_ammo',  17,  -6,  -6],
-      ['bandage',       1,   8,  -4],
-      ['dogtag',        1,   0,   6],
-      ['cash',        300,  -4,  10],
-
-      // ── Zone 4: Apartment Ruins SW (around -25~-50, 20~50) ────────────────
-      ['shotgun_ammo', 12, -30,  32],
-      ['bandage',       2, -42,  24],
-      ['painkillers',   1, -36,  44],
-      ['cash',        100, -26,  38],
-
-      // ── Zone 5: Parking Lot SE (around 20~50, 20~50) ─────────────────────
-      ['rifle_ammo',   20,  34,  30],
-      ['shotgun_ammo',  8,  44,  36],
-      ['pistol_ammo',  17,  28,  44],
-      ['cash',        200,  40,  24],
-
-      // ── Zone 6: Basement Approach S (around -15~15, 45~70) ───────────────
-      // key_basement hidden here — reward for exploring far south
-      ['key_basement',  1,  -2,  60],
-      ['medkit',        1,   8,  54],
-      ['rifle_ammo',   30,  -8,  50],
-      ['cash',        400,   2,  66],
+    // Zone spawn regions: [xMin, xMax, zMin, zMax]
+    const ZONES = [
+      { region: [-55, -15, -60, -20], name: 'Factory' },
+      { region: [ 15,  60, -60, -20], name: 'Warehouse' },
+      { region: [-15,  15, -15,  15], name: 'Central' },
+      { region: [-60, -20,  20,  55], name: 'Apartments' },
+      { region: [ 15,  60,  20,  55], name: 'Parking' },
+      { region: [-15,  15,  45,  70], name: 'Basement' },
     ];
 
-    for (const [defId, count, x, z] of placements) {
-      this._spawnItem(defId, count, new THREE.Vector3(x, 0, z));
+    // Loot pool per zone (random selection each raid)
+    const LOOT_POOL = [
+      { defId: 'rifle_ammo',   count: () => 15 + Math.floor(Math.random() * 20) },
+      { defId: 'pistol_ammo',  count: () => 10 + Math.floor(Math.random() * 10) },
+      { defId: 'shotgun_ammo', count: () => 6 + Math.floor(Math.random() * 8) },
+      { defId: 'bandage',      count: () => 1 + Math.floor(Math.random() * 2) },
+      { defId: 'medkit',       count: () => 1 },
+      { defId: 'painkillers',  count: () => 1 },
+      { defId: 'cash',         count: () => 50 + Math.floor(Math.random() * 350) },
+      { defId: 'dogtag',       count: () => 1 },
+      { defId: 'vss_ammo',     count: () => 10 + Math.floor(Math.random() * 10) },
+      { defId: 'mp5_ammo',     count: () => 20 + Math.floor(Math.random() * 20) },
+    ];
+
+    // Each zone gets 3-5 random items from the pool
+    for (const zone of ZONES) {
+      const [xMin, xMax, zMin, zMax] = zone.region;
+      const itemCount = 3 + Math.floor(Math.random() * 3);
+
+      // Fisher-Yates to pick random items
+      const shuffled = [...LOOT_POOL];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+
+      for (let i = 0; i < itemCount && i < shuffled.length; i++) {
+        const x = xMin + Math.random() * (xMax - xMin);
+        const z = zMin + Math.random() * (zMax - zMin);
+        this._spawnItem(shuffled[i].defId, shuffled[i].count(), new THREE.Vector3(x, 0, z));
+      }
     }
+
+    // Key always spawns in basement zone (but at random position within zone)
+    const kx = -10 + Math.random() * 20;
+    const kz = 50 + Math.random() * 15;
+    this._spawnItem('key_basement', 1, new THREE.Vector3(kx, 0, kz));
   }
 
   _spawnItem(defId, count, pos) {

@@ -51,6 +51,9 @@ export class Player {
     // Set true while using a medical item — halves movement speed
     this.isHealing = false;
 
+    // ADS (aim down sights)
+    this.isAiming = false;
+
     // Facing angle (radians, around Y axis)
     this._facingAngle = 0;
 
@@ -146,11 +149,15 @@ export class Player {
       this.stamina = Math.min(this.maxStamina, this.stamina + 14 * dt); // slow regen while walking
     }
 
+    // ADS toggle (right mouse button held)
+    this.isAiming = input.isDown('Mouse2');
+
     const baseSpeed = this._isCrouching ? CROUCH_SPEED
                     : this._isSprinting ? SPRINT_SPEED
                     : MOVE_SPEED;
     const healPenalty = this.isHealing ? 0.70 : 1.0;
-    const speed = baseSpeed * this.speedMultiplier * healPenalty;
+    const aimPenalty  = this.isAiming  ? 0.50 : 1.0;
+    const speed = baseSpeed * this.speedMultiplier * healPenalty * aimPenalty;
 
     this._moveDir.set(0, 0, 0);
     if (input.isDown('KeyW')) this._moveDir.z -= 1;
