@@ -130,8 +130,15 @@ export class SaveSystem {
       const raw = localStorage.getItem(SAVE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        // Merge with defaults for forward compatibility
-        return { ...JSON.parse(JSON.stringify(DEFAULT_SAVE)), ...parsed };
+        const defaults = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+        // Deep merge: per-key spreading for nested objects
+        return {
+          ...defaults,
+          ...parsed,
+          stats: { ...defaults.stats, ...(parsed.stats || {}) },
+          unlockedLevels: parsed.unlockedLevels || defaults.unlockedLevels,
+          stash: Array.isArray(parsed.stash) ? parsed.stash : defaults.stash,
+        };
       }
     } catch { /* corrupt save, reset */ }
     return JSON.parse(JSON.stringify(DEFAULT_SAVE));

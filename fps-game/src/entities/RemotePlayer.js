@@ -40,8 +40,11 @@ export class RemotePlayer {
     this.position.lerp(this._targetPos, 0.15);
     this.mesh.position.set(this.position.x, 0.8, this.position.z);
 
-    // Angle lerp
-    const angleDiff = this._targetAngle - this._angle;
+    // Angle lerp (shortest arc)
+    let angleDiff = this._targetAngle - this._angle;
+    // Wrap to [-PI, PI]
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
     this._angle += angleDiff * 0.15;
     this.mesh.rotation.y = this._angle;
 
@@ -51,13 +54,18 @@ export class RemotePlayer {
 
   destroy() {
     this._scene.remove(this.mesh);
-    this._scene.remove(this._label);
     this.mesh.traverse(child => {
       if (child.isMesh) {
         child.geometry.dispose();
         child.material.dispose();
       }
     });
+    // Clean up label sprite + texture
+    if (this._label) {
+      this._scene.remove(this._label);
+      if (this._label.material.map) this._label.material.map.dispose();
+      this._label.material.dispose();
+    }
   }
 
   _buildMesh() {

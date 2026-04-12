@@ -4,6 +4,12 @@
  */
 import { ITEM_DEFS } from '../systems/InventorySystem.js';
 
+const LEVELS = [
+  { id: 0, name: '工业区',   desc: '废弃工厂与仓库，中等难度',   enemies: 20, unlockDesc: '初始解锁',       unlockFn: () => true },
+  { id: 1, name: '港口区',   desc: '开阔水边区域，敌人更强',     enemies: 25, unlockDesc: '击杀 20 敌人',    unlockFn: (s) => s.totalKills >= 20 },
+  { id: 2, name: '实验室',   desc: '紧凑室内地图，最高难度',     enemies: 30, unlockDesc: '成功撤离 3 次',   unlockFn: (s) => s.totalExtracts >= 3 },
+];
+
 export class BaseScreen {
   /**
    * @param {import('../systems/SaveSystem').SaveSystem} save
@@ -14,10 +20,12 @@ export class BaseScreen {
     this._onStartRaid = null;
   }
 
-  /** @param {(levelId:number, loadoutItems:{defId:string,count:number}[])=>void} fn */
+  /** @param {(levelId:number)=>void} fn */
   onStartRaid(fn) { this._onStartRaid = fn; }
 
   show() {
+    // Check unlocks (side-effect free from render)
+    this._checkUnlocks();
     this._render();
     this._el.style.display = 'flex';
   }
@@ -26,71 +34,127 @@ export class BaseScreen {
     this._el.style.display = 'none';
   }
 
+  _checkUnlocks() {
+    const stats = this._save.stats;
+    for (const lv of LEVELS) {
+      if (lv.unlockFn(stats)) {
+        this._save.unlockLevel(lv.id);
+      }
+    }
+  }
+
   _render() {
     const s = this._save;
     const stats = s.stats;
 
-    // Level cards
-    const LEVELS = [
-      { id: 0, name: '工业区',   desc: '废弃工厂与仓库，中等难度',   enemies: 20, unlock: '初始解锁' },
-      { id: 1, name: '港口区',   desc: '开阔水边区域，敌人更强',     enemies: 25, unlock: `击杀 20 敌人 (${Math.min(stats.totalKills, 20)}/20)` },
-      { id: 2, name: '实验室',   desc: '紧凑室内地图，最高难度',     enemies: 30, unlock: `成功撤离 3 次 (${Math.min(stats.totalExtracts, 3)}/3)` },
-    ];
+    this._el.innerHTML = '';
+    const content = document.createElement('div');
+    content.className = 'base-content';
 
-    // Check unlock conditions
-    if (stats.totalKills >= 20) s.unlockLevel(1);
-    if (stats.totalExtracts >= 3) s.unlockLevel(2);
+    // Title
+    const h1 = document.createElement('h1');
+    h1.className = 'base-title';
+    h1.textContent = '基地';
+    content.appendChild(h1);
 
-    const levelCards = LEVELS.map(lv => {
+    // Currency
+    const curr = document.createElement('div');
+    curr.className = 'base-currency';
+    curr.textContent = '鸭元: ';
+    const currVal = document.createElement('span');
+    currVal.textContent = s.currency;
+    curr.appendChild(currVal);
+    content.appendChild(curr);
+
+    // Stats
+    const statsDiv = document.createElement('div');
+    statsDiv.className = 'base-stats';
+    for (const [label, val] of [['总击杀', stats.totalKills], ['撤离', stats.totalExtracts], ['阵亡', stats.totalDeaths], ['最高收入', stats.bestLoot]]) {
+      const sp = document.createElement('span');
+      sp.textContent = `${label} ${val}`;
+      statsDiv.appendChild(sp);
+    }
+    content.appendChild(statsDiv);
+
+    // Death recovery notice
+    if (s.deathRecovery) {
+      const notice = document.createElement('div');
+      notice.className = 'death-notice';
+      notice.textContent = '💀 上次阵亡位置有背包可拾回';
+      content.appendChild(notice);
+    }
+
+    // Level select
+    const lvTitle = document.createElement('h2');
+    lvTitle.className = 'base-subtitle';
+    lvTitle.textContent = '选择关卡';
+    content.appendChild(lvTitle);
+
+    const lvGrid = document.createElement('div');
+    lvGrid.className = 'level-grid';
+    for (const lv of LEVELS) {
       const unlocked = s.isLevelUnlocked(lv.id);
-      return `
-        <div class="level-card ${unlocked ? '' : 'locked'}" data-level="${lv.id}">
-          <div class="level-name">${lv.name}</div>
-          <div class="level-desc">${lv.desc}</div>
-          <div class="level-info">敌人: ${lv.enemies}</div>
-          <div class="level-unlock">${unlocked ? '已解锁' : lv.unlock}</div>
-          ${unlocked ? '<button class="level-start-btn">出发</button>' : ''}
-        </div>
-      `;
-    }).join('');
+      const card = document.createElement('div');
+      card.className = 'level-card' + (unlocked ? '' : ' locked');
 
-    // Stash display
-    const stashItems = s.stash.map(item => {
-      const def = ITEM_DEFS[item.defId];
-      const name = def ? def.name : item.defId;
-      return `<div class="stash-item">${name} ×${item.count}</div>`;
-    }).join('') || '<div class="stash-empty">仓库为空</div>';
+      const name = document.createElement('div');
+      name.className = 'level-name';
+      name.textContent = lv.name;
+      card.appendChild(name);
 
-    this._el.innerHTML = `
-      <div class="base-content">
-        <h1 class="base-title">基地</h1>
-        <div class="base-currency">鸭元: <span>${s.currency}</span></div>
+      const desc = document.createElement('div');
+      desc.className = 'level-desc';
+      desc.textContent = lv.desc;
+      card.appendChild(desc);
 
-        <div class="base-stats">
-          <span>总击杀 ${stats.totalKills}</span>
-          <span>撤离 ${stats.totalExtracts}</span>
-          <span>阵亡 ${stats.totalDeaths}</span>
-          <span>最高收入 ${stats.bestLoot}</span>
-        </div>
+      const info = document.createElement('div');
+      info.className = 'level-info';
+      info.textContent = `敌人: ${lv.enemies}`;
+      card.appendChild(info);
 
-        ${s.deathRecovery ? '<div class="death-notice">💀 上次阵亡位置有背包可拾回</div>' : ''}
+      const unlock = document.createElement('div');
+      unlock.className = 'level-unlock';
+      unlock.textContent = unlocked ? '已解锁' : lv.unlockDesc;
+      card.appendChild(unlock);
 
-        <h2 class="base-subtitle">选择关卡</h2>
-        <div class="level-grid">${levelCards}</div>
+      if (unlocked) {
+        const btn = document.createElement('button');
+        btn.className = 'level-start-btn';
+        btn.textContent = '出发';
+        btn.addEventListener('click', () => {
+          this.hide();
+          if (this._onStartRaid) this._onStartRaid(lv.id);
+        });
+        card.appendChild(btn);
+      }
+      lvGrid.appendChild(card);
+    }
+    content.appendChild(lvGrid);
 
-        <h2 class="base-subtitle">仓库</h2>
-        <div class="stash-grid">${stashItems}</div>
-      </div>
-    `;
+    // Stash
+    const stashTitle = document.createElement('h2');
+    stashTitle.className = 'base-subtitle';
+    stashTitle.textContent = '仓库';
+    content.appendChild(stashTitle);
 
-    // Bind start buttons
-    this._el.querySelectorAll('.level-start-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const card = e.target.closest('.level-card');
-        const levelId = Number(card.dataset.level);
-        this.hide();
-        if (this._onStartRaid) this._onStartRaid(levelId, []);
-      });
-    });
+    const stashGrid = document.createElement('div');
+    stashGrid.className = 'stash-grid';
+    if (s.stash.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'stash-empty';
+      empty.textContent = '仓库为空';
+      stashGrid.appendChild(empty);
+    } else {
+      for (const item of s.stash) {
+        const def = ITEM_DEFS[item.defId];
+        const el = document.createElement('div');
+        el.className = 'stash-item';
+        el.textContent = `${def ? def.name : item.defId} ×${item.count}`;
+        stashGrid.appendChild(el);
+      }
+    }
+    content.appendChild(stashGrid);
+
+    this._el.appendChild(content);
   }
 }

@@ -4,6 +4,8 @@
  * Handles room management, state sync, and remote player rendering.
  */
 
+const SEND_INTERVAL_MS = 50; // 20 updates/sec
+
 export class NetworkSystem {
   constructor() {
     /** @type {WebSocket|null} */
@@ -22,10 +24,10 @@ export class NetworkSystem {
     this._onRemoteState  = null;
     this._onRemoteShoot  = null;
     this._onError        = null;
+    this._onDisconnect   = null;
 
     // Send throttle
     this._lastSendTime = 0;
-    this._sendInterval = 50; // ms
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
@@ -44,12 +46,22 @@ export class NetworkSystem {
   onRemoteState(fn)  { this._onRemoteState = fn; }
   onRemoteShoot(fn)  { this._onRemoteShoot = fn; }
   onError(fn)        { this._onError = fn; }
+  onDisconnect(fn)   { this._onDisconnect = fn; }
 
   /**
    * Connect to the multiplayer server.
-   * @param {string} url  WebSocket URL (e.g. ws://localhost:8080)
+   * Closes any existing connection first.
    */
   connect(url) {
+    // Guard: close existing socket
+    if (this._ws) {
+      this._ws.onmessage = null;
+      this._ws.onclose = null;
+      this._ws.onerror = null;
+      this._ws.close();
+      this._ws = null;
+    }
+
     return new Promise((resolve, reject) => {
       try {
         this._ws = new WebSocket(url);
@@ -70,22 +82,32 @@ export class NetworkSystem {
 
       this._ws.onclose = () => {
         this._connected = false;
+        this._playerId = null;
+        this._roomCode = null;
+        this._isHost = false;
+        if (this._onDisconnect) this._onDisconnect();
       };
 
       this._ws.onmessage = (event) => {
-        this._handleMessage(JSON.parse(event.data));
+        let msg;
+        try { msg = JSON.parse(event.data); } catch { return; } // discard bad frames
+        if (!msg || typeof msg.type !== 'string') return;        // structural guard
+        this._handleMessage(msg);
       };
     });
   }
 
   disconnect() {
     if (this._ws) {
+      this._ws.onmessage = null;
+      this._ws.onclose = null;
       this._ws.close();
       this._ws = null;
     }
     this._connected = false;
     this._playerId = null;
     this._roomCode = null;
+    this._isHost = false;
   }
 
   createRoom() {
@@ -93,29 +115,26 @@ export class NetworkSystem {
   }
 
   joinRoom(code) {
-    this._send({ type: 'join_room', code });
+    this._send({ type: 'join_room', code: String(code).slice(0, 4) });
   }
 
   startGame() {
     this._send({ type: 'start_game' });
   }
 
-  /**
-   * Send local player state (throttled to 20 FPS).
-   */
   sendPlayerState(x, z, angle, health, weaponId) {
     const now = performance.now();
-    if (now - this._lastSendTime < this._sendInterval) return;
+    if (now - this._lastSendTime < SEND_INTERVAL_MS) return;
     this._lastSendTime = now;
-    this._send({ type: 'player_state', x, z, angle, health, weaponId });
+    this._send({ type: 'player_state', x: +x || 0, z: +z || 0, angle: +angle || 0, health: +health || 0, weaponId });
   }
 
   sendPlayerShoot(x, z, angle, weaponId) {
-    this._send({ type: 'player_shoot', x, z, angle, weaponId });
+    this._send({ type: 'player_shoot', x: +x || 0, z: +z || 0, angle: +angle || 0, weaponId });
   }
 
   sendPlayerHit(targetType, targetId, damage) {
-    this._send({ type: 'player_hit', targetType, targetId, damage });
+    this._send({ type: 'player_hit', targetType, targetId, damage: +damage || 0 });
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
@@ -129,41 +148,48 @@ export class NetworkSystem {
   _handleMessage(msg) {
     switch (msg.type) {
       case 'room_created':
-        this._playerId = msg.playerId;
-        this._roomCode = msg.code;
-        this._isHost = msg.isHost;
-        if (this._onRoomCreated) this._onRoomCreated(msg.code, msg.playerId);
+        this._playerId = String(msg.playerId || '');
+        this._roomCode = String(msg.code || '');
+        this._isHost = !!msg.isHost;
+        if (this._onRoomCreated) this._onRoomCreated(this._roomCode, this._playerId);
         break;
 
       case 'room_joined':
-        this._playerId = msg.playerId;
-        this._roomCode = msg.code;
-        this._isHost = msg.isHost;
-        if (this._onRoomJoined) this._onRoomJoined(msg.code, msg.playerId, msg.players);
+        this._playerId = String(msg.playerId || '');
+        this._roomCode = String(msg.code || '');
+        this._isHost = !!msg.isHost;
+        if (this._onRoomJoined) this._onRoomJoined(this._roomCode, this._playerId, msg.players || []);
         break;
 
       case 'player_joined':
-        if (this._onPlayerJoined) this._onPlayerJoined(msg.playerId, msg.playerCount);
+        if (this._onPlayerJoined) this._onPlayerJoined(String(msg.playerId || ''), msg.playerCount || 0);
         break;
 
       case 'player_left':
-        if (this._onPlayerLeft) this._onPlayerLeft(msg.playerId);
+        if (this._onPlayerLeft) this._onPlayerLeft(String(msg.playerId || ''));
         break;
 
       case 'game_start':
         if (this._onGameStart) this._onGameStart(msg.hostId);
         break;
 
-      case 'remote_player_state':
-        if (this._onRemoteState) this._onRemoteState(msg);
+      case 'remote_player_state': {
+        // Validate numeric fields
+        const x = Number(msg.x); const z = Number(msg.z);
+        if (!isFinite(x) || !isFinite(z)) break;
+        if (this._onRemoteState) this._onRemoteState({ ...msg, x, z, angle: Number(msg.angle) || 0, health: Number(msg.health) || 0 });
         break;
+      }
 
-      case 'remote_player_shoot':
-        if (this._onRemoteShoot) this._onRemoteShoot(msg);
+      case 'remote_player_shoot': {
+        const x = Number(msg.x); const z = Number(msg.z);
+        if (!isFinite(x) || !isFinite(z)) break;
+        if (this._onRemoteShoot) this._onRemoteShoot({ ...msg, x, z, angle: Number(msg.angle) || 0 });
         break;
+      }
 
       case 'error':
-        if (this._onError) this._onError(msg.message);
+        if (this._onError) this._onError(String(msg.message || 'Unknown error'));
         break;
     }
   }

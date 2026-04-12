@@ -89,6 +89,18 @@ network.onPlayerLeft((playerId) => {
   }
 });
 
+network.onDisconnect(() => {
+  // Clean up all remote players on disconnect
+  for (const rp of remotePlayers.values()) rp.destroy();
+  remotePlayers.clear();
+  _isMultiplayer = false;
+});
+
+function _cleanupRemotePlayers() {
+  for (const rp of remotePlayers.values()) rp.destroy();
+  remotePlayers.clear();
+}
+
 // Right-click: use healing item from inventory
 invUI.onUse((instanceId) => {
   const item = inventory.items.get(instanceId);
@@ -643,6 +655,9 @@ function _onPlayerDied() {
 // ── Stash screen flow ─────────────────────────────────────────────────────────
 
 stash.onSelect((loadout) => {
+  // Clean up previous raid state
+  _cleanupRemotePlayers();
+
   // Init audio on first user interaction
   sound.init();
   sound.resume();
@@ -962,7 +977,9 @@ const loop = new GameLoop(
     input.endFrame();
 
     } catch (err) {
-      console.error('Game loop error:', err);
+      _errorCount = (_errorCount ?? 0) + 1;
+      if (_errorCount <= 3) console.error('Game loop error:', err);
+      if (_errorCount >= 10) { loop.stop(); console.error('Too many errors, game loop stopped'); }
       // Reset stuck states
       player.isHealing = false;
       _healTimer = 0;
