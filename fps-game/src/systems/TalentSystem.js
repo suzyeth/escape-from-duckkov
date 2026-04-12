@@ -64,13 +64,20 @@ export class TalentSystem {
   constructor(save) {
     this._save = save;
     // Initialize unlocked talents in save if not present
-    if (!save._data.talents) {
-      save._data.talents = [];
-      save._save();
+    try {
+      if (!save._data.talents) {
+        save._data.talents = [];
+        save._save();
+      }
+    } catch {
+      // Fallback if _data is not accessible
     }
   }
 
-  get unlockedIds() { return this._save._data.talents || []; }
+  get unlockedIds() {
+    try { return this._save._data.talents || []; }
+    catch { return []; }
+  }
 
   isUnlocked(id) { return this.unlockedIds.includes(id); }
 

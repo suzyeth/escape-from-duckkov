@@ -30,9 +30,18 @@ export class BaseScreen {
   onStartRaid(fn) { this._onStartRaid = fn; }
 
   show() {
-    // Check unlocks (side-effect free from render)
-    this._checkUnlocks();
-    this._render();
+    try {
+      this._checkUnlocks();
+      this._render();
+    } catch (e) {
+      console.error('BaseScreen render error:', e);
+      // Minimal fallback
+      this._el.innerHTML = '<div style="color:#c8a96e;text-align:center;padding:3rem"><h1>基地</h1><button id="base-fallback-btn" style="margin-top:2rem;padding:.6rem 2rem;font-size:1rem;background:transparent;border:1px solid #c8a96e;color:#c8a96e;cursor:pointer">直接出发</button></div>';
+      this._el.querySelector('#base-fallback-btn')?.addEventListener('click', () => {
+        this.hide();
+        if (this._onStartRaid) this._onStartRaid(0);
+      });
+    }
     this._el.style.display = 'flex';
   }
 

@@ -733,7 +733,14 @@ let _isMultiplayer = false;
 
 startBtn.addEventListener('click', () => {
   startScreen.style.display = 'none';
-  lobbyScreen.show(network);
+  try {
+    lobbyScreen.show(network);
+  } catch (e) {
+    console.error('Lobby error:', e);
+    // Fallback: skip lobby, go to base as solo
+    _isMultiplayer = false;
+    baseScreen.show();
+  }
 });
 
 lobbyScreen.onStartSolo(() => {
