@@ -92,7 +92,7 @@ export class Enemy {
 
     this._facing       = 0;          // Y-axis angle (radians)
     this._alertTimer   = 0;
-    this._shootTimer   = Math.random() * (isElite ? ELITE_SHOOT_INTERVAL : SHOOT_INTERVAL);
+    this._shootTimer   = Math.random() * this._shootInterval;
     this._prevState    = STATE.PATROL; // track state transitions for alert events
     this._hasAlerted   = false;        // elite: only alert once per raid
 
