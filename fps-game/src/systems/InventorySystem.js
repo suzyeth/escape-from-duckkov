@@ -67,6 +67,27 @@ export const ITEM_DEFS = {
     color: '#4a4a5a', stackable: false, value: 1800, weight: 1.8,
     armor: { armorHp: 50,  reduce: 0.55, headOnly: true },
   },
+  // Blueprints (found in raids, register at base)
+  bp_medkit: {
+    id: 'bp_medkit', name: '蓝图:急救包', w: 1, h: 1,
+    color: '#4488cc', stackable: false, value: 500, weight: 0.01,
+    isBlueprint: true,
+  },
+  bp_vest: {
+    id: 'bp_vest', name: '蓝图:防弹衣', w: 1, h: 1,
+    color: '#4488cc', stackable: false, value: 800, weight: 0.01,
+    isBlueprint: true,
+  },
+  bp_painkillers: {
+    id: 'bp_painkillers', name: '蓝图:止痛药', w: 1, h: 1,
+    color: '#4488cc', stackable: false, value: 400, weight: 0.01,
+    isBlueprint: true,
+  },
+  bp_helmet: {
+    id: 'bp_helmet', name: '蓝图:头盔', w: 1, h: 1,
+    color: '#4488cc', stackable: false, value: 600, weight: 0.01,
+    isBlueprint: true,
+  },
 };
 
 const ROWS = 8;

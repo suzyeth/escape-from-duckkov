@@ -128,6 +128,20 @@ export class SaveSystem {
     }
   }
 
+  // ── Blueprints ─────────────────────────────────────────────────────────────
+
+  get blueprints() { return this._data.blueprints || []; }
+
+  addBlueprint(id) {
+    if (!this._data.blueprints) this._data.blueprints = [];
+    if (!this._data.blueprints.includes(id)) {
+      this._data.blueprints.push(id);
+      this._save();
+      return true;
+    }
+    return false;
+  }
+
   // ── Reset ──────────────────────────────────────────────────────────────────
 
   resetAll() {

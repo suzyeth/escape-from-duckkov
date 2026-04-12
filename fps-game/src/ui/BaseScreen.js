@@ -4,6 +4,7 @@
  */
 import { ITEM_DEFS } from '../systems/InventorySystem.js';
 import { TALENTS } from '../systems/TalentSystem.js';
+import { RECIPES } from '../systems/CraftingSystem.js';
 
 const LEVELS = [
   { id: 0, name: '工业区',   desc: '废弃工厂与仓库，中等难度',   enemies: 20, unlockDesc: '初始解锁',       unlockFn: () => true },
@@ -19,9 +20,15 @@ export class BaseScreen {
    * @param {import('../systems/SaveSystem').SaveSystem} save
    * @param {import('../systems/TalentSystem').TalentSystem} talents
    */
-  constructor(save, talents) {
+  /**
+   * @param {import('../systems/SaveSystem').SaveSystem} save
+   * @param {import('../systems/TalentSystem').TalentSystem} talents
+   * @param {import('../systems/CraftingSystem').CraftingSystem} crafting
+   */
+  constructor(save, talents, crafting) {
     this._save = save;
     this._talents = talents;
+    this._crafting = crafting;
     this._el = document.getElementById('base-screen');
     this._onStartRaid = null;
   }
@@ -241,6 +248,62 @@ export class BaseScreen {
       talGrid.appendChild(catDiv);
     }
     content.appendChild(talGrid);
+
+    // Crafting
+    const craftTitle = document.createElement('h2');
+    craftTitle.className = 'base-subtitle';
+    craftTitle.textContent = '工作台';
+    content.appendChild(craftTitle);
+
+    const craftGrid = document.createElement('div');
+    craftGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:.5rem';
+
+    const recipes = this._crafting.getRecipes();
+    for (const r of recipes) {
+      const card = document.createElement('div');
+      card.style.cssText = `background:#111;border:1px solid ${r.canCraft ? '#88aa55' : r.unlocked ? '#333' : '#2a2a2a'};border-radius:4px;padding:.5rem;width:155px;opacity:${r.unlocked ? '1' : '0.35'}`;
+
+      const name = document.createElement('div');
+      name.style.cssText = 'font-size:.65rem;color:#c8a96e;margin-bottom:.2rem';
+      name.textContent = r.name + (!r.unlocked ? ' 🔒' : '');
+      card.appendChild(name);
+
+      const output = document.createElement('div');
+      output.style.cssText = 'font-size:.5rem;color:#88aa55;margin-bottom:.2rem';
+      const outDef = ITEM_DEFS[r.output.defId];
+      output.textContent = `产出: ${outDef ? outDef.name : r.output.defId} ×${r.output.count}`;
+      card.appendChild(output);
+
+      const costEl = document.createElement('div');
+      costEl.style.cssText = 'font-size:.5rem;color:#888';
+      costEl.textContent = '消耗: ' + r.cost.map(c => {
+        const d = ITEM_DEFS[c.defId];
+        return `${d ? d.name : c.defId} ×${c.count}`;
+      }).join(' + ');
+      card.appendChild(costEl);
+
+      if (r.unlocked && r.canCraft) {
+        const btn = document.createElement('button');
+        btn.className = 'level-start-btn';
+        btn.style.cssText = 'margin-top:.3rem;font-size:.55rem;padding:.2rem 0';
+        btn.textContent = '制造';
+        btn.addEventListener('click', () => {
+          if (this._crafting.craft(r.id)) {
+            this._checkUnlocks();
+            this._render();
+          }
+        });
+        card.appendChild(btn);
+      } else if (!r.unlocked) {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:.45rem;color:#555;margin-top:.2rem';
+        hint.textContent = '需要在突袭中找到蓝图';
+        card.appendChild(hint);
+      }
+
+      craftGrid.appendChild(card);
+    }
+    content.appendChild(craftGrid);
 
     this._el.appendChild(content);
   }

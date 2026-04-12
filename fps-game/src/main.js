@@ -21,6 +21,7 @@ import { MinimapUI }         from './ui/MinimapUI.js';
 import { SaveSystem }        from './systems/SaveSystem.js';
 import { FogOfWar }          from './systems/FogOfWar.js';
 import { TalentSystem }      from './systems/TalentSystem.js';
+import { CraftingSystem }    from './systems/CraftingSystem.js';
 import { BaseScreen }        from './ui/BaseScreen.js';
 import { NetworkSystem }     from './systems/NetworkSystem.js';
 import { LobbyScreen }       from './ui/LobbyScreen.js';
@@ -57,7 +58,8 @@ for (const slot of level.doorSlots) doors.addDoor(slot);
 const saveSystem = new SaveSystem();
 const fogOfWar   = new FogOfWar();
 const talentSystem = new TalentSystem(saveSystem);
-const baseScreen = new BaseScreen(saveSystem, talentSystem);
+const craftingSystem = new CraftingSystem(saveSystem);
+const baseScreen = new BaseScreen(saveSystem, talentSystem, craftingSystem);
 const network    = new NetworkSystem();
 const lobbyScreen = new LobbyScreen();
 const invUI     = new InventoryUI(inventory);
@@ -305,17 +307,24 @@ function handlePlayerShoot() {
   }
 }
 
+const BLUEPRINTS = ['bp_medkit', 'bp_vest', 'bp_painkillers', 'bp_helmet'];
+
 function _randomEnemyDrop(isElite = false) {
   const drops = [];
   const r = Math.random();
   if (isElite) {
-    // Elite drops: guaranteed medkit or armor + high cash
+    // Elite drops: guaranteed medkit or armor + high cash + chance of blueprint
     if      (r < 0.25) drops.push({ defId: 'medkit',      count: 1 });
     else if (r < 0.45) drops.push({ defId: 'vest_light',  count: 1 });
     else if (r < 0.60) drops.push({ defId: 'painkillers', count: 1 });
     else               drops.push({ defId: 'dogtag',       count: 1 });
     drops.push({ defId: 'rifle_ammo', count: Math.ceil(Math.random() * 20 + 15) });
     drops.push({ defId: 'cash', count: Math.ceil(Math.random() * 600 + 300) });
+    // 25% chance to drop a blueprint
+    if (Math.random() < 0.25) {
+      const bp = BLUEPRINTS[Math.floor(Math.random() * BLUEPRINTS.length)];
+      drops.push({ defId: bp, count: 1 });
+    }
   } else {
     if      (r < 0.15) drops.push({ defId: 'medkit',     count: 1 });
     else if (r < 0.30) drops.push({ defId: 'bandage',    count: 1 });
@@ -555,10 +564,16 @@ function _showEndScreen(survived) {
   if (survived) {
     saveSystem.addExtract();
     saveSystem.addCurrency(_lootValue);
-    // Deposit inventory items to stash
+    // Deposit inventory items to stash + register blueprints
     const items = [];
     for (const item of inventory.items.values()) {
-      items.push({ defId: item.def.id, count: item.count });
+      if (item.def.isBlueprint) {
+        if (saveSystem.addBlueprint(item.def.id)) {
+          hud.pushKillFeed(`蓝图已注册: ${item.def.name}`);
+        }
+      } else {
+        items.push({ defId: item.def.id, count: item.count });
+      }
     }
     saveSystem.depositInventory(items);
     saveSystem.clearDeathRecovery();
