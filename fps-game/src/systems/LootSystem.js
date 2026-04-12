@@ -92,12 +92,27 @@ export class LootSystem {
     }
 
     // ── Loose items ───────────────────────────────────────────────────────────
+    const t = performance.now();
     for (let i = this._items.length - 1; i >= 0; i--) {
       const item = this._items[i];
       const dist = playerPos.distanceTo(item.pos);
 
-      const scale = dist < PICKUP_RANGE ? 1.0 + Math.sin(performance.now() * 0.005) * 0.1 : 1.0;
+      // Floating bob + slow rotation
+      const baseY = item._baseY ?? (item._baseY = item.mesh.position.y);
+      item.mesh.position.y = baseY + Math.sin(t * 0.003 + i) * 0.08;
+      item.mesh.rotation.y = t * 0.001 + i;
+
+      // Pulse scale when near
+      const scale = dist < PICKUP_RANGE ? 1.0 + Math.sin(t * 0.005) * 0.12 : 1.0;
       item.mesh.scale.setScalar(scale);
+
+      // Sync extra meshes (medkit cross)
+      if (item.extraMeshes) {
+        for (const m of item.extraMeshes) {
+          m.position.y = item.mesh.position.y;
+          m.rotation.y = item.mesh.rotation.y;
+        }
+      }
 
       if (ePressed && dist < PICKUP_RANGE && !pickup) {
         pickup = { defId: item.defId, count: item.count };

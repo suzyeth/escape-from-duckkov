@@ -361,6 +361,39 @@ export class Level {
     // Record door slot (gap in front wall, centered on cx at z = cz + hd)
     this.doorSlots.push({ cx, cz: cz + hd, gapW, h, color, name: `${name}_Door` });
 
+    // Windows on side walls (dark recesses)
+    const winMat = new THREE.MeshLambertMaterial({ color: 0x0a0a12 });
+    const winCount = Math.max(1, Math.floor(d / 6));
+    for (let wi = 0; wi < winCount; wi++) {
+      const wz = cz - hd + (wi + 1) * (d / (winCount + 1));
+      // Left wall windows
+      const wl = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.8, 0.7), winMat);
+      wl.position.set(cx - hw - 0.04, h * 0.55, wz);
+      this._scene.add(wl);
+      // Right wall windows
+      const wr = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.8, 0.7), winMat);
+      wr.position.set(cx + hw + 0.04, h * 0.55, wz);
+      this._scene.add(wr);
+    }
+
+    // Wall trim / baseboard (darker stripe at bottom)
+    const trimMat = new THREE.MeshLambertMaterial({ color: color - 0x111111 });
+    const trimBack = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.15, 0.55), trimMat);
+    trimBack.position.set(cx, 0.075, cz - hd);
+    this._scene.add(trimBack);
+
+    // Roof edge trim (lighter color)
+    const edgeMat = new THREE.MeshLambertMaterial({ color: color + 0x0a0a0a });
+    const edgeBack = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.12, 0.12), edgeMat);
+    edgeBack.position.set(cx, h + 0.06, cz - hd);
+    this._scene.add(edgeBack);
+    const edgeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, d + 0.4), edgeMat);
+    edgeLeft.position.set(cx - hw, h + 0.06, cz);
+    this._scene.add(edgeLeft);
+    const edgeRight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, d + 0.4), edgeMat);
+    edgeRight.position.set(cx + hw, h + 0.06, cz);
+    this._scene.add(edgeRight);
+
     // Interior floor — always present; only revealed when roof fades out
     const iGeo   = new THREE.PlaneGeometry(w - 1.0, d - 1.0);
     const iMat   = new THREE.MeshLambertMaterial({ color: 0x1a1714 });
@@ -493,11 +526,26 @@ export class Level {
       [30, 52], [-20, -50], [55, -42],
     ];
     const barrelColors = [0x3a5a3a, 0x5a3a2a, 0x4a4a4a, 0x2a4a5a];
-    for (const [x, z] of barrelPositions) {
+    for (let bi = 0; bi < barrelPositions.length; bi++) {
+      const [x, z] = barrelPositions[bi];
       const color = barrelColors[Math.floor(Math.random() * barrelColors.length)];
       const mat = new THREE.MeshLambertMaterial({ color });
       const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.9, 8), mat);
-      barrel.position.set(x, 0.45, z);
+
+      // 30% chance: barrel is tipped over
+      if (bi % 3 === 2) {
+        barrel.rotation.z = Math.PI / 2.5;
+        barrel.position.set(x, 0.25, z);
+      } else {
+        barrel.position.set(x, 0.45, z);
+      }
+
+      // Lid detail (top ring)
+      const lidMat = new THREE.MeshLambertMaterial({ color: color + 0x111111 });
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 8), lidMat);
+      lid.position.y = 0.43;
+      barrel.add(lid);
+
       barrel.castShadow = true;
       this._scene.add(barrel);
       this.collidables.push(barrel);
@@ -529,6 +577,60 @@ export class Level {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(f.w, f.h, 0.1), fenceMat);
       mesh.position.set(f.x, f.h / 2, f.z);
       this._scene.add(mesh);
+      // Fence posts
+      const postMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+      for (let px = f.x - f.w / 2; px <= f.x + f.w / 2; px += 3) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, f.h + 0.3, 4), postMat);
+        post.position.set(px, (f.h + 0.3) / 2, f.z);
+        this._scene.add(post);
+      }
+    }
+
+    // Ground markings — road lines, parking lines, zone boundaries
+    const markMat = new THREE.MeshBasicMaterial({ color: 0x6a6a5a, transparent: true, opacity: 0.3 });
+
+    // Road from north to south (center of map)
+    for (let z = -70; z < 70; z += 8) {
+      const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 3), markMat);
+      dash.rotation.x = -Math.PI / 2;
+      dash.position.set(0, 0.008, z);
+      this._scene.add(dash);
+    }
+
+    // Parking lot lines
+    const parkMark = new THREE.MeshBasicMaterial({ color: 0x7a7a6a, transparent: true, opacity: 0.25 });
+    for (let x = 18; x <= 54; x += 6) {
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 8), parkMark);
+      line.rotation.x = -Math.PI / 2;
+      line.position.set(x, 0.008, 35);
+      this._scene.add(line);
+    }
+
+    // Concrete pads under buildings
+    const padMat = new THREE.MeshLambertMaterial({ color: 0x4a4a42 });
+    const pads = [
+      { x: -40, z: -50, w: 36, d: 24 }, // Factory
+      { x:  40, z: -50, w: 44, d: 32 }, // Warehouse
+      { x: -48, z:  40, w: 32, d: 22 }, // Apartment
+    ];
+    for (const p of pads) {
+      const pad = new THREE.Mesh(new THREE.PlaneGeometry(p.w, p.d), padMat);
+      pad.rotation.x = -Math.PI / 2;
+      pad.position.set(p.x, 0.003, p.z);
+      pad.receiveShadow = true;
+      this._scene.add(pad);
+    }
+
+    // Tire marks in parking lot
+    const tireMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, transparent: true, opacity: 0.15 });
+    for (let i = 0; i < 4; i++) {
+      const tx = 25 + Math.random() * 20;
+      const tz = 28 + Math.random() * 18;
+      const tire = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 6 + Math.random() * 4), tireMat);
+      tire.rotation.x = -Math.PI / 2;
+      tire.rotation.z = (Math.random() - 0.5) * 0.3;
+      tire.position.set(tx, 0.006, tz);
+      this._scene.add(tire);
     }
   }
 
