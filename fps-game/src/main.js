@@ -19,6 +19,9 @@ import { StashScreen }       from './ui/StashScreen.js';
 import { MinimapUI }         from './ui/MinimapUI.js';
 import { SaveSystem }        from './systems/SaveSystem.js';
 import { BaseScreen }        from './ui/BaseScreen.js';
+import { NetworkSystem }     from './systems/NetworkSystem.js';
+import { LobbyScreen }       from './ui/LobbyScreen.js';
+import { RemotePlayer }      from './entities/RemotePlayer.js';
 
 // ── Scene ─────────────────────────────────────────────────────────────────────
 
@@ -50,7 +53,41 @@ for (const slot of level.doorSlots) doors.addDoor(slot);
 
 const saveSystem = new SaveSystem();
 const baseScreen = new BaseScreen(saveSystem);
+const network    = new NetworkSystem();
+const lobbyScreen = new LobbyScreen();
 const invUI     = new InventoryUI(inventory);
+
+// Remote players map
+const remotePlayers = new Map();
+
+// Network: render remote players
+network.onRemoteState((msg) => {
+  let rp = remotePlayers.get(msg.playerId);
+  if (!rp) {
+    rp = new RemotePlayer(scene, msg.playerId);
+    remotePlayers.set(msg.playerId, rp);
+  }
+  rp.setNetworkState(msg.x, msg.z, msg.angle, msg.health);
+});
+
+network.onRemoteShoot((msg) => {
+  // Show remote player's shooting effects
+  const muzzle = new THREE.Vector3(
+    msg.x + Math.sin(msg.angle) * 0.6,
+    0.5,
+    msg.z + Math.cos(msg.angle) * 0.6
+  );
+  bullets.spawnMuzzleFlash(muzzle);
+  sound.playShot(msg.weaponId);
+});
+
+network.onPlayerLeft((playerId) => {
+  const rp = remotePlayers.get(playerId);
+  if (rp) {
+    rp.destroy();
+    remotePlayers.delete(playerId);
+  }
+});
 
 // Right-click: use healing item from inventory
 invUI.onUse((instanceId) => {
@@ -207,8 +244,11 @@ function handlePlayerShoot() {
   _recoilOffset += RECOIL_STR[weapons.current.def.id] ?? 0.15;
   _addScreenShake(SHAKE_STR[weapons.current.def.id] ?? 0.2);
 
-  // Gunshot sound + crosshair bloom
+  // Gunshot sound + crosshair bloom + network
   sound.playShot(weapons.current.def.id);
+  if (_isMultiplayer && network.connected) {
+    network.sendPlayerShoot(player.position.x, player.position.z, player.mesh.rotation.y, weapons.current.def.id);
+  }
   if (_crosshairEl) {
     _crosshairEl.classList.add('shoot');
     setTimeout(() => _crosshairEl.classList.remove('shoot'), 80);
@@ -690,9 +730,20 @@ let   gameStarted = false;
 
 let _currentLevelId = 0;
 
+let _isMultiplayer = false;
+
 startBtn.addEventListener('click', () => {
   startScreen.style.display = 'none';
-  // After first game, go to base; first time go to base too
+  lobbyScreen.show(network);
+});
+
+lobbyScreen.onStartSolo(() => {
+  _isMultiplayer = false;
+  baseScreen.show();
+});
+
+lobbyScreen.onStartMulti(() => {
+  _isMultiplayer = true;
   baseScreen.show();
 });
 
@@ -861,6 +912,19 @@ const loop = new GameLoop(
 
     // Roof-reveal: hide roof of building player is currently inside
     level.updateRoofs(player.position);
+
+    // Network sync
+    if (_isMultiplayer && network.connected) {
+      network.sendPlayerState(
+        player.position.x, player.position.z,
+        player.mesh.rotation.y, player.health,
+        weapons.current.def.id
+      );
+      // Update remote players
+      for (const rp of remotePlayers.values()) {
+        rp.update(dt);
+      }
+    }
 
     // Minimap
     minimap.update(
