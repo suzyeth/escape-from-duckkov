@@ -223,6 +223,7 @@ let _firedRecentlyTimer   = 0;
 let _ambientTimer = 18 + Math.random() * 15; // first distant shot in 18-33s
 let _hitstopTimer = 0; // brief time freeze on kills
 let _lastWaveCount = 0; // track wave spawns for notification
+let _errorCount    = 0; // game loop error counter
 
 function _addScreenShake(intensity) {
   _shakeDecay = Math.min(_shakeDecay + intensity, 1.5);
