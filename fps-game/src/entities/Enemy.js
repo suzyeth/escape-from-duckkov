@@ -559,19 +559,19 @@ export class Enemy {
       gun.position.set(bodyW/2 + 0.06, -0.05, 0.35); g.add(gun);
     }
 
-    // Boss crown
+    // Head
+    const headR = elite ? 0.26 : 0.22;
+    const hMat = new THREE.MeshLambertMaterial({ color: headC });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 8, 6), hMat);
+    head.position.y = elite ? 0.68 : 0.58; head.castShadow = true; g.add(head);
+
+    // Boss crown (after head so headR is defined)
     if (isBoss) {
       const crownMat = new THREE.MeshBasicMaterial({ color: 0xffdd00, toneMapped: false });
       const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.28, 0.15, 5), crownMat);
       crown.position.y = (elite ? 0.68 : 0.58) + headR + 0.1;
       g.add(crown);
     }
-
-    // Head
-    const headR = elite ? 0.26 : 0.22;
-    const hMat = new THREE.MeshLambertMaterial({ color: headC });
-    const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 8, 6), hMat);
-    head.position.y = elite ? 0.68 : 0.58; head.castShadow = true; g.add(head);
 
     // Headgear
     if (elite) {
