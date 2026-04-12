@@ -17,6 +17,8 @@ import { DoorSystem }        from './systems/DoorSystem.js';
 import { InventoryUI }       from './ui/InventoryUI.js';
 import { StashScreen }       from './ui/StashScreen.js';
 import { MinimapUI }         from './ui/MinimapUI.js';
+import { SaveSystem }        from './systems/SaveSystem.js';
+import { BaseScreen }        from './ui/BaseScreen.js';
 
 // ── Scene ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,8 @@ const doors     = new DoorSystem(scene, level.collidables);
 // Populate doors from building front-wall gaps recorded by Level
 for (const slot of level.doorSlots) doors.addDoor(slot);
 
+const saveSystem = new SaveSystem();
+const baseScreen = new BaseScreen(saveSystem);
 const invUI     = new InventoryUI(inventory);
 
 // Right-click: use healing item from inventory
@@ -522,14 +526,43 @@ function _showEndScreen(survived) {
   loop.stop();
   hud.hide();
 
+  // Save progress
+  saveSystem.addKills(_killCount);
+  saveSystem.addXP(_xp);
+  saveSystem.updateBestLoot(_lootValue);
+
+  if (survived) {
+    saveSystem.addExtract();
+    saveSystem.addCurrency(_lootValue);
+    // Deposit inventory items to stash
+    const items = [];
+    for (const item of inventory.items.values()) {
+      items.push({ defId: item.def.id, count: item.count });
+    }
+    saveSystem.depositInventory(items);
+    saveSystem.clearDeathRecovery();
+  } else {
+    saveSystem.addDeath();
+    // Save death position for recovery
+    const items = [];
+    for (const item of inventory.items.values()) {
+      items.push({ defId: item.def.id, count: item.count });
+    }
+    if (items.length > 0) {
+      saveSystem.setDeathRecovery(_currentLevelId, player.position.x, player.position.z, items);
+    }
+  }
+
   const ss         = document.getElementById('start-screen');
   const statsEl    = document.getElementById('raid-stats');
   const controlsEl = document.getElementById('start-controls');
   const survivedSec = _survivedSeconds();
 
   ss.querySelector('h1').textContent = survived ? '✓ 撤离成功' : '✕ 阵亡';
-  ss.querySelector('p').textContent  = survived ? '你带着战利品活下来了！' : '你的战利品已遗失在战场上';
-  document.getElementById('start-btn').textContent = '再次进入';
+  ss.querySelector('p').textContent  = survived
+    ? `战利品已存入仓库！获得 ${_lootValue} 鸭元`
+    : '你的战利品已遗失在战场上（下次可拾回）';
+  document.getElementById('start-btn').textContent = '返回基地';
 
   const rating = _getRaidRating(survived, _killCount, _lootValue, survivedSec);
   statsEl.innerHTML = `
@@ -655,10 +688,18 @@ const startScreen = document.getElementById('start-screen');
 const startBtn    = document.getElementById('start-btn');
 let   gameStarted = false;
 
+let _currentLevelId = 0;
+
 startBtn.addEventListener('click', () => {
   startScreen.style.display = 'none';
+  // After first game, go to base; first time go to base too
+  baseScreen.show();
+});
+
+// Base screen → stash screen → raid
+baseScreen.onStartRaid((levelId) => {
+  _currentLevelId = levelId;
   stash.show();
-  // Game will start when loadout is selected in StashScreen
 });
 
 // ── Game loop ─────────────────────────────────────────────────────────────────
