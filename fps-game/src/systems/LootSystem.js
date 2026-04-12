@@ -252,40 +252,167 @@ export class LootSystem {
     };
     const vis = ITEM_VISUALS[defId] ?? { color: 0xffffff, size: 0.30, shape: 'box' };
 
-    let geo;
-    if (vis.shape === 'cylinder') {
-      geo = new THREE.CylinderGeometry(vis.size * 0.5, vis.size * 0.5, vis.size, 6);
-    } else if (vis.shape === 'sphere') {
-      geo = new THREE.SphereGeometry(vis.size * 0.5, 6, 5);
-    } else {
-      geo = new THREE.BoxGeometry(vis.size, vis.size, vis.size);
-    }
-
-    const mat = new THREE.MeshLambertMaterial({ color: vis.color });
-    if (vis.glow) {
-      mat.emissive = new THREE.Color(vis.color);
-      mat.emissiveIntensity = 0.3;
-    }
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(pos.x, vis.size * 0.5 + 0.05, pos.z);
+    const mesh = this._buildItemMesh(defId, vis);
+    mesh.position.set(pos.x, vis.size * 0.5 + 0.1, pos.z);
     mesh.castShadow = true;
     this._scene.add(mesh);
 
-    // Medkit: add white cross (tracked for cleanup)
+    // Extra detail meshes (tracked for cleanup)
     const extraMeshes = [];
     if (defId === 'medkit') {
       const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const h = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.06, 0.06), crossMat);
-      h.position.set(pos.x, vis.size * 0.5 + 0.05, pos.z);
-      this._scene.add(h);
-      extraMeshes.push(h);
+      h.position.set(pos.x, vis.size * 0.5 + 0.1, pos.z);
+      this._scene.add(h); extraMeshes.push(h);
       const v = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.30), crossMat);
-      v.position.set(pos.x, vis.size * 0.5 + 0.05, pos.z);
-      this._scene.add(v);
-      extraMeshes.push(v);
+      v.position.set(pos.x, vis.size * 0.5 + 0.1, pos.z);
+      this._scene.add(v); extraMeshes.push(v);
     }
 
     this._items.push({ mesh, defId, count, pos: pos.clone(), extraMeshes });
+  }
+
+  /**
+   * Build a detailed mesh for a loot item based on its type.
+   * Each item type gets a unique recognizable shape.
+   */
+  _buildItemMesh(defId, vis) {
+    const g = new THREE.Group();
+    const s = vis.size;
+
+    switch (defId) {
+      case 'cash': {
+        // Stack of bills — flat rectangles layered
+        const billMat = new THREE.MeshLambertMaterial({ color: 0x44aa33 });
+        for (let i = 0; i < 4; i++) {
+          const bill = new THREE.Mesh(new THREE.BoxGeometry(s * 1.2, 0.02, s * 0.6), billMat);
+          bill.position.y = i * 0.025 - 0.03;
+          bill.rotation.y = i * 0.1;
+          g.add(bill);
+        }
+        // $ band
+        const bandMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+        const band = new THREE.Mesh(new THREE.BoxGeometry(s * 0.3, 0.10, s * 0.65), bandMat);
+        band.position.y = 0.02;
+        g.add(band);
+        break;
+      }
+      case 'bandage': {
+        // Roll of bandage — cylinder with cross
+        const rollMat = new THREE.MeshLambertMaterial({ color: 0xeeddcc });
+        const roll = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.4, s * 0.4, s * 0.5, 8), rollMat);
+        roll.rotation.z = Math.PI / 2;
+        g.add(roll);
+        // Red cross on side
+        const crossMat = new THREE.MeshBasicMaterial({ color: 0xcc2222 });
+        const ch = new THREE.Mesh(new THREE.BoxGeometry(0.02, s * 0.3, s * 0.08), crossMat);
+        ch.position.set(s * 0.41, 0, 0);
+        g.add(ch);
+        const cv = new THREE.Mesh(new THREE.BoxGeometry(0.02, s * 0.08, s * 0.3), crossMat);
+        cv.position.set(s * 0.41, 0, 0);
+        g.add(cv);
+        break;
+      }
+      case 'medkit': {
+        // Red box with handle
+        const boxMat = new THREE.MeshLambertMaterial({ color: 0xcc2222 });
+        const box = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.7, s * 0.6), boxMat);
+        g.add(box);
+        // Handle
+        const hMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(s * 0.5, 0.06, 0.06), hMat);
+        handle.position.y = s * 0.4;
+        g.add(handle);
+        break;
+      }
+      case 'painkillers': {
+        // Pill bottle — cylinder with cap
+        const bottleMat = new THREE.MeshLambertMaterial({ color: 0xee8833 });
+        const bottle = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.3, s * 0.3, s * 0.7, 8), bottleMat);
+        g.add(bottle);
+        const capMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.32, s * 0.32, 0.08, 8), capMat);
+        cap.position.y = s * 0.38;
+        g.add(cap);
+        break;
+      }
+      case 'dogtag': {
+        // Metal tag on chain
+        const tagMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+        const tag = new THREE.Mesh(new THREE.BoxGeometry(s * 0.5, s * 0.7, 0.04), tagMat);
+        g.add(tag);
+        // Chain ring
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x999999 });
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(s * 0.12, 0.02, 4, 8), ringMat);
+        ring.position.y = s * 0.42;
+        g.add(ring);
+        break;
+      }
+      case 'key_basement': {
+        // Golden key shape
+        const keyMat = new THREE.MeshLambertMaterial({ color: 0xffcc33, emissive: new THREE.Color(0xffcc33), emissiveIntensity: 0.4 });
+        // Handle (ring)
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(s * 0.2, 0.03, 4, 8), keyMat);
+        ring.position.y = s * 0.2;
+        g.add(ring);
+        // Shaft
+        const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.04, s * 0.5, 0.04), keyMat);
+        shaft.position.y = -s * 0.1;
+        g.add(shaft);
+        // Teeth
+        const teeth = new THREE.Mesh(new THREE.BoxGeometry(s * 0.15, 0.04, 0.04), keyMat);
+        teeth.position.set(s * 0.06, -s * 0.32, 0);
+        g.add(teeth);
+        break;
+      }
+      case 'vest_light':
+      case 'vest_heavy': {
+        // Vest shape — flat wide box with shoulder straps
+        const vestColor = defId === 'vest_heavy' ? 0x3a5040 : 0x4a6a5a;
+        const vestMat = new THREE.MeshLambertMaterial({ color: vestColor });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.8, s * 0.3), vestMat);
+        g.add(body);
+        // Shoulder straps
+        const strapMat = new THREE.MeshLambertMaterial({ color: vestColor - 0x111111 });
+        const ls = new THREE.Mesh(new THREE.BoxGeometry(s * 0.15, 0.06, s * 0.6), strapMat);
+        ls.position.set(-s * 0.3, s * 0.42, 0); g.add(ls);
+        const rs = new THREE.Mesh(new THREE.BoxGeometry(s * 0.15, 0.06, s * 0.6), strapMat);
+        rs.position.set(s * 0.3, s * 0.42, 0); g.add(rs);
+        break;
+      }
+      case 'helmet': {
+        // Half sphere helmet
+        const helMat = new THREE.MeshLambertMaterial({ color: 0x5a5a6a });
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(s * 0.5, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.6), helMat);
+        g.add(dome);
+        // Visor
+        const visMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(s * 0.8, s * 0.15, 0.04), visMat);
+        visor.position.set(0, -s * 0.1, s * 0.4);
+        g.add(visor);
+        break;
+      }
+      default: {
+        // Fallback: use basic shape from vis config
+        let geo;
+        if (vis.shape === 'cylinder') {
+          geo = new THREE.CylinderGeometry(s * 0.5, s * 0.5, s, 6);
+        } else if (vis.shape === 'sphere') {
+          geo = new THREE.SphereGeometry(s * 0.5, 6, 5);
+        } else {
+          geo = new THREE.BoxGeometry(s, s, s);
+        }
+        const mat = new THREE.MeshLambertMaterial({ color: vis.color });
+        if (vis.glow) {
+          mat.emissive = new THREE.Color(vis.color);
+          mat.emissiveIntensity = 0.3;
+        }
+        g.add(new THREE.Mesh(geo, mat));
+        break;
+      }
+    }
+
+    return g;
   }
 
   // ── Container system ────────────────────────────────────────────────────────
