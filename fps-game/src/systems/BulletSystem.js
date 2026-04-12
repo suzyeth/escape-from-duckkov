@@ -12,6 +12,7 @@ export class BulletSystem {
     this._particles = [];  // { mesh, vel, life, maxLife }
     this._flashes  = [];   // { mesh, life }
     this._projectiles = []; // { mesh, pos, dir, speed, damage, range, traveled, def, owner }
+    this._projRay = new THREE.Raycaster(); // reused for wall checks
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
@@ -242,8 +243,10 @@ export class BulletSystem {
 
       // Check wall hits
       if (!hit) {
-        const ray = new THREE.Raycaster(p.pos, p.dir, 0, step + 0.3);
-        const wallHits = ray.intersectObjects(collidables, false);
+        this._projRay.set(p.pos, p.dir);
+        this._projRay.near = 0;
+        this._projRay.far = step + 0.3;
+        const wallHits = this._projRay.intersectObjects(collidables, false);
         if (wallHits.length > 0 && wallHits[0].object.name !== 'Floor') {
           this.spawnHitEffect(wallHits[0].point);
           hit = true;

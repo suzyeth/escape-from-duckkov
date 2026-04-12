@@ -15,6 +15,9 @@ export class AISystem {
     this._scene   = scene;
     /** @type {Enemy[]} */
     this.enemies  = [];
+    this._respawnTimer = 0;
+    this._waveCount    = 0;
+    this._pruneTimer   = 0;
 
     this._spawnEnemies();
   }
@@ -44,13 +47,34 @@ export class AISystem {
       if (!enemy.isAlive) continue;
       const result = enemy.update(dt, playerPos, collidables, playerFiredRecently);
       if (result.shot) {
-        shots.push({ origin: result.origin, dir: result.dir, damage: result.damage });
+        shots.push({ origin: result.origin, dir: result.dir, damage: result.damage, isMelee: result.isMelee });
       }
       if (result.eliteAlert) eliteAlerted = true;
     }
 
+    // Prune dead enemies every 30s to prevent array growth
+    this._pruneTimer += dt;
+    if (this._pruneTimer >= 30) {
+      this._pruneTimer = 0;
+      for (let i = this.enemies.length - 1; i >= 0; i--) {
+        if (!this.enemies[i].isAlive) {
+          const dead = this.enemies[i];
+          // Dispose Three.js resources
+          dead.mesh.traverse(child => {
+            if (child.isMesh) { child.geometry.dispose(); child.material.dispose(); }
+          });
+          this._scene.remove(dead.mesh);
+          if (dead._patrolLine) { this._scene.remove(dead._patrolLine); }
+          if (dead._stateRing) { this._scene.remove(dead._stateRing); }
+          if (dead._targetMarker) { this._scene.remove(dead._targetMarker); }
+          dead._waypointMarkers?.forEach(m => this._scene.remove(m));
+          this.enemies.splice(i, 1);
+        }
+      }
+    }
+
     // Wave respawn: check every frame, spawn new enemies periodically
-    this._respawnTimer = (this._respawnTimer ?? 0) + dt;
+    this._respawnTimer += dt;
     if (this._respawnTimer >= 90) { // every 90 seconds
       this._respawnTimer = 0;
       this._spawnWave(playerPos);

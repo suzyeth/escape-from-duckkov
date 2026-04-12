@@ -104,6 +104,14 @@ export class LootSystem {
         this._scene.remove(item.mesh);
         item.mesh.geometry.dispose();
         item.mesh.material.dispose();
+        // Clean up extra meshes (e.g., medkit cross)
+        if (item.extraMeshes) {
+          for (const m of item.extraMeshes) {
+            this._scene.remove(m);
+            m.geometry.dispose();
+            m.material.dispose();
+          }
+        }
         this._items.splice(i, 1);
       }
     }
@@ -248,18 +256,21 @@ export class LootSystem {
     mesh.castShadow = true;
     this._scene.add(mesh);
 
-    // Medkit: add white cross
+    // Medkit: add white cross (tracked for cleanup)
+    const extraMeshes = [];
     if (defId === 'medkit') {
       const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const h = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.06, 0.06), crossMat);
       h.position.set(pos.x, vis.size * 0.5 + 0.05, pos.z);
       this._scene.add(h);
+      extraMeshes.push(h);
       const v = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.30), crossMat);
       v.position.set(pos.x, vis.size * 0.5 + 0.05, pos.z);
       this._scene.add(v);
+      extraMeshes.push(v);
     }
 
-    this._items.push({ mesh, defId, count, pos: pos.clone() });
+    this._items.push({ mesh, defId, count, pos: pos.clone(), extraMeshes });
   }
 
   // ── Container system ────────────────────────────────────────────────────────

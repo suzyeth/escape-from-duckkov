@@ -8,6 +8,7 @@ import { HUD }               from './ui/HUD.js';
 import { WeaponSystem }      from './systems/WeaponSystem.js';
 import { BulletSystem }      from './systems/BulletSystem.js';
 import { AISystem }          from './systems/AISystem.js';
+import { ENEMY_TYPES }       from './entities/Enemy.js';
 import { InventorySystem, ITEM_DEFS } from './systems/InventorySystem.js';
 import { LootSystem }        from './systems/LootSystem.js';
 import { HealthSystem }      from './systems/HealthSystem.js';
@@ -629,13 +630,14 @@ stash.onSelect((loadout) => {
   _cleanupRemotePlayers();
   _difficulty = loadout.difficulty ?? 1;
 
-  // Apply difficulty scaling to enemies
+  // Apply difficulty scaling to enemies (from base stats, not current — prevents stacking)
   const hpMult  = [0.5, 1.0, 1.5][_difficulty];
   const dmgMult = [0.5, 1.0, 1.5][_difficulty];
   for (const enemy of aiSystem.enemies) {
-    enemy.maxHealth = Math.round(enemy.maxHealth * hpMult);
-    enemy.health    = enemy.maxHealth;
-    enemy._shootDamage = Math.round(enemy._shootDamage * dmgMult);
+    const baseDef = ENEMY_TYPES[enemy.enemyType] || ENEMY_TYPES.normal;
+    enemy.maxHealth    = Math.round(baseDef.hp * hpMult);
+    enemy.health       = enemy.maxHealth;
+    enemy._shootDamage = Math.round(baseDef.damage * dmgMult);
   }
 
   // Init audio on first user interaction

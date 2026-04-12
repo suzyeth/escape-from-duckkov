@@ -116,6 +116,18 @@ export class SaveSystem {
     this._save();
   }
 
+  // ── Talents ─────────────────────────────────────────────────────────────────
+
+  get talents() { return this._data.talents || []; }
+
+  addTalent(id) {
+    if (!this._data.talents) this._data.talents = [];
+    if (!this._data.talents.includes(id)) {
+      this._data.talents.push(id);
+      this._save();
+    }
+  }
+
   // ── Reset ──────────────────────────────────────────────────────────────────
 
   resetAll() {

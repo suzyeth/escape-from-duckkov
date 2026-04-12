@@ -37,21 +37,9 @@ export class TalentSystem {
    */
   constructor(save) {
     this._save = save;
-    // Initialize unlocked talents in save if not present
-    try {
-      if (!save._data.talents) {
-        save._data.talents = [];
-        save._save();
-      }
-    } catch {
-      // Fallback if _data is not accessible
-    }
   }
 
-  get unlockedIds() {
-    try { return this._save._data.talents || []; }
-    catch { return []; }
-  }
+  get unlockedIds() { return this._save.talents; }
 
   isUnlocked(id) { return this.unlockedIds.includes(id); }
 
@@ -68,8 +56,7 @@ export class TalentSystem {
     if (!this.canUnlock(id)) return false;
     const talent = TALENTS.find(t => t.id === id);
     this._save.spendCurrency(talent.cost);
-    this._save._data.talents.push(id);
-    this._save._save();
+    this._save.addTalent(id);
     return true;
   }
 
