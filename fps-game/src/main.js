@@ -122,6 +122,7 @@ invUI.onUse((instanceId) => {
   hud.pushKillFeed(`使用 ${def.name}…`);
   invUI.close();
   if (_crosshairEl) _crosshairEl.style.display = 'block';
+  fogOfWar.show();
 });
 
 // Shift+click or right-click non-healing: drop item
