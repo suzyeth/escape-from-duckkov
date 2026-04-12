@@ -225,8 +225,10 @@ let _firedRecentlyTimer   = 0;
 // ── Ambient sound timer ───────────────────────────────────────────────────────
 let _ambientTimer = 18 + Math.random() * 15; // first distant shot in 18-33s
 let _hitstopTimer = 0; // brief time freeze on kills
-let _lastWaveCount = 0; // track wave spawns for notification
-let _errorCount    = 0; // game loop error counter
+let _lastWaveCount  = 0; // track wave spawns for notification
+let _errorCount     = 0; // game loop error counter
+let _isMultiplayer  = false;
+let _currentLevelId = 0;
 
 function _addScreenShake(intensity) {
   _shakeDecay = Math.min(_shakeDecay + intensity, 1.5);
@@ -645,9 +647,11 @@ stash.onSelect((loadout) => {
   _cleanupRemotePlayers();
   _difficulty = loadout.difficulty ?? 1;
 
-  // Apply difficulty scaling to enemies (from base stats, not current — prevents stacking)
+  // Apply difficulty scaling to all enemies (from base stats, not current)
   const hpMult  = [0.5, 1.0, 1.5][_difficulty];
   const dmgMult = [0.5, 1.0, 1.5][_difficulty];
+  aiSystem._difficultyHpMult  = hpMult;  // for wave spawns
+  aiSystem._difficultyDmgMult = dmgMult;
   for (const enemy of aiSystem.enemies) {
     const baseDef = ENEMY_TYPES[enemy.enemyType] || ENEMY_TYPES.normal;
     enemy.maxHealth    = Math.round(baseDef.hp * hpMult);
@@ -744,10 +748,6 @@ stash.onSelect((loadout) => {
 const startScreen = document.getElementById('start-screen');
 const startBtn    = document.getElementById('start-btn');
 let   gameStarted = false;
-
-let _currentLevelId = 0;
-
-let _isMultiplayer = false;
 
 startBtn.addEventListener('click', () => {
   startScreen.style.display = 'none';
@@ -929,7 +929,7 @@ const loop = new GameLoop(
     if (kg > 35) weightMult = 0.7;
     else if (kg > 25) weightMult = 0.85;
     // Apply weight multiplier on top of health speed multiplier
-    player.speedMultiplier = health.speedMultiplier * weightMult;
+    player.speedMultiplier = health.speedMultiplier * weightMult * talentSystem.getStats().speedMult;
 
     // Extraction
     handleExtraction(dt);

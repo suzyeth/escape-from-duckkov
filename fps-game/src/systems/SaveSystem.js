@@ -18,6 +18,8 @@ const DEFAULT_SAVE = {
   },
   unlockedLevels: [0],     // level indices: 0=industrial, 1=port, 2=lab
   deathRecovery: null,     // { levelId, x, z, items: [{defId, count}] } or null
+  talents: [],             // unlocked talent IDs
+  blueprints: [],          // registered blueprint IDs
 };
 
 export class SaveSystem {
@@ -164,6 +166,8 @@ export class SaveSystem {
           stats: { ...defaults.stats, ...(parsed.stats || {}) },
           unlockedLevels: parsed.unlockedLevels || defaults.unlockedLevels,
           stash: Array.isArray(parsed.stash) ? parsed.stash : defaults.stash,
+          talents: Array.isArray(parsed.talents) ? parsed.talents : defaults.talents,
+          blueprints: Array.isArray(parsed.blueprints) ? parsed.blueprints : defaults.blueprints,
         };
       }
     } catch { /* corrupt save, reset */ }

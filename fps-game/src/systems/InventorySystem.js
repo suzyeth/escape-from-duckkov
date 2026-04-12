@@ -194,7 +194,7 @@ export class InventorySystem {
   getBestHealingItem() {
     let best = null;
     for (const [instanceId, item] of this.items.entries()) {
-      if (item.def.heals && (!best || item.def.heals > best.item.def.heals)) {
+      if (item.def.heals && (!best || item.def.heals > best.def.heals)) {
         best = { def: item.def, instanceId };
       }
     }

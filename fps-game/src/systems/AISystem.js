@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Enemy } from '../entities/Enemy.js';
+import { Enemy, ENEMY_TYPES } from '../entities/Enemy.js';
 
 /**
  * AISystem
@@ -64,10 +64,10 @@ export class AISystem {
             if (child.isMesh) { child.geometry.dispose(); child.material.dispose(); }
           });
           this._scene.remove(dead.mesh);
-          if (dead._patrolLine) { this._scene.remove(dead._patrolLine); }
-          if (dead._stateRing) { this._scene.remove(dead._stateRing); }
-          if (dead._targetMarker) { this._scene.remove(dead._targetMarker); }
-          dead._waypointMarkers?.forEach(m => this._scene.remove(m));
+          if (dead._patrolLine) { this._scene.remove(dead._patrolLine); dead._patrolLine.geometry.dispose(); dead._patrolLine.material.dispose(); }
+          if (dead._stateRing) { this._scene.remove(dead._stateRing); dead._stateRing.geometry.dispose(); dead._stateRing.material.dispose(); }
+          if (dead._targetMarker) { this._scene.remove(dead._targetMarker); dead._targetMarker.geometry.dispose(); dead._targetMarker.material.dispose(); }
+          dead._waypointMarkers?.forEach(m => { this._scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
           this.enemies.splice(i, 1);
         }
       }
@@ -120,6 +120,13 @@ export class AISystem {
       else if (roll < 0.30) type = 'rusher';
       else if (roll < 0.40) type = 'tank';
       const enemy = new Enemy(this._scene, pos, wp, type);
+      // Apply difficulty scaling if set
+      if (this._difficultyHpMult) {
+        const baseDef = ENEMY_TYPES[type] || ENEMY_TYPES.normal;
+        enemy.maxHealth = Math.round(baseDef.hp * this._difficultyHpMult);
+        enemy.health = enemy.maxHealth;
+        enemy._shootDamage = Math.round(baseDef.damage * this._difficultyDmgMult);
+      }
       this.enemies.push(enemy);
       spawned++;
     }
