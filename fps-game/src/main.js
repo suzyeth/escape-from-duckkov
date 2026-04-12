@@ -979,11 +979,9 @@ const loop = new GameLoop(
     camera.position.lerp(_scratchCamTarget, 0.12);
     camera.lookAt(player.position);
 
-    // Fog of war — project player world position to screen coordinates
+    // Fog of war — project player world position to screen
     const _fogProj = player.position.clone().project(camera);
-    const fogScreenX = (_fogProj.x + 1) / 2;
-    const fogScreenY = (-_fogProj.y + 1) / 2;
-    fogOfWar.update(fogScreenX, fogScreenY, player.facingAngle);
+    fogOfWar.update((_fogProj.x + 1) / 2, (-_fogProj.y + 1) / 2);
 
     // HUD
     hud.update(dt);
