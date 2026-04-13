@@ -231,16 +231,16 @@ export class Player {
     rightBoot.position.set(0.15, -0.62, 0.04);
     group.add(rightBoot);
 
-    // Body (torso — tactical vest shape)
+    // Body (torso — tactical vest, saturated green for low-poly look)
     const bodyGeo = new THREE.BoxGeometry(0.52, 0.65, 0.35);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3a5a3a });
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4a7a4a, flatShading: true });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0.05;
     body.castShadow = true;
     group.add(body);
 
     // Vest plate (front)
-    const plateMat = new THREE.MeshLambertMaterial({ color: 0x4a6a4a });
+    const plateMat = new THREE.MeshLambertMaterial({ color: 0x5a8a5a, flatShading: true });
     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.06), plateMat);
     plate.position.set(0, 0.08, 0.2);
     group.add(plate);
@@ -259,36 +259,71 @@ export class Player {
     group.add(rightArm);
 
     // Head
-    const headGeo = new THREE.SphereGeometry(0.22, 8, 6);
-    const headMat = new THREE.MeshLambertMaterial({ color: 0xf5c87a });
+    const headGeo = new THREE.SphereGeometry(0.22, 5, 4);
+    const headMat = new THREE.MeshLambertMaterial({ color: 0xf5c87a, flatShading: true });
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 0.58;
     head.castShadow = true;
     group.add(head);
 
-    // Helmet
-    const helmetGeo = new THREE.SphereGeometry(0.25, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.6);
-    const helmetMat = new THREE.MeshLambertMaterial({ color: 0x3a4a3a });
+    // Helmet — low-poly faceted look
+    const helmetGeo = new THREE.SphereGeometry(0.25, 6, 4, 0, Math.PI * 2, 0, Math.PI * 0.6);
+    const helmetMat = new THREE.MeshLambertMaterial({ color: 0x4a5a3a, flatShading: true });
     const helmet = new THREE.Mesh(helmetGeo, helmetMat);
     helmet.position.y = 0.62;
     helmet.castShadow = true;
     group.add(helmet);
 
-    // Weapon (gun barrel pointing forward)
-    const gunMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
-    const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.55), gunMat);
-    gunBody.position.set(0.18, 0.0, 0.42);
-    group.add(gunBody);
+    // Weapon — low-poly gun model
+    const gunMat  = new THREE.MeshLambertMaterial({ color: 0x2a2a2a, flatShading: true });
+    const gunMat2 = new THREE.MeshLambertMaterial({ color: 0x3a3a3a, flatShading: true });
+    const woodMat = new THREE.MeshLambertMaterial({ color: 0x6a4a2a, flatShading: true });
+
+    // Receiver (main body)
+    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.10, 0.35), gunMat);
+    receiver.position.set(0.20, 0.02, 0.32);
+    group.add(receiver);
+
+    // Barrel
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.35, 6), gunMat2);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0.20, 0.04, 0.58);
+    group.add(barrel);
+
+    // Barrel tip / muzzle brake
+    const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.06, 6), gunMat);
+    muzzle.rotation.x = Math.PI / 2;
+    muzzle.position.set(0.20, 0.04, 0.76);
+    group.add(muzzle);
+
+    // Stock (wood)
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.20), woodMat);
+    stock.position.set(0.20, -0.01, 0.10);
+    group.add(stock);
+
     // Magazine
-    const magMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
-    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.20, 0.08), magMat);
-    mag.position.set(0.18, -0.08, 0.30);
+    const magMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, flatShading: true });
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.06), magMat);
+    mag.rotation.z = 0.1; // slight angle
+    mag.position.set(0.20, -0.10, 0.30);
     group.add(mag);
-    // Scope glint (barrel tip glow)
-    const scopeMat = new THREE.MeshBasicMaterial({ color: 0xccdd44 });
-    const scope = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), scopeMat);
-    scope.position.set(0.18, 0.04, 0.70);
-    group.add(scope);
+
+    // Sight / scope rail
+    const sightMat = new THREE.MeshLambertMaterial({ color: 0x444444, flatShading: true });
+    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.04, 0.12), sightMat);
+    sight.position.set(0.20, 0.09, 0.36);
+    group.add(sight);
+
+    // Front sight post
+    const fSight = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.05, 0.015), sightMat);
+    fSight.position.set(0.20, 0.09, 0.50);
+    group.add(fSight);
+
+    // Muzzle flash point (glow)
+    const flashMat = new THREE.MeshBasicMaterial({ color: 0xccdd44 });
+    const flashPt = new THREE.Mesh(new THREE.SphereGeometry(0.025, 4, 4), flashMat);
+    flashPt.position.set(0.20, 0.04, 0.80);
+    group.add(flashPt);
 
     // Backpack
     const bpMat = new THREE.MeshLambertMaterial({ color: 0x4a5a3a });

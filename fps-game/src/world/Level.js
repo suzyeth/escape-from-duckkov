@@ -459,7 +459,7 @@ export class Level {
   _wall(cx, cz, w, d, h, color, name) {
     if (!name || h <= 0) return;
     const geo  = new THREE.BoxGeometry(w, h, d);
-    const mat  = new THREE.MeshLambertMaterial({ color });
+    const mat  = new THREE.MeshLambertMaterial({ color, flatShading: true });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(cx, h / 2, cz);
     mesh.castShadow    = true;
@@ -472,7 +472,7 @@ export class Level {
 
   _box(cx, cz, w, h, d, color, name) {
     const geo  = new THREE.BoxGeometry(w, h, d);
-    const mat  = new THREE.MeshLambertMaterial({ color });
+    const mat  = new THREE.MeshLambertMaterial({ color, flatShading: true });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(cx, h / 2, cz);
     mesh.castShadow    = true;

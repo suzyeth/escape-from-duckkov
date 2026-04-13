@@ -526,7 +526,7 @@ export class Enemy {
     // Body
     const bodyW = elite ? 0.55 : 0.46;
     const bodyH = elite ? 0.70 : 0.58;
-    const bMat = new THREE.MeshLambertMaterial({ color: bodyC });
+    const bMat = new THREE.MeshLambertMaterial({ color: bodyC, flatShading: true });
     const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, 0.30), bMat);
     body.position.y = 0.05; body.castShadow = true; g.add(body);
 
@@ -538,7 +538,7 @@ export class Enemy {
     }
 
     // Arms with weapon
-    const armMat = new THREE.MeshLambertMaterial({ color: bodyC });
+    const armMat = new THREE.MeshLambertMaterial({ color: bodyC, flatShading: true });
     const la = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.42, 6), armMat);
     la.position.set(-(bodyW/2 + 0.06), 0.0, 0.06); la.rotation.x = 0.4; la.castShadow = true; g.add(la);
     const ra = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.42, 6), armMat);
@@ -561,8 +561,8 @@ export class Enemy {
 
     // Head
     const headR = elite ? 0.26 : 0.22;
-    const hMat = new THREE.MeshLambertMaterial({ color: headC });
-    const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 8, 6), hMat);
+    const hMat = new THREE.MeshLambertMaterial({ color: headC, flatShading: true });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 5, 4), hMat);
     head.position.y = elite ? 0.68 : 0.58; head.castShadow = true; g.add(head);
 
     // Boss crown (after head so headR is defined)
