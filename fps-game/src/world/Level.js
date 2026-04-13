@@ -65,8 +65,8 @@ export class Level {
     this._buildEnvironmentProps();
     this._buildDustParticles();
 
-    scene.background = new THREE.Color(0x8aaabc);   // brighter overcast sky
-    scene.fog        = new THREE.FogExp2(0x8aaabc, 0.005); // slightly denser for atmosphere
+    scene.background = new THREE.Color(0x7a9aaa);   // overcast sky blue-grey
+    scene.fog        = new THREE.FogExp2(0x7a9aaa, 0.004); // lighter, less dense fog
   }
 
   // ── Lighting ──────────────────────────────────────────────────────────────
@@ -102,15 +102,8 @@ export class Level {
   // ── Ground ────────────────────────────────────────────────────────────────
 
   _buildGround() {
-    // Main ground — use subdivided geometry for low-poly terrain feel
-    const geo = new THREE.PlaneGeometry(160, 160, 32, 32);
-    // Slightly displace vertices for organic terrain
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      pos.setZ(i, pos.getZ(i) + (Math.random() - 0.5) * 0.15);
-    }
-    geo.computeVertexNormals();
-    const mat = new THREE.MeshLambertMaterial({ color: 0x6a6858, flatShading: true });
+    const geo  = new THREE.PlaneGeometry(160, 160);
+    const mat  = new THREE.MeshLambertMaterial({ color: 0x5a5850 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.rotation.x = -Math.PI / 2;
     mesh.receiveShadow = true;
@@ -118,58 +111,24 @@ export class Level {
     this._scene.add(mesh);
     this.collidables.push(mesh);
 
-    // Zone floor tints — with slight texture variation
+    // Zone floor tints
     const zones = [
-      { x: -35, z: -45, w: 40, d: 50, c: 0x45413a, seg: 6 },  // Factory — dark steel
-      { x:  40, z: -45, w: 50, d: 50, c: 0x2a3238, seg: 8 },  // Warehouse — blue-grey
-      { x:   0, z:   0, w: 40, d: 40, c: 0x5a5a4a, seg: 6 },  // Central — tan
-      { x: -40, z:  45, w: 50, d: 50, c: 0x433e38, seg: 8 },  // Apartments — brown
-      { x:  37, z:  42, w: 55, d: 45, c: 0x6a6a5a, seg: 8 },  // Parking — concrete
-      { x:  -5, z:  65, w: 30, d: 20, c: 0x2e2e32, seg: 4 },  // Basement — dark
+      { x: -35, z: -45, w: 40, d: 50, c: 0x35312a }, // Factory — dark steel
+      { x:  40, z: -45, w: 50, d: 50, c: 0x1a2228 }, // Warehouse — dark blue-grey
+      { x:   0, z:   0, w: 40, d: 40, c: 0x4a4a3a }, // Central — lighter tan
+      { x: -40, z:  45, w: 50, d: 50, c: 0x332e28 }, // Apartments — dark brown
+      { x:  37, z:  42, w: 55, d: 45, c: 0x5a5a4a }, // Parking — light grey concrete
+      { x:  -5, z:  65, w: 30, d: 20, c: 0x1e1e22 }, // Basement entrance — very dark
     ];
-    zones.forEach(({ x, z, w, d, c, seg }) => {
-      const g = new THREE.PlaneGeometry(w, d, seg, seg);
-      // Micro displacement for zone texture
-      const p2 = g.attributes.position;
-      for (let i = 0; i < p2.count; i++) {
-        p2.setZ(i, p2.getZ(i) + (Math.random() - 0.5) * 0.08);
-      }
-      g.computeVertexNormals();
-      const m = new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+    zones.forEach(({ x, z, w, d, c }) => {
+      const g = new THREE.PlaneGeometry(w, d);
+      const m = new THREE.MeshLambertMaterial({ color: c });
       const p = new THREE.Mesh(g, m);
       p.rotation.x = -Math.PI / 2;
-      p.position.set(x, 0.006, z);
+      p.position.set(x, 0.005, z);
       p.receiveShadow = true;
       this._scene.add(p);
     });
-
-    // Grass patches (scattered green planes in open areas)
-    const grassMat = new THREE.MeshLambertMaterial({ color: 0x5a8a4a, flatShading: true });
-    const grassPositions = [
-      [-60,-30], [-55,-35], [-50,-25], [60,-30], [55,10], [-55,55],
-      [-30,60], [55,55], [10,-55], [-20,10], [20,-10], [-45,-10],
-      [45,10], [-10,30], [10,50], [-50,15], [50,-15], [0,40],
-    ];
-    for (const [gx, gz] of grassPositions) {
-      const size = 2 + Math.random() * 4;
-      const gGeo = new THREE.CircleGeometry(size, 5);
-      const grass = new THREE.Mesh(gGeo, grassMat);
-      grass.rotation.x = -Math.PI / 2;
-      grass.position.set(gx + Math.random() * 3, 0.008, gz + Math.random() * 3);
-      this._scene.add(grass);
-    }
-
-    // Puddles (dark reflective patches)
-    const puddleMat = new THREE.MeshBasicMaterial({ color: 0x3a4a5a, transparent: true, opacity: 0.4 });
-    const puddles = [[-10,-30], [15,20], [-30,10], [40,-10], [-5,50], [30,40]];
-    for (const [px, pz] of puddles) {
-      const r = 1 + Math.random() * 2;
-      const pGeo = new THREE.CircleGeometry(r, 6);
-      const puddle = new THREE.Mesh(pGeo, puddleMat);
-      puddle.rotation.x = -Math.PI / 2;
-      puddle.position.set(px, 0.009, pz);
-      this._scene.add(puddle);
-    }
   }
 
   // ── Boundary walls ────────────────────────────────────────────────────────
@@ -642,52 +601,6 @@ export class Level {
       line.rotation.x = -Math.PI / 2;
       line.position.set(x, 0.008, 35);
       this._scene.add(line);
-    }
-
-    // Low-poly trees (cone + cylinder trunk)
-    const treeTrunkMat = new THREE.MeshLambertMaterial({ color: 0x6a4a2a, flatShading: true });
-    const treeLeafMat  = new THREE.MeshLambertMaterial({ color: 0x3a8a3a, flatShading: true });
-    const treeLeafMat2 = new THREE.MeshLambertMaterial({ color: 0x4a9a4a, flatShading: true });
-    const treePositions = [
-      [-65,-20], [-60,-10], [-65,10], [-60,20], [-65,40],
-      [65,-20], [60,-10], [65,10], [60,20], [65,40],
-      [-20,-65], [20,-65], [-20,70], [20,70],
-      [-62,68], [62,65], [-62,-65], [62,-62],
-    ];
-    for (const [tx, tz] of treePositions) {
-      const h = 3 + Math.random() * 2;
-      const r = 1.2 + Math.random() * 0.8;
-      // Trunk
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, h * 0.4, 5), treeTrunkMat);
-      trunk.position.set(tx, h * 0.2, tz);
-      trunk.castShadow = true;
-      this._scene.add(trunk);
-      // Canopy (2-3 stacked cones)
-      const leafMat = Math.random() > 0.5 ? treeLeafMat : treeLeafMat2;
-      const cone1 = new THREE.Mesh(new THREE.ConeGeometry(r, h * 0.5, 5), leafMat);
-      cone1.position.set(tx, h * 0.55, tz);
-      cone1.castShadow = true;
-      this._scene.add(cone1);
-      const cone2 = new THREE.Mesh(new THREE.ConeGeometry(r * 0.7, h * 0.35, 5), leafMat);
-      cone2.position.set(tx, h * 0.8, tz);
-      cone2.castShadow = true;
-      this._scene.add(cone2);
-    }
-
-    // Rocks (low-poly icosahedrons)
-    const rockMat = new THREE.MeshLambertMaterial({ color: 0x6a6a62, flatShading: true });
-    const rockPositions = [
-      [-55,0], [-45,15], [50,5], [40,15], [-15,-40],
-      [15,55], [-35,55], [55,-35], [-10,25], [25,-25],
-    ];
-    for (const [rx, rz] of rockPositions) {
-      const size = 0.4 + Math.random() * 0.8;
-      const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 0), rockMat);
-      rock.position.set(rx, size * 0.4, rz);
-      rock.rotation.set(Math.random(), Math.random(), Math.random());
-      rock.castShadow = true;
-      this._scene.add(rock);
-      this.collidables.push(rock);
     }
 
     // Concrete pads under buildings
