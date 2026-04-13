@@ -32,9 +32,9 @@ const PART_DEFS = {
 };
 
 // Cumulative probability table for random hit location
-// head 5%, torso 50%, each limb ~11.25%
+// head 15%, torso 40%, each limb ~11.25%
 const HIT_TABLE = [
-  { part: PART.HEAD,      threshold: 0.05 },
+  { part: PART.HEAD,      threshold: 0.15 },
   { part: PART.TORSO,     threshold: 0.55 },
   { part: PART.LEFT_ARM,  threshold: 0.66 },
   { part: PART.RIGHT_ARM, threshold: 0.77 },
@@ -257,8 +257,8 @@ export class HealthSystem {
     const priority = [PART.TORSO, PART.HEAD, PART.LEFT_LEG, PART.RIGHT_LEG, PART.LEFT_ARM, PART.RIGHT_ARM];
     for (const key of priority) {
       if (remaining <= 0) break;
-      const def     = PART_DEFS[key];
-      const missing = def.maxHp - this._hp[key];
+      const max     = this._maxHp?.[key] ?? PART_DEFS[key].maxHp;
+      const missing = max - this._hp[key];
       const apply   = Math.min(missing, remaining);
       this._hp[key] += apply;
       remaining     -= apply;

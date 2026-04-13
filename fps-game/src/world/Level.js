@@ -1,4 +1,14 @@
 import * as THREE from 'three';
+import { createTree, createSandbags, OUTDOOR_ENV } from '../props/env-outdoor.js';
+import { createRockCluster } from '../props/rock-cluster.js';
+import { createWoodFence, createStakeRope } from '../props/fence.js';
+import { createCrateCluster } from '../props/crate-cluster.js';
+import { createContainer } from '../props/container.js';
+import { createForklift } from '../props/forklift.js';
+import { createBarrel } from '../props/barrel.js';
+import { createBuilding, createUmbrella, createStreetLight, createBench } from '../props/building.js';
+import { createShelf } from '../props/shelf.js';
+import { createExtinguisher } from '../props/extinguisher.js';
 
 /**
  * Level — 150×150 Extraction Map
@@ -65,67 +75,120 @@ export class Level {
     this._buildEnvironmentProps();
     this._buildDustParticles();
 
-    scene.background = new THREE.Color(0x7a9aaa);   // overcast sky blue-grey
-    scene.fog        = new THREE.FogExp2(0x7a9aaa, 0.004); // lighter, less dense fog
+    // Sky & fog from env config
+    scene.background = new THREE.Color(OUTDOOR_ENV.skyColor);
+    scene.fog        = new THREE.Fog(OUTDOOR_ENV.fog.color, OUTDOOR_ENV.fog.near * 4, OUTDOOR_ENV.fog.far * 4);
   }
 
   // ── Lighting ──────────────────────────────────────────────────────────────
 
   _buildLighting() {
-    // Bright ambient — no dark corners
-    this._scene.add(new THREE.AmbientLight(0xccdde8, 1.6));
+    const E = OUTDOOR_ENV;
 
-    const sun = new THREE.DirectionalLight(0xfff4e0, 2.4);
-    sun.position.set(40, 80, 40);
+    // Ambient + Hemisphere
+    this._scene.add(new THREE.AmbientLight(E.ambient.color, E.ambient.intensity));
+    this._scene.add(new THREE.HemisphereLight(E.hemisphere.sky, E.hemisphere.ground, E.hemisphere.intensity));
+
+    // Sun — low angle for long shadows
+    const sun = new THREE.DirectionalLight(E.sun.color, E.sun.intensity);
+    sun.position.set(E.sun.position[0] * 10, E.sun.position[1] * 10, E.sun.position[2] * 10);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.mapSize.set(E.sun.shadowMapSize, E.sun.shadowMapSize);
     sun.shadow.camera.left   = -100;
     sun.shadow.camera.right  =  100;
     sun.shadow.camera.top    =  100;
     sun.shadow.camera.bottom = -100;
     sun.shadow.camera.near   = 1;
     sun.shadow.camera.far    = 250;
-    sun.shadow.bias = -0.0005;
+    sun.shadow.bias = E.sun.shadowBias;
     this._scene.add(sun);
+    this._sun = sun;
 
-    // Secondary fill from opposite side
-    const fill = new THREE.DirectionalLight(0x88aacc, 0.9);
-    fill.position.set(-50, 40, -30);
+    // Fill — cold, from opposite side
+    const fill = new THREE.DirectionalLight(E.fill.color, E.fill.intensity);
+    fill.position.set(E.fill.position[0] * 10, E.fill.position[1] * 10, E.fill.position[2] * 10);
     this._scene.add(fill);
-
-    // Warm bounce from ground
-    const bounce = new THREE.DirectionalLight(0xddcc99, 0.4);
-    bounce.position.set(0, -1, 0);
-    this._scene.add(bounce);
+    this._fill = fill;
   }
 
   // ── Ground ────────────────────────────────────────────────────────────────
 
   _buildGround() {
-    const geo  = new THREE.PlaneGeometry(160, 160);
-    const mat  = new THREE.MeshLambertMaterial({ color: 0x5a5850 });
+    const E = OUTDOOR_ENV;
+
+    // Main grass ground — vertex-colored for natural variation
+    const geo = new THREE.PlaneGeometry(160, 160, 48, 48);
+    const baseG = new THREE.Color(E.ground.grass.color);
+    const litG  = new THREE.Color(E.ground.grassLit.color);
+    const colors = [];
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const t = (Math.sin(pos.getX(i) * 0.05) * Math.cos(pos.getZ(i) * 0.04) + 1) * 0.5;
+      const noise = Math.random() * 0.15;
+      const c = baseG.clone().lerp(litG, t + noise);
+      colors.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const mat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: E.ground.grass.roughness,
+      metalness: 0,
+    });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.rotation.x = -Math.PI / 2;
     mesh.receiveShadow = true;
     mesh.name = 'Floor';
     this._scene.add(mesh);
     this.collidables.push(mesh);
+    this._groundMat = mat;
 
-    // Zone floor tints
+    // Dirt/mud paths — vertex-colored with rough edges
+    const dirtC  = new THREE.Color(E.ground.dirt.color);
+    const dirtDk = new THREE.Color(E.ground.dirtDark.color);
+    const dirtPaths = [
+      { x:   0, z:   0, w: 5, d: 140, rot: 0 },
+      { x:   0, z:   0, w: 140, d: 5, rot: 0 },
+      { x: -40, z: -30, w: 8, d: 20, rot: 0 },
+      { x:  40, z: -30, w: 8, d: 20, rot: 0 },
+      { x: -40, z:  30, w: 8, d: 20, rot: 0 },
+      { x:  37, z:  30, w: 8, d: 20, rot: 0 },
+    ];
+    dirtPaths.forEach(({ x, z, w, d, rot }) => {
+      const g = new THREE.PlaneGeometry(w, d, 8, 16);
+      const gPos = g.attributes.position;
+      const dColors = [];
+      for (let i = 0; i < gPos.count; i++) {
+        const edgeDist = Math.abs(gPos.getX(i)) / (w / 2);
+        gPos.setX(i, gPos.getX(i) + (Math.random() - 0.5) * 0.5 * edgeDist);
+        const t = Math.random() * 0.4;
+        const c = dirtC.clone().lerp(dirtDk, t);
+        dColors.push(c.r, c.g, c.b);
+      }
+      g.setAttribute('color', new THREE.Float32BufferAttribute(dColors, 3));
+      const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+      const p = new THREE.Mesh(g, m);
+      p.rotation.x = -Math.PI / 2;
+      p.position.set(x, 0.006, z);
+      p.receiveShadow = true;
+      this._scene.add(p);
+    });
+
+    // Zone floor tints — concrete under buildings
     const zones = [
-      { x: -35, z: -45, w: 40, d: 50, c: 0x35312a }, // Factory — dark steel
-      { x:  40, z: -45, w: 50, d: 50, c: 0x1a2228 }, // Warehouse — dark blue-grey
-      { x:   0, z:   0, w: 40, d: 40, c: 0x4a4a3a }, // Central — lighter tan
-      { x: -40, z:  45, w: 50, d: 50, c: 0x332e28 }, // Apartments — dark brown
-      { x:  37, z:  42, w: 55, d: 45, c: 0x5a5a4a }, // Parking — light grey concrete
-      { x:  -5, z:  65, w: 30, d: 20, c: 0x1e1e22 }, // Basement entrance — very dark
+      { x: -35, z: -45, w: 40, d: 50, c: 0x4a5058 },
+      { x:  40, z: -45, w: 50, d: 50, c: 0x3a4048 },
+      { x:   0, z:   0, w: 40, d: 40, c: 0x6a6a5a },
+      { x: -40, z:  45, w: 50, d: 50, c: 0x5a5048 },
+      { x:  37, z:  42, w: 55, d: 45, c: 0x6a6a5a },
+      { x:  -5, z:  65, w: 30, d: 20, c: 0x2a2a30 },
     ];
     zones.forEach(({ x, z, w, d, c }) => {
       const g = new THREE.PlaneGeometry(w, d);
-      const m = new THREE.MeshLambertMaterial({ color: c });
+      const m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, metalness: 0.1 });
       const p = new THREE.Mesh(g, m);
       p.rotation.x = -Math.PI / 2;
-      p.position.set(x, 0.005, z);
+      p.position.set(x, 0.008, z);
       p.receiveShadow = true;
       this._scene.add(p);
     });
@@ -183,7 +246,7 @@ export class Level {
   _buildCentralSquare() {
     // Concrete fountain / monument (non-collidable visual)
     const geo = new THREE.CylinderGeometry(3, 3.5, 1.2, 8);
-    const mat = new THREE.MeshLambertMaterial({ color: 0x888070 });
+    const mat = new THREE.MeshStandardMaterial({ color: 0x888070 });
     const fnt = new THREE.Mesh(geo, mat);
     fnt.position.set(0, 0.6, 0);
     fnt.castShadow = true;
@@ -248,7 +311,7 @@ export class Level {
 
     // Locked door marker (darker)
     const dGeo = new THREE.BoxGeometry(3, 2.5, 0.2);
-    const dMat = new THREE.MeshLambertMaterial({ color: 0x1a1a2a });
+    const dMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2a });
     const door = new THREE.Mesh(dGeo, dMat);
     door.position.set(0, 1.25, 54.5);
     this._scene.add(door);
@@ -359,7 +422,7 @@ export class Level {
     this.doorSlots.push({ cx, cz: cz + hd, gapW, h, color, name: `${name}_Door` });
 
     // Windows on side walls (dark recesses)
-    const winMat = new THREE.MeshLambertMaterial({ color: 0x0a0a12 });
+    const winMat = new THREE.MeshStandardMaterial({ color: 0x0a0a12 });
     const winCount = Math.max(1, Math.floor(d / 6));
     for (let wi = 0; wi < winCount; wi++) {
       const wz = cz - hd + (wi + 1) * (d / (winCount + 1));
@@ -374,13 +437,13 @@ export class Level {
     }
 
     // Wall trim / baseboard (darker stripe at bottom)
-    const trimMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color).multiplyScalar(0.8) });
+    const trimMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.8), roughness: 0.8, metalness: 0.1 });
     const trimBack = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.15, 0.55), trimMat);
     trimBack.position.set(cx, 0.075, cz - hd);
     this._scene.add(trimBack);
 
     // Roof edge trim (lighter color)
-    const edgeMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color).multiplyScalar(1.15) });
+    const edgeMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(1.15), roughness: 0.7, metalness: 0.15 });
     const edgeBack = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.12, 0.12), edgeMat);
     edgeBack.position.set(cx, h + 0.06, cz - hd);
     this._scene.add(edgeBack);
@@ -393,7 +456,7 @@ export class Level {
 
     // Interior floor — always present; only revealed when roof fades out
     const iGeo   = new THREE.PlaneGeometry(w - 1.0, d - 1.0);
-    const iMat   = new THREE.MeshLambertMaterial({ color: 0x1a1714 });
+    const iMat   = new THREE.MeshStandardMaterial({ color: 0x3a4048, roughness: 0.7, metalness: 0.1 });
     const iFloor = new THREE.Mesh(iGeo, iMat);
     iFloor.rotation.x = -Math.PI / 2;
     iFloor.position.set(cx, 0.01, cz);
@@ -406,8 +469,10 @@ export class Level {
     // NOT added to collidables: all raycasts are horizontal so a horizontal
     // roof plane would never be hit anyway.
     const rGeo = new THREE.BoxGeometry(w + 0.2, 0.35, d + 0.2);
-    const rMat = new THREE.MeshLambertMaterial({
+    const rMat = new THREE.MeshStandardMaterial({
       color,
+      roughness: 0.7,
+      metalness: 0.15,
       transparent: true,
       opacity:     1.0,
     });
@@ -459,7 +524,7 @@ export class Level {
   _wall(cx, cz, w, d, h, color, name) {
     if (!name || h <= 0) return;
     const geo  = new THREE.BoxGeometry(w, h, d);
-    const mat  = new THREE.MeshLambertMaterial({ color, flatShading: true });
+    const mat  = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0.05 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(cx, h / 2, cz);
     mesh.castShadow    = true;
@@ -472,7 +537,7 @@ export class Level {
 
   _box(cx, cz, w, h, d, color, name) {
     const geo  = new THREE.BoxGeometry(w, h, d);
-    const mat  = new THREE.MeshLambertMaterial({ color, flatShading: true });
+    const mat  = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0.05 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(cx, h / 2, cz);
     mesh.castShadow    = true;
@@ -486,107 +551,270 @@ export class Level {
   // ── Environment props ─────────────────────────────────────────────────────
 
   _buildEnvironmentProps() {
-    // Street lamps
-    const lampPosts = [
-      [-15, -15], [15, -15], [-15, 15], [15, 15],
-      [0, -35], [0, 35], [-35, 0], [35, 0],
+    // ═══════════════════════════════════════════════════════════════════════
+    // 摆放规则：
+    //   自然物(树/岩石/灌木)     → 草地/地图边缘，禁止混凝土区
+    //   工业物(货架/纸箱/油桶)   → 建筑内部或紧贴外墙
+    //   市政物(路灯/长椅/遮阳伞) → 道路旁/广场
+    //   军事物(沙袋/集装箱/围栏) → 区域边界/战术要点
+    //   同类道具成组摆放，不单独散落
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // ── 1. 自然物：地图边缘 + 区域间草地过渡带 ─────────────────────────
+
+    // 树丛 — 只在草地区域（地图边缘、区域间过渡带）
+    const treeSpots = [
+      // NW 工厂外围 — 工厂西/北侧树林带
+      [-65, -55, 'round'], [-62, -50, 'cone'], [-68, -48, 'bush'],
+      [-60, -62, 'cone'],  [-66, -42, 'round'], [-70, -35, 'bush'],
+      // NE 仓库外围 — 仓库东侧
+      [68, -55, 'round'], [70, -45, 'cone'], [66, -65, 'bush'],
+      // SW 公寓外围 — 西侧和南侧
+      [-68, 55, 'round'], [-65, 50, 'cone'], [-62, 62, 'round'],
+      [-70, 45, 'bush'],  [-58, 68, 'cone'],
+      // SE 停车场外围 — 东侧
+      [68, 55, 'cone'], [70, 48, 'round'], [65, 62, 'bush'],
+      // 西边界树带
+      [-72, 0, 'round'], [-70, 10, 'cone'], [-72, -15, 'bush'], [-68, 20, 'round'],
+      // 东边界树带
+      [72, 5, 'round'], [70, -10, 'cone'], [72, 18, 'bush'],
+      // 区域间过渡 — 工厂/公寓之间的草地（X:-60~-20, Z:0~20）
+      [-55, 8, 'round'], [-50, 14, 'cone'], [-58, 3, 'bush'],
+      // 仓库/停车场之间的草地（X:60~70, Z:-10~10）
+      [65, 0, 'round'], [68, 8, 'bush'],
     ];
-    for (const [x, z] of lampPosts) {
-      // Pole
-      const poleMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.10, 4.5, 6), poleMat);
-      pole.position.set(x, 2.25, z);
-      pole.castShadow = true;
-      this._scene.add(pole);
-      // Light fixture
-      const fixMat = new THREE.MeshBasicMaterial({ color: 0xffeeaa, toneMapped: false });
-      const fix = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.4), fixMat);
-      fix.position.set(x, 4.5, z);
-      this._scene.add(fix);
-      // Glow halo sphere
-      const glowMat = new THREE.MeshBasicMaterial({
-        color: 0xffdd99, transparent: true, opacity: 0.25, depthWrite: false, toneMapped: false,
-      });
-      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), glowMat);
-      glow.position.set(x, 4.5, z);
-      this._scene.add(glow);
-      // Point light (warm, brighter)
-      const light = new THREE.PointLight(0xffcc88, 1.8, 14);
-      light.position.set(x, 4.2, z);
-      this._scene.add(light);
+    for (const [x, z, type] of treeSpots) {
+      const tree = createTree(type);
+      tree.position.set(x, 0, z);
+      tree.scale.setScalar(2.5 + Math.random() * 1.5);
+      tree.rotation.y = Math.random() * Math.PI * 2;
+      this._scene.add(tree);
     }
 
-    // Oil barrels (scattered around zones)
-    const barrelPositions = [
-      [-30, -28], [-32, -28], [22, -36], [24, -36],
-      [-50, 34], [48, 28], [50, 28], [-8, 56],
-      [30, 52], [-20, -50], [55, -42],
+    // 岩石群 — 草地区域，做地形分割和天然掩体
+    const rockSpots = [
+      // 工厂和公寓之间（西侧过渡带）
+      [-55, -15, 5], [-48, 5, 4],
+      // 仓库北侧空地
+      [10, -65, 3],
+      // 停车场东南角外
+      [65, 38, 4],
+      // 地下室南侧（自然地形）
+      [-15, 68, 5], [8, 70, 3],
+      // 中央广场外围过渡（广场边缘有几块零星岩石）
+      [-22, -18, 2], [22, 18, 2],
     ];
-    const barrelColors = [0x3a5a3a, 0x5a3a2a, 0x4a4a4a, 0x2a4a5a];
-    for (let bi = 0; bi < barrelPositions.length; bi++) {
-      const [x, z] = barrelPositions[bi];
+    for (const [x, z, count] of rockSpots) {
+      const rocks = createRockCluster(count);
+      rocks.position.set(x, 0, z);
+      rocks.scale.setScalar(2);
+      this._scene.add(rocks);
+    }
+
+    // ── 2. 工业物：建筑内部/紧贴外墙 ──────────────────────────────────
+
+    // 纸箱堆 — 工厂和仓库内部
+    const crateSpots = [
+      // 工厂内部（-56~-24, -60~-40）
+      [-38, -45, 5], [-48, -52, 3], [-30, -55, 4],
+      // 仓库内部（20~60, -64~-36）
+      [30, -48, 6], [45, -55, 4], [52, -42, 3],
+      // 公寓内部（-62~-34, 31~49）
+      [-48, 38, 3], [-42, 44, 2],
+    ];
+    for (const [x, z, count] of crateSpots) {
+      const crates = createCrateCluster(count);
+      crates.position.set(x, 0, z);
+      crates.scale.setScalar(1.5);
+      this._scene.add(crates);
+    }
+
+    // 油桶 — 工厂外墙旁、仓库码头、停车场边
+    const barrelData = [
+      // 工厂外墙旁 2组
+      [-22, -42, false], [-22, -44, false], [-24, -43, true],
+      // 仓库码头 2组
+      [56, -38, false], [58, -38, false], [57, -40, true],
+      // 停车场入口旁
+      [14, 28, false], [16, 28, false],
+      // 公寓废墟旁
+      [-52, 34, false], [-52, 36, true],
+      // 地下室入口
+      [-8, 58, false],
+    ];
+    const barrelColors = [0x4a7a3a, 0x5a3a2a, 0x4a4a4a, 0xcc6633];
+    for (const [x, z, fallen] of barrelData) {
       const color = barrelColors[Math.floor(Math.random() * barrelColors.length)];
-      const mat = new THREE.MeshLambertMaterial({ color });
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.9, 8), mat);
-
-      // 30% chance: barrel is tipped over
-      if (bi % 3 === 2) {
-        barrel.rotation.z = Math.PI / 2.5;
-        barrel.position.set(x, 0.25, z);
-      } else {
-        barrel.position.set(x, 0.45, z);
-      }
-
-      // Lid detail (top ring)
-      const lidMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color).multiplyScalar(1.2) });
-      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 8), lidMat);
-      lid.position.y = 0.45;
-      barrel.add(lid);
-
-      barrel.castShadow = true;
+      const barrel = createBarrel({ color, fallen });
+      barrel.position.x = x;
+      barrel.position.z = z;
       this._scene.add(barrel);
       this.collidables.push(barrel);
     }
 
-    // Sandbag walls (tactical cover)
-    const sandbagPositions = [
-      { x: -5, z: -28, w: 3, d: 0.8 },
-      { x: 5,  z: -28, w: 3, d: 0.8 },
-      { x: 25, z: 18,  w: 0.8, d: 3 },
-      { x: -25, z: 18, w: 0.8, d: 3 },
+    // 货架 — 工厂和仓库内部
+    const shelfSpots = [
+      // 工厂内 — 靠墙
+      [-50, -45], [-50, -50],
+      // 仓库内 — 靠墙
+      [25, -52], [25, -46],
     ];
-    const sbMat = new THREE.MeshLambertMaterial({ color: 0x8a7a5a });
-    for (const sb of sandbagPositions) {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sb.w, 0.7, sb.d), sbMat);
-      mesh.position.set(sb.x, 0.35, sb.z);
-      mesh.castShadow = true;
-      this._scene.add(mesh);
-      this.collidables.push(mesh);
+    for (const [x, z] of shelfSpots) {
+      const shelf = createShelf();
+      shelf.position.set(x, 0, z);
+      shelf.scale.setScalar(1.5);
+      this._scene.add(shelf);
     }
 
-    // Wire fences
-    const fenceMat = new THREE.MeshLambertMaterial({ color: 0x666666, wireframe: true });
-    const fencePositions = [
-      { x: -30, z: 20, w: 12, h: 2 },
-      { x: 30,  z: -20, w: 8, h: 2 },
+    // 灭火器 — 建筑内部靠墙
+    const extSpots = [
+      [-26, -42],  // 工厂入口内
+      [22, -38],   // 仓库入口内
+      [-36, 40],   // 公寓内
     ];
-    for (const f of fencePositions) {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(f.w, f.h, 0.1), fenceMat);
-      mesh.position.set(f.x, f.h / 2, f.z);
-      this._scene.add(mesh);
-      // Fence posts
-      const postMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
-      for (let px = f.x - f.w / 2; px <= f.x + f.w / 2; px += 3) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, f.h + 0.3, 4), postMat);
-        post.position.set(px, (f.h + 0.3) / 2, f.z);
-        this._scene.add(post);
-      }
+    for (const [x, z] of extSpots) {
+      const ext = createExtinguisher();
+      ext.position.set(x, 0, z);
+      ext.scale.setScalar(1.5);
+      this._scene.add(ext);
     }
 
-    // Ground markings — road lines, parking lines, zone boundaries
+    // 集装箱 — 仓库码头区域
+    const containerSpots = [
+      [58, -55, 0],                // 仓库东侧码头
+      [58, -48, Math.PI / 2],     // 码头并排
+      [22, -62, 0.2],             // 仓库北侧外
+    ];
+    for (const [x, z, rot] of containerSpots) {
+      const c = createContainer();
+      c.position.set(x, 0, z);
+      c.rotation.y = rot;
+      c.scale.setScalar(2);
+      this._scene.add(c);
+    }
+
+    // 叉车 — 仓库内部
+    const fl = createForklift();
+    fl.position.set(35, 0, -50);
+    fl.rotation.y = Math.PI / 6;
+    fl.scale.setScalar(2);
+    this._scene.add(fl);
+
+    // ── 3. 市政物：道路旁/广场 ─────────────────────────────────────────
+
+    // 路灯 — 沿主干道和广场周围
+    const streetLightSpots = [
+      // 中央广场四角
+      [-15, -15], [15, -15], [-15, 15], [15, 15],
+      // 南北主路
+      [0, -35], [0, 35],
+      // 东西横路
+      [-35, 0], [35, 0],
+    ];
+    for (const [x, z] of streetLightSpots) {
+      const sl = createStreetLight();
+      sl.position.set(x, 0, z);
+      sl.rotation.y = Math.random() * Math.PI * 2;
+      sl.scale.setScalar(2);
+      this._scene.add(sl);
+    }
+
+    // 长椅 — 广场喷泉周围
+    const benchSpots = [
+      { x: -6, z: -8, rot: Math.PI / 4 },       // 面向喷泉
+      { x:  6, z:  8, rot: Math.PI + Math.PI / 4 },
+      { x: -8, z:  6, rot: -Math.PI / 4 },
+    ];
+    for (const b of benchSpots) {
+      const bench = createBench();
+      bench.position.set(b.x, 0, b.z);
+      bench.rotation.y = b.rot;
+      bench.scale.setScalar(2);
+      this._scene.add(bench);
+    }
+
+    // 遮阳伞 — 广场长椅旁
+    const umbrellaSpots = [[-7, -9], [7, 9]];
+    for (const [x, z] of umbrellaSpots) {
+      const umb = createUmbrella();
+      umb.position.set(x, 0, z);
+      umb.scale.setScalar(2);
+      this._scene.add(umb);
+    }
+
+    // 木桩绳索 — 沿泥地路径引导
+    const stakeSpots = [
+      { x: -3, z: -30, rot: 0 },          // 北路旁
+      { x:  3, z:  30, rot: 0 },           // 南路旁
+      { x: -32, z: -3, rot: Math.PI / 2 }, // 西路旁
+    ];
+    for (const s of stakeSpots) {
+      const stake = createStakeRope(6);
+      stake.position.set(s.x, 0, s.z);
+      stake.rotation.y = s.rot;
+      stake.scale.setScalar(2);
+      this._scene.add(stake);
+    }
+
+    // ── 4. 军事物：区域边界/战术要点 ───────────────────────────────────
+
+    // 沙袋 — 区域入口、关键通道
+    const sandbagSpots = [
+      { x: -10, z: -22, rot: 0 },           // 工厂区南入口
+      { x:  10, z: -22, rot: 0 },           // 仓库区南入口
+      { x: -20, z:  22, rot: Math.PI / 2 }, // 公寓区北入口
+      { x:  20, z:  22, rot: Math.PI / 2 }, // 停车场北入口
+    ];
+    for (const sb of sandbagSpots) {
+      const bags = createSandbags(5);
+      bags.position.set(sb.x, 0, sb.z);
+      bags.rotation.y = sb.rot;
+      bags.scale.setScalar(2.5);
+      this._scene.add(bags);
+    }
+
+    // 木围栏 — 区域边界/草地与建筑过渡
+    const fenceSpots = [
+      // 工厂区南侧边界
+      { x: -35, z: -20, len: 5, rot: 0, broken: false },
+      // 仓库区西侧边界
+      { x: 15,  z: -40, len: 4, rot: Math.PI / 2, broken: true },
+      // 公寓区北侧（废墟破损围栏）
+      { x: -40, z: 22, len: 4, rot: 0, broken: true },
+      // 停车场西侧
+      { x: 12, z: 35, len: 3, rot: Math.PI / 2, broken: false },
+      // 地图西边界附近
+      { x: -65, z: -5, len: 5, rot: Math.PI / 8, broken: false },
+    ];
+    for (const f of fenceSpots) {
+      const fence = createWoodFence(f.len, f.broken);
+      fence.position.set(f.x, 0, f.z);
+      fence.rotation.y = f.rot;
+      fence.scale.setScalar(2);
+      this._scene.add(fence);
+    }
+
+    // ── 5. 建筑小品 — 与区域功能匹配 ──────────────────────────────────
+
+    // 村庄建筑 — 公寓废墟区域旁（SW的废弃民居）
+    const buildingSpots = [
+      { x: -58, z: 30, rot: 0, color: 0x5a6a8a, w: 3, d: 2.5 },           // 公寓区西侧民居
+      { x: -38, z: 62, rot: Math.PI / 2, color: 0x7a6a5a, w: 2.5, d: 2 }, // 公寓区南侧
+      // 仓库区旁小办公楼
+      { x: 50, z: -66, rot: 0, color: 0x6a6a7a, w: 2.5, d: 2 },
+    ];
+    for (const b of buildingSpots) {
+      const bld = createBuilding({ w: b.w, d: b.d, color: b.color });
+      bld.position.set(b.x, 0, b.z);
+      bld.rotation.y = b.rot;
+      bld.scale.setScalar(2);
+      this._scene.add(bld);
+    }
+
+    // ── 6. 地面标记 ───────────────────────────────────────────────────
+
+    // 道路中线虚线
     const markMat = new THREE.MeshBasicMaterial({ color: 0x6a6a5a, transparent: true, opacity: 0.3 });
-
-    // Road from north to south (center of map)
     for (let z = -70; z < 70; z += 8) {
       const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 3), markMat);
       dash.rotation.x = -Math.PI / 2;
@@ -594,7 +822,7 @@ export class Level {
       this._scene.add(dash);
     }
 
-    // Parking lot lines
+    // 停车场线
     const parkMark = new THREE.MeshBasicMaterial({ color: 0x7a7a6a, transparent: true, opacity: 0.25 });
     for (let x = 18; x <= 54; x += 6) {
       const line = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 8), parkMark);
@@ -603,12 +831,12 @@ export class Level {
       this._scene.add(line);
     }
 
-    // Concrete pads under buildings
-    const padMat = new THREE.MeshLambertMaterial({ color: 0x4a4a42 });
+    // 建筑底座混凝土
+    const padMat = new THREE.MeshStandardMaterial({ color: 0x4a5058, roughness: 0.7, metalness: 0.1 });
     const pads = [
-      { x: -40, z: -50, w: 36, d: 24 }, // Factory
-      { x:  40, z: -50, w: 44, d: 32 }, // Warehouse
-      { x: -48, z:  40, w: 32, d: 22 }, // Apartment
+      { x: -40, z: -50, w: 36, d: 24 },  // 工厂
+      { x:  40, z: -50, w: 44, d: 32 },  // 仓库
+      { x: -48, z:  40, w: 32, d: 22 },  // 公寓
     ];
     for (const p of pads) {
       const pad = new THREE.Mesh(new THREE.PlaneGeometry(p.w, p.d), padMat);
@@ -616,18 +844,6 @@ export class Level {
       pad.position.set(p.x, 0.003, p.z);
       pad.receiveShadow = true;
       this._scene.add(pad);
-    }
-
-    // Tire marks in parking lot
-    const tireMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, transparent: true, opacity: 0.15 });
-    for (let i = 0; i < 4; i++) {
-      const tx = 25 + Math.random() * 20;
-      const tz = 28 + Math.random() * 18;
-      const tire = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 6 + Math.random() * 4), tireMat);
-      tire.rotation.x = -Math.PI / 2;
-      tire.rotation.z = (Math.random() - 0.5) * 0.3;
-      tire.position.set(tx, 0.006, tz);
-      this._scene.add(tire);
     }
   }
 

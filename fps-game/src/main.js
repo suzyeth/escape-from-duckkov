@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import GUI from 'lil-gui';
 import { Renderer }          from './core/Renderer.js';
 import { InputManager }      from './core/InputManager.js';
 import { GameLoop }          from './core/GameLoop.js';
@@ -63,6 +64,65 @@ const baseScreen = new BaseScreen(saveSystem, talentSystem, craftingSystem);
 const network    = new NetworkSystem();
 const lobbyScreen = new LobbyScreen();
 const invUI     = new InventoryUI(inventory);
+
+// ── Art Debug GUI (lil-gui) ───────────────────────────────────────────────────
+// Toggle with G key. Lets you adjust colors, lighting, fog in real-time.
+const _artGUI = new GUI({ title: 'Art Debug', width: 280 });
+_artGUI.domElement.style.zIndex = '9999';
+
+// Sky & Fog
+const _skyFolder = _artGUI.addFolder('Sky & Fog');
+const _skyParams = {
+  skyColor: '#' + scene.background.getHexString(),
+  fogNear: scene.fog.near,
+  fogFar: scene.fog.far,
+};
+_skyFolder.addColor(_skyParams, 'skyColor').name('Sky Color').onChange(v => {
+  scene.background.set(v);
+  scene.fog.color.set(v);
+});
+_skyFolder.add(_skyParams, 'fogNear', 10, 200).name('Fog Near').onChange(v => { scene.fog.near = v; });
+_skyFolder.add(_skyParams, 'fogFar', 50, 400).name('Fog Far').onChange(v => { scene.fog.far = v; });
+
+// Lighting
+const _lightFolder = _artGUI.addFolder('Lighting');
+const _lightParams = {
+  sunColor: '#' + level._sun.color.getHexString(),
+  sunIntensity: level._sun.intensity,
+  sunX: level._sun.position.x,
+  sunY: level._sun.position.y,
+  sunZ: level._sun.position.z,
+  fillColor: '#' + level._fill.color.getHexString(),
+  fillIntensity: level._fill.intensity,
+};
+_lightFolder.addColor(_lightParams, 'sunColor').name('Sun Color').onChange(v => level._sun.color.set(v));
+_lightFolder.add(_lightParams, 'sunIntensity', 0, 3).name('Sun Intensity').onChange(v => { level._sun.intensity = v; });
+_lightFolder.add(_lightParams, 'sunX', -100, 100).name('Sun X').onChange(v => { level._sun.position.x = v; });
+_lightFolder.add(_lightParams, 'sunY', 10, 120).name('Sun Y').onChange(v => { level._sun.position.y = v; });
+_lightFolder.add(_lightParams, 'sunZ', -100, 100).name('Sun Z').onChange(v => { level._sun.position.z = v; });
+_lightFolder.addColor(_lightParams, 'fillColor').name('Fill Color').onChange(v => level._fill.color.set(v));
+_lightFolder.add(_lightParams, 'fillIntensity', 0, 2).name('Fill Intensity').onChange(v => { level._fill.intensity = v; });
+
+// Ground (vertex-colored — only roughness is tunable)
+const _groundFolder = _artGUI.addFolder('Ground');
+const _groundParams = { roughness: level._groundMat.roughness };
+_groundFolder.add(_groundParams, 'roughness', 0, 1).name('Roughness').onChange(v => { level._groundMat.roughness = v; });
+
+// Misc
+const _miscFolder = _artGUI.addFolder('Misc');
+const _miscParams = { fogOfWar: true };
+_miscFolder.add(_miscParams, 'fogOfWar').name('Fog of War').onChange(v => { fogOfWar.enabled = v; });
+
+// Start collapsed — press G to toggle
+_artGUI.close();
+let _guiVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') { _togglePause(); return; }
+  if (e.code === 'KeyG' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    _guiVisible = !_guiVisible;
+    _artGUI.domElement.style.display = _guiVisible ? '' : 'none';
+  }
+});
 
 // Remote players map
 const remotePlayers = new Map();
@@ -231,9 +291,97 @@ let _lastWaveCount  = 0; // track wave spawns for notification
 let _errorCount     = 0; // game loop error counter
 let _isMultiplayer  = false;
 let _currentLevelId = 0;
+let _isPaused       = false;
+window._screenShakeEnabled = true;
 
 function _addScreenShake(intensity) {
+  if (window._screenShakeEnabled === false) return;
   _shakeDecay = Math.min(_shakeDecay + intensity, 1.5);
+}
+
+// ── Pause ────────────────────────────────────────────────────────────────────
+
+function _togglePause() {
+  if (!hud._hud || hud._hud.style.display === 'none') return; // not in game
+  _isPaused = !_isPaused;
+  const el = document.getElementById('pause-screen');
+  if (el) el.style.display = _isPaused ? 'flex' : 'none';
+  // Close settings when unpausing
+  if (!_isPaused) {
+    const settingsEl = document.getElementById('settings-screen');
+    if (settingsEl) settingsEl.style.display = 'none';
+  }
+}
+
+document.getElementById('pause-resume')?.addEventListener('click', () => _togglePause());
+document.getElementById('pause-settings')?.addEventListener('click', () => {
+  const el = document.getElementById('settings-screen');
+  if (el) el.style.display = 'flex';
+});
+document.getElementById('pause-rules')?.addEventListener('click', () => {
+  const el = document.getElementById('rules-screen');
+  if (el) el.style.display = 'flex';
+});
+document.getElementById('pause-quit')?.addEventListener('click', () => {
+  _isPaused = false;
+  const pauseEl = document.getElementById('pause-screen');
+  if (pauseEl) pauseEl.style.display = 'none';
+  const settingsEl = document.getElementById('settings-screen');
+  if (settingsEl) settingsEl.style.display = 'none';
+  _showEndScreen(false);
+});
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+document.getElementById('settings-close')?.addEventListener('click', () => {
+  const el = document.getElementById('settings-screen');
+  if (el) el.style.display = 'none';
+});
+
+document.getElementById('setting-volume')?.addEventListener('input', (e) => {
+  const v = e.target.value;
+  document.getElementById('setting-volume-val').textContent = v + '%';
+  sound.setVolume(v / 100);
+});
+
+document.getElementById('setting-sensitivity')?.addEventListener('input', (e) => {
+  const v = e.target.value;
+  document.getElementById('setting-sensitivity-val').textContent = v + '%';
+});
+
+document.getElementById('setting-fog')?.addEventListener('change', (e) => {
+  fogOfWar.enabled = e.target.checked;
+  e.target.nextElementSibling.textContent = e.target.checked ? '开启' : '关闭';
+});
+
+document.getElementById('setting-shake')?.addEventListener('change', (e) => {
+  window._screenShakeEnabled = e.target.checked;
+  e.target.nextElementSibling.textContent = e.target.checked ? '开启' : '关闭';
+});
+
+// ── Damage direction indicator ───────────────────────────────────────────────
+
+function _showDamageDirection(fromX, fromZ) {
+  const container = document.getElementById('damage-direction');
+  if (!container) return;
+
+  const dx = fromX - player.position.x;
+  const dz = fromZ - player.position.z;
+  const angle = Math.atan2(dx, dz);
+
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const edgeDist = Math.min(cx, cy) * 0.85;
+
+  const screenX = cx + Math.sin(angle) * edgeDist - 30;
+  const screenY = cy - Math.cos(angle) * edgeDist - 30;
+
+  const el = document.createElement('div');
+  el.className = 'dmg-indicator';
+  el.style.left = screenX + 'px';
+  el.style.top = screenY + 'px';
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 800);
 }
 
 function _gainXP(amount, reason) {
@@ -313,10 +461,34 @@ function handlePlayerShoot() {
 
 const BLUEPRINTS = ['bp_medkit', 'bp_vest', 'bp_painkillers', 'bp_helmet'];
 
-function _randomEnemyDrop(isElite = false) {
+function _randomEnemyDrop(enemyType = 'normal') {
   const drops = [];
   const r = Math.random();
-  if (isElite) {
+
+  if (enemyType === 'rusher') {
+    // Rusher: bandage + pistol ammo + small cash
+    drops.push({ defId: 'bandage',     count: 1 });
+    drops.push({ defId: 'pistol_ammo', count: Math.ceil(Math.random() * 10 + 5) });
+    drops.push({ defId: 'cash',        count: Math.ceil(Math.random() * 150 + 50) });
+
+  } else if (enemyType === 'tank') {
+    // Tank: vest_heavy(25%) or medkit + rifle ammo(20-30) + medium cash(400-800)
+    if (r < 0.25) drops.push({ defId: 'vest_heavy', count: 1 });
+    else          drops.push({ defId: 'medkit',      count: 1 });
+    drops.push({ defId: 'rifle_ammo', count: Math.ceil(Math.random() * 10 + 20) });
+    drops.push({ defId: 'cash',       count: Math.ceil(Math.random() * 400 + 400) });
+
+  } else if (enemyType === 'boss') {
+    // Boss: vest_heavy(50%) or helmet + rifle ammo(25-40) + high cash(800-1500) + guaranteed blueprint
+    if (r < 0.50) drops.push({ defId: 'vest_heavy', count: 1 });
+    else          drops.push({ defId: 'helmet',      count: 1 });
+    drops.push({ defId: 'rifle_ammo', count: Math.ceil(Math.random() * 15 + 25) });
+    drops.push({ defId: 'cash',       count: Math.ceil(Math.random() * 700 + 800) });
+    // Guaranteed blueprint
+    const bp = BLUEPRINTS[Math.floor(Math.random() * BLUEPRINTS.length)];
+    drops.push({ defId: bp, count: 1 });
+
+  } else if (enemyType === 'elite') {
     // Elite drops: guaranteed medkit or armor + high cash + chance of blueprint
     if      (r < 0.25) drops.push({ defId: 'medkit',      count: 1 });
     else if (r < 0.45) drops.push({ defId: 'vest_light',  count: 1 });
@@ -330,6 +502,7 @@ function _randomEnemyDrop(isElite = false) {
       drops.push({ defId: bp, count: 1 });
     }
   } else {
+    // Normal enemy drops
     if      (r < 0.15) drops.push({ defId: 'medkit',     count: 1 });
     else if (r < 0.30) drops.push({ defId: 'bandage',    count: 1 });
     else if (r < 0.60) drops.push({ defId: 'rifle_ammo', count: Math.ceil(Math.random() * 20 + 5) });
@@ -360,6 +533,7 @@ function handleEnemyShots(shots) {
       hud.showDamageFlash();
       sound.playDamaged();
       _addScreenShake(0.8);
+      _showDamageDirection(shot.origin.x, shot.origin.z);
       hud.pushKillFeed(`被近战攻击！(${_partLabel(partHit)}) -${shot.damage}HP`);
       if (!health.isAlive) _onPlayerDied();
     } else {
@@ -573,6 +747,12 @@ function _formatTime(sec) {
 }
 
 function _showEndScreen(survived) {
+  _isPaused = false;
+  const _pauseEl = document.getElementById('pause-screen');
+  if (_pauseEl) _pauseEl.style.display = 'none';
+  const _settingsEl = document.getElementById('settings-screen');
+  if (_settingsEl) _settingsEl.style.display = 'none';
+
   tutorial.complete();
   loop.stop();
   hud.hide();
@@ -749,6 +929,13 @@ stash.onSelect((loadout) => {
     _onPlayerDied();
   });
 
+  // Reset pause state
+  _isPaused = false;
+  const pauseEl = document.getElementById('pause-screen');
+  if (pauseEl) pauseEl.style.display = 'none';
+  const settingsEl = document.getElementById('settings-screen');
+  if (settingsEl) settingsEl.style.display = 'none';
+
   stash.hide();
   document.getElementById('start-screen').style.display = 'none';
   hud.show();
@@ -802,6 +989,7 @@ const loop = new GameLoop(
   // update
   (dt) => {
     if (!gameStarted) return;
+    if (_isPaused) return;
     try {
 
     // Hitstop — brief freeze on kills
@@ -836,7 +1024,7 @@ const loop = new GameLoop(
     // Auto-refill weapon reserve from inventory ammo
     const AMMO_MAP = { rifle: 'rifle_ammo', pistol: 'pistol_ammo', shotgun: 'shotgun_ammo', vss: 'vss_ammo', mp5: 'mp5_ammo' };
     const cur = weapons.current;
-    if (cur.reserve <= 0 && cur.mag <= 0) {
+    if (cur.reserve <= 0) {
       const ammoId = AMMO_MAP[cur.def.id];
       if (ammoId) {
         // Find ammo in inventory and consume it
@@ -889,7 +1077,7 @@ const loop = new GameLoop(
           sound.playKillConfirm();
           _addScreenShake(hit.enemy.isElite ? 0.5 : 0.3);
           _hitstopTimer = hit.enemy.isElite ? 0.08 : 0.05;
-          loot.dropLoot(hit.enemy.position, _randomEnemyDrop(hit.enemy.isElite));
+          loot.dropLoot(hit.enemy.position, _randomEnemyDrop(hit.enemy.enemyType));
         }
       } else if (hit.target === 'player') {
         const partHit = health.takeDamage(hit.damage);
@@ -898,6 +1086,7 @@ const loop = new GameLoop(
         hud.showDamageFlash();
         sound.playDamaged();
         _addScreenShake(0.4);
+        _showDamageDirection(hit.pos.x, hit.pos.z);
         hud.pushKillFeed(`中弹！(${_partLabel(partHit)}) -${hit.damage}HP`);
         if (health.armorJustBroke) hud.pushKillFeed('⚠ 护甲已损毁！');
         if (!health.isAlive) _onPlayerDied();
@@ -912,6 +1101,22 @@ const loop = new GameLoop(
     if (aiResult.eliteAlerted) {
       sound.playEliteAlert();
       hud.pushKillFeed('⚠ 精英鸭卒发现你！');
+    }
+
+    // Boss health bar
+    const bossWrap = document.getElementById('boss-health-wrap');
+    const bossBar = document.getElementById('boss-health-inner');
+    const bossNameEl = document.getElementById('boss-name');
+    if (bossWrap && bossBar) {
+      const boss = aiSystem.enemies.find(e => e.enemyType === 'boss' && e.isAlive);
+      if (boss) {
+        bossWrap.style.display = 'block';
+        bossBar.style.width = `${(boss.health / boss.maxHealth) * 100}%`;
+        const typeDef = ENEMY_TYPES[boss.enemyType];
+        if (bossNameEl) bossNameEl.textContent = (typeDef && typeDef.label) || 'BOSS 鸭王';
+      } else {
+        bossWrap.style.display = 'none';
+      }
     }
 
     // Wave spawn notification
@@ -935,20 +1140,22 @@ const loop = new GameLoop(
         hud.setHealChannel(-1);
         hud.pushKillFeed('治疗中断');
       } else if (_healTimer <= 0) {
-        // Complete — validate item still exists before consuming
-        if (inventory.items.has(_healInstanceId)) {
-          inventory.useHealing(_healInstanceId);
+        // Complete — consume the item; skip heal if item was already used
+        const consumed = inventory.useHealing(_healInstanceId);
+        if (consumed) {
+          health.heal(_healAmount);
+          const wasBleeding = health.isBleeding;
+          if (_healStopsBleeding) health.stopBleeding();
+          player.health          = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
+          player.speedMultiplier = health.speedMultiplier;
+          if (invUI.isOpen) invUI.refresh();
+          const bleedMsg = wasBleeding && _healStopsBleeding ? ' (已止血)' : wasBleeding ? ' (仍在流血!)' : '';
+          hud.pushKillFeed(`治疗完成 +${_healAmount}HP${bleedMsg}`);
+        } else {
+          hud.pushKillFeed('治疗失败：物品已消耗');
         }
-        health.heal(_healAmount);
-        const wasBleeding = health.isBleeding;
-        if (_healStopsBleeding) health.stopBleeding();
-        player.health          = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
-        player.speedMultiplier = health.speedMultiplier;
         player.isHealing       = false;
         hud.setHealChannel(-1);
-        if (invUI.isOpen) invUI.refresh();
-        const bleedMsg = wasBleeding && _healStopsBleeding ? ' (已止血)' : wasBleeding ? ' (仍在流血!)' : '';
-        hud.pushKillFeed(`治疗完成 +${_healAmount}HP${bleedMsg}`);
       }
     }
 
@@ -1058,6 +1265,35 @@ const loop = new GameLoop(
     const _fogProj = player.position.clone().project(camera);
     fogOfWar.update((_fogProj.x + 1) / 2, (-_fogProj.y + 1) / 2);
 
+    // Hide enemies outside player's vision cone (must match fog-of-war direction)
+    if (fogOfWar.enabled) {
+      const visionRange = 18;
+      const halfFov = fogOfWar._fovAngle / 2;
+      // Derive facing angle from player→mouse in world space (same source as fog overlay)
+      const facingDx = _aimWorldPos.x - player.position.x;
+      const facingDz = _aimWorldPos.z - player.position.z;
+      const pAngle = Math.atan2(facingDx, facingDz);
+      for (const enemy of aiSystem.enemies) {
+        if (enemy.state === 4) continue; // DEAD — keep as-is
+        const dx = enemy.position.x - player.position.x;
+        const dz = enemy.position.z - player.position.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        // Always visible if very close
+        if (dist < 3) { enemy.mesh.visible = true; continue; }
+        // Outside vision range
+        if (dist > visionRange) { enemy.mesh.visible = false; continue; }
+        // Check angle
+        const angleToEnemy = Math.atan2(dx, dz);
+        let diff = angleToEnemy - pAngle;
+        // Normalize to [-PI, PI]
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        enemy.mesh.visible = Math.abs(diff) < halfFov;
+      }
+    } else {
+      for (const enemy of aiSystem.enemies) enemy.mesh.visible = true;
+    }
+
     // HUD
     hud.update(dt);
     hud.setHealth(player.health, player.maxHealth);
@@ -1071,6 +1307,8 @@ const loop = new GameLoop(
       weapons.current.reserve
     );
     hud.setActiveWeaponSlot(weapons.activeSlot);
+    hud.setWeight(inventory.totalWeight, 50);
+    hud.setReloadProgress(weapons.current.isReloading ? weapons.current.reloadProgress : -1);
     hud.setFractureState(health.legFractured, health.armFractured);
     if (_crosshairEl) _crosshairEl.classList.toggle('ads', player.isAiming && !invUI.isOpen);
 

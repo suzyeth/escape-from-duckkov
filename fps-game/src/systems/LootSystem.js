@@ -1,5 +1,13 @@
 import * as THREE from 'three';
 import { ITEM_DEFS } from './InventorySystem.js';
+import {
+  createRifleAmmo, createPistolAmmo, createShotgunAmmo,
+  createMedkit, createBandage, createPainkiller,
+  createArmor, createHelmet,
+  createChip, createGoldBar, createKeycard,
+} from '../props/loot-items.js';
+import { createCrateCluster } from '../props/crate-cluster.js';
+import { createContainer } from '../props/container.js';
 
 const PICKUP_RANGE    = 2.0;
 const CONTAINER_RANGE = 2.2;
@@ -12,17 +20,26 @@ const _rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 function _rollContainerLoot(tier = 'normal') {
   const tables = {
     normal: [
-      { defId: 'cash',        count: () => _rand(80,  250) },
-      { defId: 'bandage',     count: () => 1               },
-      { defId: 'pistol_ammo', count: () => _rand(10,  17)  },
-      { defId: 'rifle_ammo',  count: () => _rand(10,  20)  },
+      { defId: 'cash',         count: () => _rand(80,  250) },
+      { defId: 'bandage',      count: () => 1               },
+      { defId: 'pistol_ammo',  count: () => _rand(10,  17)  },
+      { defId: 'rifle_ammo',   count: () => _rand(10,  20)  },
+      { defId: 'painkillers',  count: () => 1               },
+      { defId: 'shotgun_ammo', count: () => _rand(4,   8)   },
+      { defId: 'vss_ammo',     count: () => _rand(5,  10)   },
+      { defId: 'mp5_ammo',     count: () => _rand(10, 20)   },
+      { defId: 'dogtag',       count: () => 1               },
     ],
     rich: [
-      { defId: 'cash',        count: () => _rand(300, 700) },
-      { defId: 'medkit',      count: () => 1               },
-      { defId: 'rifle_ammo',  count: () => _rand(20,  30)  },
-      { defId: 'dogtag',      count: () => 1               },
-      { defId: 'painkillers', count: () => 1               },
+      { defId: 'cash',         count: () => _rand(300, 700) },
+      { defId: 'medkit',       count: () => 1               },
+      { defId: 'rifle_ammo',   count: () => _rand(20,  30)  },
+      { defId: 'dogtag',       count: () => 1               },
+      { defId: 'painkillers',  count: () => 1               },
+      { defId: 'helmet',       count: () => 1               },
+      { defId: 'vest_light',   count: () => 1               },
+      { defId: 'key_basement', count: () => (Math.random() < 0.05 ? 1 : 0) },
+      { defId: 'shotgun_ammo', count: () => _rand(6,  12)   },
     ],
   };
   const pool   = tables[tier.toLowerCase()] ?? tables.normal;
@@ -283,146 +300,52 @@ export class LootSystem {
   }
 
   /**
-   * Build a detailed mesh for a loot item based on its type.
-   * Each item type gets a unique recognizable shape.
+   * Build a detailed mesh for a loot item using the props library.
+   * Falls back to basic geometry for unmapped types.
    */
   _buildItemMesh(defId, vis) {
-    const g = new THREE.Group();
-    const s = vis.size;
+    // Map defId → props library creator function
+    const PROPS_MAP = {
+      rifle_ammo:   createRifleAmmo,
+      pistol_ammo:  createPistolAmmo,
+      shotgun_ammo: createShotgunAmmo,
+      vss_ammo:     createRifleAmmo,   // reuse rifle ammo visual
+      mp5_ammo:     createPistolAmmo,  // reuse pistol ammo visual
+      bandage:      createBandage,
+      medkit:       createMedkit,
+      painkillers:  createPainkiller,
+      vest_light:   () => createArmor(1),
+      vest_heavy:   () => createArmor(3),
+      helmet:       createHelmet,
+      key_basement: createKeycard,
+      dogtag:       createChip,
+      cash:         createGoldBar,
+    };
 
-    switch (defId) {
-      case 'cash': {
-        // Stack of bills — flat rectangles layered
-        const billMat = new THREE.MeshLambertMaterial({ color: 0x44aa33 });
-        for (let i = 0; i < 4; i++) {
-          const bill = new THREE.Mesh(new THREE.BoxGeometry(s * 1.2, 0.02, s * 0.6), billMat);
-          bill.position.y = i * 0.025 - 0.03;
-          bill.rotation.y = i * 0.1;
-          g.add(bill);
-        }
-        // $ band
-        const bandMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
-        const band = new THREE.Mesh(new THREE.BoxGeometry(s * 0.3, 0.10, s * 0.65), bandMat);
-        band.position.y = 0.02;
-        g.add(band);
-        break;
-      }
-      case 'bandage': {
-        // Roll of bandage — cylinder with cross
-        const rollMat = new THREE.MeshLambertMaterial({ color: 0xeeddcc });
-        const roll = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.4, s * 0.4, s * 0.5, 8), rollMat);
-        roll.rotation.z = Math.PI / 2;
-        g.add(roll);
-        // Red cross on side
-        const crossMat = new THREE.MeshBasicMaterial({ color: 0xcc2222 });
-        const ch = new THREE.Mesh(new THREE.BoxGeometry(0.02, s * 0.3, s * 0.08), crossMat);
-        ch.position.set(s * 0.41, 0, 0);
-        g.add(ch);
-        const cv = new THREE.Mesh(new THREE.BoxGeometry(0.02, s * 0.08, s * 0.3), crossMat);
-        cv.position.set(s * 0.41, 0, 0);
-        g.add(cv);
-        break;
-      }
-      case 'medkit': {
-        // Red box with handle
-        const boxMat = new THREE.MeshLambertMaterial({ color: 0xcc2222 });
-        const box = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.7, s * 0.6), boxMat);
-        g.add(box);
-        // Handle
-        const hMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
-        const handle = new THREE.Mesh(new THREE.BoxGeometry(s * 0.5, 0.06, 0.06), hMat);
-        handle.position.y = s * 0.4;
-        g.add(handle);
-        break;
-      }
-      case 'painkillers': {
-        // Pill bottle — cylinder with cap
-        const bottleMat = new THREE.MeshLambertMaterial({ color: 0xee8833 });
-        const bottle = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.3, s * 0.3, s * 0.7, 8), bottleMat);
-        g.add(bottle);
-        const capMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-        const cap = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.32, s * 0.32, 0.08, 8), capMat);
-        cap.position.y = s * 0.38;
-        g.add(cap);
-        break;
-      }
-      case 'dogtag': {
-        // Metal tag on chain
-        const tagMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
-        const tag = new THREE.Mesh(new THREE.BoxGeometry(s * 0.5, s * 0.7, 0.04), tagMat);
-        g.add(tag);
-        // Chain ring
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x999999 });
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(s * 0.12, 0.02, 4, 8), ringMat);
-        ring.position.y = s * 0.42;
-        g.add(ring);
-        break;
-      }
-      case 'key_basement': {
-        // Golden key shape
-        const keyMat = new THREE.MeshLambertMaterial({ color: 0xffcc33, emissive: new THREE.Color(0xffcc33), emissiveIntensity: 0.4 });
-        // Handle (ring)
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(s * 0.2, 0.03, 4, 8), keyMat);
-        ring.position.y = s * 0.2;
-        g.add(ring);
-        // Shaft
-        const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.04, s * 0.5, 0.04), keyMat);
-        shaft.position.y = -s * 0.1;
-        g.add(shaft);
-        // Teeth
-        const teeth = new THREE.Mesh(new THREE.BoxGeometry(s * 0.15, 0.04, 0.04), keyMat);
-        teeth.position.set(s * 0.06, -s * 0.32, 0);
-        g.add(teeth);
-        break;
-      }
-      case 'vest_light':
-      case 'vest_heavy': {
-        // Vest shape — flat wide box with shoulder straps
-        const vestColor = defId === 'vest_heavy' ? 0x3a5040 : 0x4a6a5a;
-        const vestMat = new THREE.MeshLambertMaterial({ color: vestColor });
-        const body = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.8, s * 0.3), vestMat);
-        g.add(body);
-        // Shoulder straps
-        const strapColor = new THREE.Color(vestColor).multiplyScalar(0.8);
-        const strapMat = new THREE.MeshLambertMaterial({ color: strapColor });
-        const ls = new THREE.Mesh(new THREE.BoxGeometry(s * 0.15, 0.06, s * 0.6), strapMat);
-        ls.position.set(-s * 0.3, s * 0.42, 0); g.add(ls);
-        const rs = new THREE.Mesh(new THREE.BoxGeometry(s * 0.15, 0.06, s * 0.6), strapMat);
-        rs.position.set(s * 0.3, s * 0.42, 0); g.add(rs);
-        break;
-      }
-      case 'helmet': {
-        // Half sphere helmet
-        const helMat = new THREE.MeshLambertMaterial({ color: 0x5a5a6a });
-        const dome = new THREE.Mesh(new THREE.SphereGeometry(s * 0.5, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.6), helMat);
-        g.add(dome);
-        // Visor
-        const visMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
-        const visor = new THREE.Mesh(new THREE.BoxGeometry(s * 0.8, s * 0.15, 0.04), visMat);
-        visor.position.set(0, -s * 0.1, s * 0.4);
-        g.add(visor);
-        break;
-      }
-      default: {
-        // Fallback: use basic shape from vis config
-        let geo;
-        if (vis.shape === 'cylinder') {
-          geo = new THREE.CylinderGeometry(s * 0.5, s * 0.5, s, 6);
-        } else if (vis.shape === 'sphere') {
-          geo = new THREE.SphereGeometry(s * 0.5, 6, 5);
-        } else {
-          geo = new THREE.BoxGeometry(s, s, s);
-        }
-        const mat = new THREE.MeshLambertMaterial({ color: vis.color });
-        if (vis.glow) {
-          mat.emissive = new THREE.Color(vis.color);
-          mat.emissiveIntensity = 0.3;
-        }
-        g.add(new THREE.Mesh(geo, mat));
-        break;
-      }
+    const creator = PROPS_MAP[defId];
+    if (creator) {
+      const mesh = creator();
+      mesh.scale.setScalar(2);
+      return mesh;
     }
 
+    // Fallback for unmapped types
+    const g = new THREE.Group();
+    const s = vis.size;
+    let geo;
+    if (vis.shape === 'cylinder') {
+      geo = new THREE.CylinderGeometry(s * 0.5, s * 0.5, s, 6);
+    } else if (vis.shape === 'sphere') {
+      geo = new THREE.SphereGeometry(s * 0.5, 6, 5);
+    } else {
+      geo = new THREE.BoxGeometry(s, s, s);
+    }
+    const mat = new THREE.MeshStandardMaterial({ color: vis.color, roughness: 0.7 });
+    if (vis.glow) {
+      mat.emissive = new THREE.Color(vis.color);
+      mat.emissiveIntensity = 0.3;
+    }
+    g.add(new THREE.Mesh(geo, mat));
     return g;
   }
 
@@ -452,36 +375,17 @@ export class LootSystem {
 
     for (const [x, z, tier, color, name] of configs) {
       const isRich = tier === 'rich';
-      // Rich = metal box (flatter, grey-green); normal = wooden crate (taller, brown)
-      const w = isRich ? 0.75 : 0.90;
-      const h = isRich ? 0.50 : 0.70;
-      const d = isRich ? 0.55 : 0.70;
 
-      const containerColor = isRich ? 0x3a5a6a : color;
-      const geo  = new THREE.BoxGeometry(w, h, d);
-      const mat  = new THREE.MeshLambertMaterial({ color: containerColor });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(x, h / 2, z);
-      mesh.castShadow    = true;
-      mesh.receiveShadow = true;
+      let mesh;
+      if (isRich) {
+        mesh = createContainer();
+        mesh.scale.setScalar(1.2);
+      } else {
+        mesh = createCrateCluster(2);
+      }
+      mesh.position.set(x, 0, z);
       mesh.name = name;
       this._scene.add(mesh);
-
-      if (isRich) {
-        // Padlock icon on front
-        const lockMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
-        const lock = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.04), lockMat);
-        lock.position.set(x, h * 0.4, z + d / 2 + 0.02);
-        this._scene.add(lock);
-      } else {
-        // Crate slat lines
-        const slatMat = new THREE.MeshLambertMaterial({ color: 0x5a4a3a });
-        for (let sy = 0.15; sy < h - 0.1; sy += 0.22) {
-          const slat = new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, 0.04, d + 0.02), slatMat);
-          slat.position.set(x, sy, z);
-          this._scene.add(slat);
-        }
-      }
 
       this._containers.push({
         mesh,
@@ -495,9 +399,12 @@ export class LootSystem {
   /** Visually mark container as opened and drop its contents nearby. */
   _openContainer(container) {
     container.opened = true;
-    // Squash container to show it's been looted
-    container.mesh.scale.y   = 0.25;
-    container.mesh.position.y *= 0.25;
-    container.mesh.material.color.setHex(0x2a2420);
+    container.mesh.scale.set(1, 0.25, 1);
+    container.mesh.traverse(child => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+        child.material.color.setHex(0x2a2420);
+      }
+    });
   }
 }

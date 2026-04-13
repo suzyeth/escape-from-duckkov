@@ -11,13 +11,13 @@ export const WEAPON_DEFS = {
     id:          'rifle',
     name:        'AK-74',
     slot:        0,
-    damage:      24,           // nerfed from 28
-    fireRate:    0.10,          // nerfed from 0.09 (slower)
+    damage:      28,           // buffed: high damage per shot ("power" weapon)
+    fireRate:    0.12,          // slower fire rate for power role
     magSize:     30,
     reserveMax:  90,
-    range:       55,            // nerfed from 65
-    spread:      0.018,         // nerfed from 0.006 (much less accurate hip)
-    reloadTime:  2.6,           // nerfed from 2.4
+    range:       55,
+    spread:      0.022,         // higher spread — trades accuracy for damage
+    reloadTime:  2.4,           // faster reload
     pellets:     1,
     tracerColor: 0xffdd44,
     bulletSpeed: 110,
@@ -27,7 +27,7 @@ export const WEAPON_DEFS = {
     id:          'pistol',
     name:        '格洛克17',
     slot:        1,
-    damage:      32,            // nerfed from 38 but still high per-shot
+    damage:      26,            // reduced: starter weapon
     fireRate:    0.18,          // buffed from 0.32 (much faster fire rate)
     magSize:     17,
     reserveMax:  51,
@@ -75,12 +75,12 @@ export const WEAPON_DEFS = {
     id:          'mp5',
     name:        'MP5',
     slot:        4,
-    damage:      22,
-    fireRate:    0.075,
+    damage:      16,            // low damage — "accuracy" weapon
+    fireRate:    0.065,         // fast fire rate
     magSize:     30,
     reserveMax:  90,
     range:       38,
-    spread:      0.014,
+    spread:      0.012,         // tight spread
     reloadTime:  1.9,
     pellets:     1,
     tracerColor: 0xffdd88,

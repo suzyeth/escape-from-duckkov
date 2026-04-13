@@ -28,6 +28,12 @@ export class HUD {
     this._healWrap      = document.getElementById('heal-channel-wrap');
     this._healBar       = document.getElementById('heal-channel-inner');
     this._healLabel     = document.getElementById('heal-channel-label');
+    this._healthHpText  = document.getElementById('health-hp-text');
+    this._healthDisplay = document.getElementById('health-display');
+    this._weightDisplay = document.getElementById('weight-display');
+    this._weightValue   = document.getElementById('weight-value');
+    this._reloadIndicator = document.getElementById('reload-indicator');
+    this._reloadBar     = document.getElementById('reload-bar-inner');
 
     this._raidSeconds   = 45 * 60;
     this._flashTimer    = 0;
@@ -125,6 +131,10 @@ export class HUD {
         pct > 50 ? '#4caf50' : pct > 25 ? '#ff9800' : '#f44336';
     }
     if (this._healthValue) this._healthValue.textContent = Math.ceil(hp);
+    if (this._healthHpText) this._healthHpText.textContent = Math.ceil(hp);
+    if (this._healthDisplay) {
+      this._healthDisplay.classList.toggle('low-hp', pct <= 30 && pct > 0);
+    }
     if (this._healthDanger) {
       if (pct <= 20 && pct > 0) {
         this._healthDanger.textContent = '⚠ 危险 — 按H急救';
@@ -238,7 +248,7 @@ export class HUD {
    * @param {number} idx
    */
   setActiveWeaponSlot(idx) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
       const el = document.getElementById(`wslot-${i}`);
       if (el) el.classList.toggle('active', i === idx);
     }
@@ -260,6 +270,30 @@ export class HUD {
       if (!this._bpCache?.[key]) continue;
       const row = this._bpCache[key].inner.closest?.('.bp-row');
       if (row) row.style.outline = frac ? '1px solid #ff4444' : '';
+    }
+  }
+
+  setWeight(current, max) {
+    if (!this._weightDisplay) return;
+    const el = this._weightDisplay;
+    const val = this._weightValue;
+    if (val) val.textContent = current.toFixed(1);
+    el.classList.remove('heavy', 'overloaded');
+    if (current > 35) el.classList.add('overloaded');
+    else if (current > 25) el.classList.add('heavy');
+  }
+
+  /**
+   * Show/hide reload progress bar.
+   * @param {number} pct 0–1 progress, or -1 to hide
+   */
+  setReloadProgress(pct) {
+    if (!this._reloadIndicator) return;
+    if (pct < 0) {
+      this._reloadIndicator.style.display = 'none';
+    } else {
+      this._reloadIndicator.style.display = 'block';
+      if (this._reloadBar) this._reloadBar.style.width = `${Math.min(1, pct) * 100}%`;
     }
   }
 

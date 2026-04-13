@@ -71,18 +71,16 @@
       50% { opacity: calc(var(--vig-opacity, 0) * 0.6); }
     }
 
-    /* Top-left: status */
+    /* Top-left: status + XP compact */
     #status-display {
-      position: absolute; top: 1.4rem; left: 2rem;
-      font-size: .68rem; color: #555; letter-spacing: .1em; text-transform: uppercase;
+      position: absolute; top: .8rem; left: 1.5rem;
+      font-size: .6rem; color: #555; letter-spacing: .1em; text-transform: uppercase;
     }
-
-    /* XP display */
     #xp-display {
-      position: absolute; top: 3.4rem; left: 2rem;
-      font-size: .62rem; color: #c8a96e; letter-spacing: .1em;
+      position: absolute; top: 2rem; left: 1.5rem;
+      font-size: .55rem; color: #c8a96e; letter-spacing: .08em;
     }
-    #xp-value { font-size: 1rem; display: block; margin-top: .1rem; }
+    #xp-value { font-size: .85rem; display: inline; margin-left: .3rem; }
 
     /* XP popup */
     .xp-popup {
@@ -98,30 +96,56 @@
 
     /* Top-right: timer */
     #timer-display {
-      position: absolute; top: 1.4rem; right: 2rem; text-align: right;
-      font-size: .68rem; color: #666; letter-spacing: .15em;
+      position: absolute; bottom: 8.5rem; right: 1.5rem; text-align: center;
+      font-size: .55rem; color: #666; letter-spacing: .1em;
     }
-    #timer-value { display: block; font-size: 1.45rem; color: #c8a96e; margin-top: .1rem; }
+    #timer-value { display: block; font-size: 1.1rem; color: #c8a96e; margin-top: .1rem; }
 
-    /* Bottom-left: health + stamina */
-    #health-display { position: absolute; bottom: 2rem; left: 2rem; color: #e0e0e0; }
-    #health-label { font-size: .62rem; letter-spacing: .15em; color: #666; text-transform: uppercase; margin-bottom: .3rem; }
-    #health-bar-outer { width: 150px; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
-    #health-bar-inner { height: 100%; width: 100%; background: #4caf50; border-radius: 3px; transition: width .25s, background .25s; }
-    #health-value { font-size: 1.3rem; margin-top: .3rem; }
+    /* Bottom-left: health + stamina + armor + weight */
+    #health-display { position: absolute; bottom: 1.2rem; left: 1.5rem; color: #e0e0e0; }
+    #health-label { display: none; }
+    #health-bar-outer {
+      width: 180px; height: 16px; background: rgba(20,20,18,0.85);
+      border: 1px solid #444; border-radius: 4px; overflow: hidden; position: relative;
+      display: flex; align-items: center;
+    }
+    #health-bar-inner {
+      height: 100%; width: 100%; background: linear-gradient(90deg, #cc3333, #ee5544);
+      border-radius: 3px; transition: width .25s, background .25s;
+    }
+    #health-hp-text {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      font-size: .65rem; font-weight: bold; color: #fff; z-index: 1;
+      text-shadow: 0 1px 2px rgba(0,0,0,.9);
+      pointer-events: none;
+    }
+    #health-value { display: none; }
     #health-danger { font-size: .55rem; color: #f44336; margin-top: .15rem; display: none; animation: bleed-pulse .9s ease-in-out infinite; }
+    #health-display.low-hp #health-bar-outer { animation: hp-pulse .8s ease-in-out infinite; }
+    @keyframes hp-pulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(221,51,51,0.3); }
+      50%      { box-shadow: 0 0 12px rgba(221,51,51,0.7); }
+    }
 
     /* Stamina bar (hidden when full) */
-    #stamina-bar-wrap { width: 150px; margin-top: .4rem; display: none; }
-    #stamina-bar-label { font-size: .55rem; letter-spacing: .15em; color: #44aaff; text-transform: uppercase; margin-bottom: .2rem; }
-    #stamina-bar-outer { height: 3px; background: #111; border-radius: 2px; overflow: hidden; }
+    #stamina-bar-wrap { width: 180px; margin-top: .3rem; display: none; }
+    #stamina-bar-label { display: none; }
+    #stamina-bar-outer { height: 4px; background: rgba(20,20,18,0.85); border-radius: 2px; overflow: hidden; }
     #stamina-bar-inner { height: 100%; width: 100%; background: #44aaff; border-radius: 2px; transition: width .1s, background .2s; }
 
     /* Armor bar (hidden when no armor) */
-    #armor-bar-wrap { width: 150px; margin-top: .4rem; display: none; }
-    #armor-bar-label { font-size: .55rem; letter-spacing: .15em; color: #88ccaa; text-transform: uppercase; margin-bottom: .2rem; }
-    #armor-bar-outer { height: 3px; background: #111; border-radius: 2px; overflow: hidden; }
+    #armor-bar-wrap { width: 180px; margin-top: .3rem; display: none; }
+    #armor-bar-label { display: none; }
+    #armor-bar-outer { height: 4px; background: rgba(20,20,18,0.85); border-radius: 2px; overflow: hidden; }
     #armor-bar-inner { height: 100%; width: 100%; background: #66bb88; border-radius: 2px; transition: width .15s, background .2s; }
+
+    /* Weight display (below armor bar) */
+    #weight-display {
+      font-size: .6rem; color: #666; margin-top: .25rem; letter-spacing: .06em;
+    }
+    #weight-value { color: #888; }
+    #weight-display.heavy #weight-value { color: #ff9800; }
+    #weight-display.overloaded #weight-value { color: #f44336; }
 
     /* Heal channel progress (shown while using medical item) */
     #heal-channel-wrap {
@@ -132,32 +156,57 @@
     #heal-channel-outer { height: 5px; background: #1a0a0a; border-radius: 3px; overflow: hidden; }
     #heal-channel-inner { height: 100%; width: 0%; background: #cc4444; border-radius: 3px; transition: width .08s; }
 
-    /* Weapon slot bar — above weapon display */
+    /* Weapon slot bar — bottom-center quickbar */
     #weapon-slots {
-      position: absolute; bottom: 8.4rem; right: 2rem;
-      display: flex; gap: .35rem; justify-content: flex-end;
+      position: absolute; bottom: .6rem; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 3px;
     }
     .wslot {
-      width: 28px; height: 28px; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      font-size: .65rem; letter-spacing: .06em;
-      border: 1px solid #333; color: #444; border-radius: 2px;
-      transition: border-color .15s, color .15s, background .15s;
+      width: 44px; height: 44px;
+      background: rgba(20, 20, 18, 0.85);
+      border: 1px solid #333; border-radius: 4px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: .6rem; color: #555; position: relative;
+      transition: border-color .15s, background .15s;
     }
     .wslot.active {
-      border-color: #c8a96e; color: #c8a96e;
-      background: rgba(200,169,110,0.10);
+      border-color: #dab840; color: #dab840;
+      background: rgba(218, 184, 64, 0.15);
+      box-shadow: 0 0 6px rgba(218,184,64,0.25);
     }
-    .wslot-key   { font-size: .55rem; color: #555; }
+    .wslot-key {
+      position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+      font-size: .5rem; color: #444;
+    }
     .wslot.active .wslot-key { color: #9a7a4e; }
+    .wslot-icon {
+      font-size: .6rem; color: #666; text-align: center;
+      line-height: 1; margin-top: -2px;
+    }
+    .wslot.active .wslot-icon { color: #dab840; }
 
-    /* Bottom-right: weapon + ammo */
-    #weapon-display { position: absolute; bottom: 2rem; right: 2rem; text-align: right; color: #e0e0e0; }
-    #weapon-name    { font-size: .7rem; color: #888; letter-spacing: .12em; margin-bottom: .2rem; text-transform: uppercase; }
-    #ammo-current   { font-size: 2.5rem; font-weight: bold; line-height: 1; transition: color .15s; }
+    /* Weapon + ammo — above quickbar, centered */
+    #weapon-display {
+      position: absolute; bottom: 3.8rem; left: 50%; transform: translateX(-50%);
+      text-align: center; color: #e0e0e0;
+      background: rgba(20,20,18,0.8); padding: .2rem .8rem; border-radius: 4px;
+      border: 1px solid #333;
+    }
+    #weapon-name {
+      font-size: .55rem; color: #888; letter-spacing: .12em;
+      text-transform: uppercase; display: inline; margin-right: .5rem;
+    }
+    #ammo-current {
+      font-size: 1.4rem; font-weight: bold; line-height: 1; transition: color .15s;
+      display: inline;
+    }
     #ammo-current.low { animation: ammo-blink .6s ease-in-out infinite; }
     @keyframes ammo-blink { 0%,100% { opacity:1; } 50% { opacity:.4; } }
-    #ammo-reserve   { font-size: .85rem; color: #666; margin-top: .1rem; }
+    #ammo-reserve { font-size: .75rem; color: #666; display: inline; }
+    #reload-indicator { display: none; margin-top: .2rem; }
+    #reload-text { font-size: .6rem; color: #dab840; letter-spacing: .1em; }
+    #reload-bar-outer { width: 80px; height: 3px; background: #222; border-radius: 2px; overflow: hidden; margin: .15rem auto 0; }
+    #reload-bar-inner { height: 100%; width: 0%; background: #dab840; border-radius: 2px; transition: width .05s; }
 
     /* Centre-bottom: pickup hint */
     #pickup-hint {
@@ -166,11 +215,11 @@
       background: rgba(0,0,0,.5); padding: .3rem .8rem; border-radius: 3px; display: none;
     }
 
-    /* Bottom-center: key hints bar (fades out after 15s) */
+    /* Bottom-center: key hints bar (fades out after 15s) — above quickbar */
     #key-hints {
-      position: absolute; bottom: .8rem; left: 50%; transform: translateX(-50%);
-      font-size: .58rem; color: #555; letter-spacing: .08em;
-      background: rgba(0,0,0,.35); padding: .25rem 1rem; border-radius: 3px;
+      position: absolute; bottom: 4.8rem; left: 50%; transform: translateX(-50%);
+      font-size: .55rem; color: #444; letter-spacing: .08em;
+      background: rgba(0,0,0,.3); padding: .2rem .8rem; border-radius: 3px;
       transition: opacity 2s;
     }
     #key-hints .kh-key {
@@ -187,13 +236,13 @@
     #extract-bar-outer { height: 6px; background: #1a3a1a; border-radius: 3px; overflow: hidden; }
     #extract-bar-inner { height: 100%; width: 0%; background: #00ff80; border-radius: 3px; transition: width .1s; }
 
-    /* Kill feed — pushed below minimap (minimap is 140px + label ~16px + top 1.4rem≈22px) */
-    #kill-feed { position: absolute; top: 11rem; right: 2rem; text-align: right; font-size: .75rem; color: #e05050; }
+    /* Kill feed — top-right */
+    #kill-feed { position: absolute; top: 3.5rem; right: 2rem; text-align: right; font-size: .7rem; color: #e05050; }
 
     /* ── Bleeding indicator ─────────────────── */
     #bleed-indicator {
-      position: absolute; bottom: 5.5rem; left: 2rem;
-      font-size: .65rem; color: #ff3333; letter-spacing: .12em;
+      position: absolute; bottom: 4.2rem; left: 1.5rem;
+      font-size: .6rem; color: #ff3333; letter-spacing: .1em;
       display: none; animation: bleed-pulse 0.9s ease-in-out infinite;
     }
     @keyframes bleed-pulse {
@@ -201,15 +250,16 @@
       50%       { opacity: 0.3; }
     }
 
-    /* ── Minimap ────────────────────────────── */
+    /* ── Minimap — bottom-right, circular ──── */
     #minimap-wrap {
-      position: absolute; top: 1.4rem; right: 2rem;
-      border: 1px solid rgba(200,169,110,0.3); border-radius: 2px;
+      position: absolute; bottom: .6rem; right: 1.5rem;
+      border: 2px solid rgba(200,169,110,0.3); border-radius: 50%;
+      overflow: hidden;
     }
-    #minimap-canvas { display: block; width: 140px; height: 140px; }
+    #minimap-canvas { display: block; width: 120px; height: 120px; border-radius: 50%; }
     #minimap-label {
-      text-align: center; font-size: .52rem; color: #555;
-      letter-spacing: .12em; padding: 2px 0; background: rgba(0,0,0,0.6);
+      position: absolute; bottom: -1.2rem; left: 50%; transform: translateX(-50%);
+      font-size: .5rem; color: #555; letter-spacing: .1em; white-space: nowrap;
     }
 
     /* ── Tips ticker — rolling hints at top center ─────── */
@@ -231,10 +281,10 @@
       pointer-events: none;
     }
 
-    /* ── Body parts panel ─────────────────────────── */
+    /* ── Body parts panel — above health, left side ─── */
     #body-parts {
-      position: absolute; top: 4.5rem; left: 2rem;
-      font-size: .62rem; color: #888; width: 120px;
+      position: absolute; bottom: 5.5rem; left: 1.5rem;
+      font-size: .55rem; color: #888; width: 110px;
     }
     .bp-row { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
     .bp-label { width: 26px; color: #666; text-align: right; flex-shrink: 0; }
@@ -420,6 +470,98 @@
       padding: .4rem .7rem; font-size: .72rem; color: #ccc;
       pointer-events: none; display: none; z-index: 90; white-space: nowrap;
     }
+
+    /* ── Pause screen ────────────────────────────── */
+    #pause-screen {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: none; align-items: center; justify-content: center;
+      z-index: 50; pointer-events: auto;
+    }
+    .pause-content {
+      text-align: center; min-width: 260px;
+    }
+    .pause-content h2 {
+      font-size: 1.8rem; letter-spacing: .4em; color: #c8a96e;
+      text-transform: uppercase; margin-bottom: 2rem;
+    }
+    .pause-buttons { display: flex; flex-direction: column; gap: .6rem; }
+    .pause-btn {
+      padding: .6rem 2rem; font-size: .8rem; font-family: inherit;
+      letter-spacing: .15em; background: transparent;
+      border: 1px solid #555; color: #aaa;
+      cursor: pointer; border-radius: 4px; transition: all .2s;
+    }
+    .pause-btn:hover { border-color: #c8a96e; color: #c8a96e; background: rgba(200,169,110,0.08); }
+    .pause-btn-danger { color: #aa5544; border-color: #553333; }
+    .pause-btn-danger:hover { border-color: #dd3333; color: #dd3333; background: rgba(200,0,0,0.08); }
+    .pause-hint { font-size: .6rem; color: #444; margin-top: 1.5rem; letter-spacing: .15em; }
+
+    /* ── Settings screen ─────────────────────────── */
+    #settings-screen {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: none; align-items: center; justify-content: center;
+      z-index: 55; pointer-events: auto;
+    }
+    .settings-content {
+      min-width: 320px; max-width: 400px;
+    }
+    .settings-content h2 {
+      font-size: 1.4rem; letter-spacing: .3em; color: #c8a96e;
+      text-transform: uppercase; margin-bottom: 1.5rem; text-align: center;
+    }
+    .settings-group {
+      display: flex; align-items: center; gap: .8rem;
+      margin-bottom: 1rem; font-size: .75rem; color: #888;
+    }
+    .settings-label { width: 100px; text-align: right; color: #888; flex-shrink: 0; }
+    .settings-slider {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 4px; background: #333; border-radius: 2px; outline: none;
+    }
+    .settings-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      background: #c8a96e; border-radius: 50%; cursor: pointer;
+    }
+    .settings-val { width: 40px; color: #aaa; font-size: .7rem; }
+    .settings-toggle { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
+    .settings-toggle input { accent-color: #c8a96e; width: 16px; height: 16px; cursor: pointer; }
+    .toggle-text { color: #888; font-size: .7rem; }
+
+    /* ── Damage direction indicator ───────────────── */
+    #damage-direction {
+      position: fixed; inset: 0; pointer-events: none; z-index: 8;
+    }
+    .dmg-indicator {
+      position: absolute; width: 60px; height: 60px;
+      background: radial-gradient(ellipse, rgba(255,0,0,0.6) 0%, transparent 70%);
+      pointer-events: none;
+      animation: dmg-fade 0.8s ease-out forwards;
+    }
+    @keyframes dmg-fade {
+      0% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* ── Boss health bar ─────────────────────────── */
+    #boss-health-wrap {
+      position: absolute; top: 4rem; left: 50%; transform: translateX(-50%);
+      width: 300px; display: none; text-align: center;
+    }
+    #boss-name {
+      font-size: .75rem; color: #ff4444; letter-spacing: .2em;
+      text-transform: uppercase; margin-bottom: .3rem;
+      text-shadow: 0 0 8px rgba(255,60,60,0.4);
+    }
+    #boss-health-outer {
+      height: 8px; background: rgba(20,20,18,0.85);
+      border: 1px solid #553333; border-radius: 4px; overflow: hidden;
+    }
+    #boss-health-inner {
+      height: 100%; width: 100%; background: linear-gradient(90deg, #cc2222, #ff4444);
+      border-radius: 3px; transition: width .2s;
+    }
   </style>
 </head>
 <body>
@@ -501,10 +643,10 @@
       <h3>武器一览</h3>
       <table class="rules-table">
         <tr><td>AK-74 (槽1)</td><td>全自动步枪 — 28伤害 / 65m射程 / 30发弹匣</td></tr>
-        <tr><td>格洛克17 (槽2)</td><td>手枪 — 38伤害 / 28m射程 / 17发弹匣（快速备用）</td></tr>
+        <tr><td>格洛克17 (槽2)</td><td>手枪 — 26伤害 / 28m射程 / 17发弹匣（快速备用）</td></tr>
         <tr><td>MP-133 (槽3)</td><td>霰弹枪 — 8×16伤害 / 16m射程 / 8发（室内清场）</td></tr>
         <tr><td>VSS Vintorez (槽4)</td><td>狙击步枪 — 88伤害 / 95m射程 / 10发（爆头利器）</td></tr>
-        <tr><td>MP5 (槽5)</td><td>冲锋枪 — 22伤害 / 38m射程 / 30发（800RPM，高DPS）</td></tr>
+        <tr><td>MP5 (槽5)</td><td>冲锋枪 — 16伤害 / 38m射程 / 30发（800RPM，高DPS）</td></tr>
       </table>
     </div>
 
@@ -552,7 +694,10 @@
 
     <div id="health-display">
       <div id="health-label">生命值</div>
-      <div id="health-bar-outer"><div id="health-bar-inner"></div></div>
+      <div id="health-bar-outer">
+        <div id="health-bar-inner"></div>
+        <span id="health-hp-text">100</span>
+      </div>
       <div id="health-value">100</div>
       <div id="health-danger"></div>
       <div id="stamina-bar-wrap">
@@ -562,6 +707,9 @@
       <div id="armor-bar-wrap">
         <div id="armor-bar-label">护甲</div>
         <div id="armor-bar-outer"><div id="armor-bar-inner"></div></div>
+      </div>
+      <div id="weight-display">
+        <span id="weight-value">0.0</span><span id="weight-unit"> / 50 kg</span>
       </div>
     </div>
 
@@ -573,17 +721,24 @@
     <div id="body-parts"></div>
 
     <div id="weapon-slots">
-      <div class="wslot active" id="wslot-0"><span class="wslot-key">1</span></div>
-      <div class="wslot"        id="wslot-1"><span class="wslot-key">2</span></div>
-      <div class="wslot"        id="wslot-2"><span class="wslot-key">3</span></div>
-      <div class="wslot"        id="wslot-3"><span class="wslot-key">4</span></div>
-      <div class="wslot"        id="wslot-4"><span class="wslot-key">5</span></div>
+      <div class="wslot active" id="wslot-0"><span class="wslot-key">1</span><span class="wslot-icon">AK</span></div>
+      <div class="wslot" id="wslot-1"><span class="wslot-key">2</span><span class="wslot-icon">手枪</span></div>
+      <div class="wslot" id="wslot-2"><span class="wslot-key">3</span><span class="wslot-icon">霰弹</span></div>
+      <div class="wslot" id="wslot-3"><span class="wslot-key">4</span><span class="wslot-icon">VSS</span></div>
+      <div class="wslot" id="wslot-4"><span class="wslot-key">5</span><span class="wslot-icon">MP5</span></div>
+      <div class="wslot" id="wslot-5"><span class="wslot-key">6</span></div>
+      <div class="wslot" id="wslot-6"><span class="wslot-key">7</span></div>
+      <div class="wslot" id="wslot-7"><span class="wslot-key">8</span></div>
     </div>
 
     <div id="weapon-display">
       <div id="weapon-name">AK-74</div>
       <div id="ammo-current">30</div>
       <div id="ammo-reserve">/ 90</div>
+      <div id="reload-indicator">
+        <div id="reload-text">RELOAD</div>
+        <div id="reload-bar-outer"><div id="reload-bar-inner"></div></div>
+      </div>
     </div>
 
     <div id="pickup-hint"></div>
@@ -603,13 +758,64 @@
       <span class="kh-key">R</span> 换弹 &nbsp;
       <span class="kh-key">E</span> 拾取/撤离 &nbsp;
       <span class="kh-key">F</span> 开门 &nbsp;
-      <span class="kh-key">1-5</span> 切武器
+      <span class="kh-key">1-8</span> 切武器
     </div>
 
     <!-- Minimap (positioned top-right, overlaps kill-feed which moves down) -->
     <div id="minimap-wrap">
       <canvas id="minimap-canvas" width="140" height="140"></canvas>
       <div id="minimap-label">突袭区域</div>
+    </div>
+
+    <div id="damage-direction"></div>
+
+    <div id="boss-health-wrap">
+      <div id="boss-name">BOSS 鸭王</div>
+      <div id="boss-health-outer"><div id="boss-health-inner"></div></div>
+    </div>
+
+    <div id="pause-screen">
+      <div class="pause-content">
+        <h2>暂停</h2>
+        <div class="pause-buttons">
+          <button class="pause-btn" id="pause-resume">继续游戏</button>
+          <button class="pause-btn" id="pause-settings">设置</button>
+          <button class="pause-btn" id="pause-rules">操作说明</button>
+          <button class="pause-btn pause-btn-danger" id="pause-quit">退出突袭</button>
+        </div>
+        <div class="pause-hint">ESC 继续</div>
+      </div>
+    </div>
+
+    <div id="settings-screen">
+      <div class="settings-content">
+        <h2>设置</h2>
+        <div class="settings-group">
+          <label class="settings-label">主音量</label>
+          <input type="range" id="setting-volume" class="settings-slider" min="0" max="100" value="70">
+          <span class="settings-val" id="setting-volume-val">70%</span>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">鼠标灵敏度</label>
+          <input type="range" id="setting-sensitivity" class="settings-slider" min="10" max="200" value="100">
+          <span class="settings-val" id="setting-sensitivity-val">100%</span>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">战争迷雾</label>
+          <label class="settings-toggle">
+            <input type="checkbox" id="setting-fog" checked>
+            <span class="toggle-text">开启</span>
+          </label>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">屏幕震动</label>
+          <label class="settings-toggle">
+            <input type="checkbox" id="setting-shake" checked>
+            <span class="toggle-text">开启</span>
+          </label>
+        </div>
+        <button class="pause-btn" id="settings-close">返回</button>
+      </div>
     </div>
   </div>
 

@@ -12,7 +12,7 @@ export class FogOfWar {
     this._canvas.id = 'fog-of-war';
     this._canvas.style.cssText = `
       position: fixed; inset: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 5; opacity: 0.72;
+      pointer-events: none; z-index: 5; opacity: 0.45;
       mix-blend-mode: multiply;
     `;
     document.body.appendChild(this._canvas);
@@ -75,8 +75,8 @@ export class FogOfWar {
     // Vision radius in pixels
     const visionRadius = h * this._viewRange;
 
-    // Clear to full black
-    ctx.fillStyle = '#000';
+    // Fill with dark blue-gray (not pure black — scene stays visible)
+    ctx.fillStyle = '#2a3040';
     ctx.fillRect(0, 0, w, h);
 
     // Cut out vision cone

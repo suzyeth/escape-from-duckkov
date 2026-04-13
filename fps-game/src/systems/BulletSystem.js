@@ -225,17 +225,17 @@ export class BulletSystem {
       let hit = false;
 
       if (p.owner === 'player') {
-        // Check enemy hits
-        const enemy = aiSystem.checkPlayerHit(p.pos, p.dir, 0.8);
+        // Check enemy hits — range covers this frame's travel + enemy radius
+        const enemy = aiSystem.checkPlayerHit(p.pos, p.dir, step + 1.0);
         if (enemy) {
           hits.push({ target: 'enemy', enemy, damage: Math.round(dmg), pos: p.pos.clone() });
           hit = true;
         }
       } else {
-        // Enemy bullet → check player hit
+        // Enemy bullet → check player hit (also use step-aware range)
         const dx = player.position.x - p.pos.x;
         const dz = player.position.z - p.pos.z;
-        if (Math.sqrt(dx * dx + dz * dz) < 0.65) {
+        if (Math.sqrt(dx * dx + dz * dz) < 0.65 + step) {
           hits.push({ target: 'player', damage: Math.round(dmg), pos: p.pos.clone() });
           hit = true;
         }

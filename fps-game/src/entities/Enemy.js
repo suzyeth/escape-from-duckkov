@@ -27,7 +27,7 @@ const ELITE_SHOOT_RANGE    = 22;
 export const ENEMY_TYPES = {
   normal:  { hp: 80,  speed: 3.8, damage: 10, interval: 1.3,  range: 16, vision: 18, melee: false, color: 0x7a3a1e, headColor: 0xf0c060, label: '鸭卒' },
   elite:   { hp: 160, speed: 3.8, damage: 16, interval: 0.85, range: 22, vision: 24, melee: false, color: 0x3a0a0a, headColor: 0xcc9944, label: '★精英鸭卒' },
-  rusher:  { hp: 60,  speed: 6.5, damage: 25, interval: 0.8,  range: 2,  vision: 20, melee: true,  color: 0x8a2a1a, headColor: 0xee8844, label: '暴走鸭' },
+  rusher:  { hp: 60,  speed: 6.5, damage: 25, interval: 0.8,  range: 4,  vision: 20, melee: true,  color: 0x8a2a1a, headColor: 0xee8844, label: '暴走鸭' },
   tank:    { hp: 300, speed: 2.0, damage: 20, interval: 1.0,  range: 18, vision: 16, melee: false, color: 0x2a2a3a, headColor: 0x8888aa, label: '重甲鸭' },
   boss:    { hp: 600, speed: 3.0, damage: 30, interval: 0.6,  range: 25, vision: 30, melee: false, color: 0x1a0a1a, headColor: 0xff4444, label: 'BOSS 鸭王' },
 };
@@ -290,7 +290,7 @@ export class Enemy {
 
     // Melee attack — direct damage when close enough
     if (this.isMelee) {
-      if (dist < 2.0) {
+      if (dist < 3.5) {
         this._shootTimer = this._shootInterval;
         return { shot: true, origin: this.position.clone(), dir: this._v1.clone(), damage: this._shootDamage, isMelee: true };
       }
@@ -311,7 +311,9 @@ export class Enemy {
 
     // Clone dir/origin only on actual shot (fire-rate gated — acceptable allocation)
     this._v2.copy(this._v1);
-    const spread = this.isElite ? 0.04 : 0.08; // elite has tighter aim
+    const basSpread = this.isElite ? 0.04 : 0.08;
+    const distFactor = Math.max(0.6, dist / this._shootRange); // closer = worse aim
+    const spread = basSpread * distFactor;
     this._v2.x += (Math.random() - 0.5) * spread;
     this._v2.z += (Math.random() - 0.5) * spread;
     this._v2.normalize();

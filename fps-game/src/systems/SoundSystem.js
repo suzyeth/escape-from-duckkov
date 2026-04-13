@@ -45,6 +45,13 @@ export class SoundSystem {
     if (this._ctx && this._ctx.state === 'suspended') this._ctx.resume();
   }
 
+  /** Set master volume (0..1). */
+  setVolume(v) {
+    if (this._master) {
+      this._master.gain.value = Math.max(0, Math.min(1, v));
+    }
+  }
+
   // ── Public play methods ────────────────────────────────────────────────────
 
   /**
