@@ -404,7 +404,21 @@ function handleLootPickup(dt) {
         _gainXP(XP_REWARDS.container, '开箱');
       }
     } else {
-      const added = inventory.addItem(pickup.defId, pickup.count);
+      // If it's ammo for current weapon, refill reserve first
+      const AMMO_TO_WEAPON = { rifle_ammo: 'rifle', pistol_ammo: 'pistol', shotgun_ammo: 'shotgun', vss_ammo: 'vss', mp5_ammo: 'mp5' };
+      const weaponId = AMMO_TO_WEAPON[pickup.defId];
+      let pickupCount = pickup.count;
+      if (weaponId) {
+        for (const slot of weapons.slots) {
+          if (slot.def.id === weaponId && slot.reserve < slot.def.reserveMax) {
+            const fill = Math.min(pickupCount, slot.def.reserveMax - slot.reserve);
+            slot.reserve += fill;
+            pickupCount -= fill;
+          }
+        }
+      }
+      // Remaining goes to inventory
+      const added = pickupCount <= 0 || inventory.addItem(pickup.defId, pickupCount);
       if (!added) {
         hud.pushKillFeed('⚠ 背包已满！');
       } else {
@@ -818,6 +832,31 @@ const loop = new GameLoop(
     weapons.update(dt, input);
     // Play reload sound on reload start
     if (!wasReloading && weapons.current.isReloading) sound.playReload();
+
+    // Auto-refill weapon reserve from inventory ammo
+    const AMMO_MAP = { rifle: 'rifle_ammo', pistol: 'pistol_ammo', shotgun: 'shotgun_ammo', vss: 'vss_ammo', mp5: 'mp5_ammo' };
+    const cur = weapons.current;
+    if (cur.reserve <= 0 && cur.mag <= 0) {
+      const ammoId = AMMO_MAP[cur.def.id];
+      if (ammoId) {
+        // Find ammo in inventory and consume it
+        for (const [instId, item] of inventory.items) {
+          if (item.def.id === ammoId) {
+            const take = Math.min(item.count, cur.def.reserveMax);
+            cur.reserve += take;
+            if (item.def.stackable) {
+              item.count -= take;
+              if (item.count <= 0) inventory.removeItem(instId);
+            } else {
+              inventory.removeItem(instId);
+            }
+            hud.pushKillFeed(`从背包补充 ${take} 发弹药`);
+            if (invUI.isOpen) invUI.refresh();
+            break;
+          }
+        }
+      }
+    }
 
     // Shooting
     handlePlayerShoot();
