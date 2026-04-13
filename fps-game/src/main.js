@@ -122,7 +122,8 @@ invUI.onUse((instanceId) => {
   _healDuration   = Math.max(0.1, def.id === 'medkit' ? 3.0 : def.id === 'painkillers' ? 2.5 : 1.8);
   _healTimer      = _healDuration;
   _healAmount     = def.heals;
-  _healInstanceId = instanceId;
+  _healInstanceId    = instanceId;
+  _healStopsBleeding = def.stopsBleeding !== false;
   player.isHealing = true;
   hud.pushKillFeed(`使用 ${def.name}…`);
   invUI.close();
@@ -192,7 +193,8 @@ renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 let _healTimer      = 0;    // remaining seconds
 let _healDuration   = 0;    // total duration for current item
 let _healAmount     = 0;    // HP to restore on completion
-let _healInstanceId = null; // which inventory item is being consumed
+let _healInstanceId  = null; // which inventory item is being consumed
+let _healStopsBleeding = true; // whether current heal item stops bleeding
 
 // ── Recoil ────────────────────────────────────────────────────────────────────
 
@@ -403,7 +405,9 @@ function handleLootPickup(dt) {
       }
     } else {
       const added = inventory.addItem(pickup.defId, pickup.count);
-      if (added) {
+      if (!added) {
+        hud.pushKillFeed('⚠ 背包已满！');
+      } else {
         _lootedThisSession = true;
         const def = ITEM_DEFS[pickup.defId];
         if (def) _lootValue += def.value * pickup.count;
@@ -456,8 +460,9 @@ function handleHealing() {
     // Duration by item type (must be > 0)
     _healDuration   = Math.max(0.1, def.id === 'medkit' ? 3.0 : def.id === 'painkillers' ? 2.5 : 1.8);
     _healTimer      = _healDuration;
-    _healAmount     = def.heals;
-    _healInstanceId = instanceId;
+    _healAmount         = def.heals;
+    _healInstanceId     = instanceId;
+    _healStopsBleeding  = def.stopsBleeding !== false;
     player.isHealing = true;
     hud.pushKillFeed(`使用 ${def.name}…`);
   }
@@ -855,6 +860,7 @@ const loop = new GameLoop(
         sound.playDamaged();
         _addScreenShake(0.4);
         hud.pushKillFeed(`中弹！(${_partLabel(partHit)}) -${hit.damage}HP`);
+        if (health.armorJustBroke) hud.pushKillFeed('⚠ 护甲已损毁！');
         if (!health.isAlive) _onPlayerDied();
       }
     }
@@ -896,13 +902,14 @@ const loop = new GameLoop(
         }
         health.heal(_healAmount);
         const wasBleeding = health.isBleeding;
-        health.stopBleeding();
+        if (_healStopsBleeding) health.stopBleeding();
         player.health          = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
         player.speedMultiplier = health.speedMultiplier;
         player.isHealing       = false;
         hud.setHealChannel(-1);
         if (invUI.isOpen) invUI.refresh();
-        hud.pushKillFeed(wasBleeding ? `治疗完成 +${_healAmount}HP (已止血)` : `治疗完成 +${_healAmount}HP`);
+        const bleedMsg = wasBleeding && _healStopsBleeding ? ' (已止血)' : wasBleeding ? ' (仍在流血!)' : '';
+        hud.pushKillFeed(`治疗完成 +${_healAmount}HP${bleedMsg}`);
       }
     }
 

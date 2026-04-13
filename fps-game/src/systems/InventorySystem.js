@@ -20,17 +20,17 @@ export const ITEM_DEFS = {
   bandage: {
     id: 'bandage', name: '绷带', w: 1, h: 1,
     color: '#c8b89a', stackable: true,  maxStack: 5,  value: 200, weight: 0.3,
-    heals: 15,
+    heals: 5, stopsBleeding: true,  // 主要止血，微量回血
   },
   medkit: {
     id: 'medkit', name: '急救包', w: 2, h: 2,
     color: '#cc4444', stackable: false, value: 900,  weight: 2.0,
-    heals: 60,
+    heals: 60, stopsBleeding: false, // 大量回血，不止血
   },
   painkillers: {
     id: 'painkillers', name: '止痛药', w: 1, h: 2,
     color: '#aaaa44', stackable: false, value: 400,  weight: 0.5,
-    heals: 30,
+    heals: 30, stopsBleeding: true,  // 中量回血+止血
   },
   dogtag: {
     id: 'dogtag', name: '狗牌', w: 1, h: 1,

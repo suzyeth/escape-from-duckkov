@@ -102,6 +102,9 @@ export class HealthSystem {
     return this._armorMax > 0 ? this._armorHp / this._armorMax : -1;
   }
 
+  /** True on the frame armor was destroyed */
+  get armorJustBroke() { return this._armorJustBroke; }
+
   /**
    * Equip or replace armor.
    * @param {{ armorHp: number, reduce: number }} def
@@ -196,10 +199,12 @@ export class HealthSystem {
     const target = part ?? this._rollHitPart();
 
     // Armor absorbs damage; headOnly armor (helmet) only protects the HEAD part
+    this._armorJustBroke = false;
     if (this._armorHp > 0 && (!this._armorHeadOnly || target === PART.HEAD)) {
       const absorbed = amount * this._armorReduce;
       this._armorHp  = Math.max(0, this._armorHp - absorbed);
       amount         = amount - absorbed;
+      if (this._armorHp <= 0) this._armorJustBroke = true;
     }
     this._hp[target] = Math.max(0, this._hp[target] - amount);
     // 30 % chance to cause bleeding on each hit

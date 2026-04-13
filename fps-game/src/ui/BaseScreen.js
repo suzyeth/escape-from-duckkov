@@ -86,6 +86,10 @@ export class BaseScreen {
     const currVal = document.createElement('span');
     currVal.textContent = s.currency;
     curr.appendChild(currVal);
+    const xpSpan = document.createElement('span');
+    xpSpan.style.cssText = 'margin-left:1.5rem;color:#c8a96e';
+    xpSpan.textContent = `XP: ${stats.totalXP || 0}`;
+    curr.appendChild(xpSpan);
     content.appendChild(curr);
 
     // Stats
@@ -225,7 +229,7 @@ export class BaseScreen {
         if (!unlocked && !locked) {
           const cost = document.createElement('div');
           cost.style.cssText = `font-size:.55rem;color:${canBuy ? '#88aa55' : '#555'}`;
-          cost.textContent = `${t.cost} 鸭元`;
+          cost.textContent = `${t.cost} 鸭元 + ${t.xp || 0} XP`;
           card.appendChild(cost);
 
           if (canBuy) {

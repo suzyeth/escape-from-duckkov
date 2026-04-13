@@ -11,24 +11,24 @@
  */
 export const TALENTS = [
   // ── 生存 ──
-  { id: 'hp_1', name: '生命强化 I',   desc: '+20 最大生命',     cost: 600,   category: '生存', effect: { hpBonus: 20 } },
-  { id: 'hp_2', name: '生命强化 II',  desc: '+40 最大生命',     cost: 1500,  category: '生存', requires: 'hp_1', effect: { hpBonus: 40 } },
-  { id: 'hp_3', name: '生命强化 III', desc: '+60 最大生命',     cost: 3500,  category: '生存', requires: 'hp_2', effect: { hpBonus: 60 } },
+  { id: 'hp_1', name: '生命强化 I',   desc: '+20 最大生命',     cost: 600,   xp: 200,  category: '生存', effect: { hpBonus: 20 } },
+  { id: 'hp_2', name: '生命强化 II',  desc: '+40 最大生命',     cost: 1500,  xp: 500,  category: '生存', requires: 'hp_1', effect: { hpBonus: 40 } },
+  { id: 'hp_3', name: '生命强化 III', desc: '+60 最大生命',     cost: 3500,  xp: 1200, category: '生存', requires: 'hp_2', effect: { hpBonus: 60 } },
 
   // ── 机动 ──
-  { id: 'spd_1', name: '轻量化 I',   desc: '+8% 移速',         cost: 600,   category: '机动', effect: { speedMult: 1.08 } },
-  { id: 'spd_2', name: '轻量化 II',  desc: '+15% 移速',        cost: 1500,  category: '机动', requires: 'spd_1', effect: { speedMult: 1.15 } },
-  { id: 'sta_1', name: '耐力强化',   desc: '+30 体力上限',      cost: 800,   category: '机动', effect: { staminaBonus: 30 } },
+  { id: 'spd_1', name: '轻量化 I',   desc: '+8% 移速',         cost: 600,   xp: 200,  category: '机动', effect: { speedMult: 1.08 } },
+  { id: 'spd_2', name: '轻量化 II',  desc: '+15% 移速',        cost: 1500,  xp: 500,  category: '机动', requires: 'spd_1', effect: { speedMult: 1.15 } },
+  { id: 'sta_1', name: '耐力强化',   desc: '+30 体力上限',      cost: 800,   xp: 250,  category: '机动', effect: { staminaBonus: 30 } },
 
   // ── 战斗 ──
-  { id: 'aim_1', name: '精准射击 I',  desc: '-20% 散布',        cost: 800,   category: '战斗', effect: { spreadMult: 0.80 } },
-  { id: 'aim_2', name: '精准射击 II', desc: '-35% 散布',        cost: 2500,  category: '战斗', requires: 'aim_1', effect: { spreadMult: 0.65 } },
-  { id: 'rld_1', name: '快速换弹',   desc: '-25% 换弹时间',     cost: 1200,  category: '战斗', effect: { reloadMult: 0.75 } },
+  { id: 'aim_1', name: '精准射击 I',  desc: '-20% 散布',        cost: 800,   xp: 300,  category: '战斗', effect: { spreadMult: 0.80 } },
+  { id: 'aim_2', name: '精准射击 II', desc: '-35% 散布',        cost: 2500,  xp: 800,  category: '战斗', requires: 'aim_1', effect: { spreadMult: 0.65 } },
+  { id: 'rld_1', name: '快速换弹',   desc: '-25% 换弹时间',     cost: 1200,  xp: 400,  category: '战斗', effect: { reloadMult: 0.75 } },
 
   // ── 防护 ──
-  { id: 'arm_1', name: '护甲精通',   desc: '+20% 护甲效率',     cost: 1500,  category: '防护', effect: { armorBonus: 0.20 } },
-  { id: 'bleed_1', name: '止血训练', desc: '流血伤害-50%',       cost: 1000,  category: '防护', effect: { bleedResist: 0.5 } },
-  { id: 'head_1', name: '铁头功',   desc: '头部HP+20',          cost: 2000,  category: '防护', effect: { hpBonus: 20 } },
+  { id: 'arm_1', name: '护甲精通',   desc: '+20% 护甲效率',     cost: 1500,  xp: 500,  category: '防护', effect: { armorBonus: 0.20 } },
+  { id: 'bleed_1', name: '止血训练', desc: '流血伤害-50%',       cost: 1000,  xp: 350,  category: '防护', effect: { bleedResist: 0.5 } },
+  { id: 'head_1', name: '铁头功',   desc: '头部HP+20',          cost: 2000,  xp: 700,  category: '防护', effect: { hpBonus: 20 } },
 ];
 
 export class TalentSystem {
@@ -49,6 +49,7 @@ export class TalentSystem {
     if (this.isUnlocked(id)) return false;
     if (talent.requires && !this.isUnlocked(talent.requires)) return false;
     if (this._save.currency < talent.cost) return false;
+    if ((this._save.stats.totalXP || 0) < (talent.xp || 0)) return false;
     return true;
   }
 

@@ -102,6 +102,20 @@ export class LootSystem {
       item.mesh.position.y = baseY + Math.sin(t * 0.003 + i) * 0.08;
       item.mesh.rotation.y = t * 0.001 + i;
 
+      // Decay: items disappear after 3 minutes (180s)
+      const age = (t - (item.spawnTime || 0)) / 1000;
+      if (age > 180) {
+        this._scene.remove(item.mesh);
+        item.mesh.traverse(child => { if (child.isMesh) { child.geometry.dispose(); child.material.dispose(); } });
+        if (item.extraMeshes) for (const m of item.extraMeshes) { this._scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+        this._items.splice(i, 1);
+        continue;
+      }
+      // Blink when about to decay (last 30s)
+      if (age > 150) {
+        item.mesh.visible = Math.sin(t * 0.01) > 0;
+      }
+
       // Pulse scale when near
       const scale = dist < PICKUP_RANGE ? 1.0 + Math.sin(t * 0.005 + i * 0.7) * 0.12 : 1.0;
       item.mesh.scale.setScalar(scale);
@@ -265,7 +279,7 @@ export class LootSystem {
     // Extra meshes array (medkit cross is now built inside _buildItemMesh)
     const extraMeshes = [];
 
-    this._items.push({ mesh, defId, count, pos: pos.clone(), extraMeshes });
+    this._items.push({ mesh, defId, count, pos: pos.clone(), extraMeshes, spawnTime: performance.now() });
   }
 
   /**
