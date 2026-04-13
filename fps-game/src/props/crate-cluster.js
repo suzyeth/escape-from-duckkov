@@ -1,28 +1,26 @@
 import * as THREE from 'three';
 import { MAT } from './materials.js';
 
-const labelMat = new THREE.MeshStandardMaterial({ color: 0x665533, roughness: 0.9 });
-const stencilMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.85 });
-const damageMat = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.95 });
-
-// 3种箱体颜色变体
-const cardboardVariants = [
-  new THREE.MeshStandardMaterial({ color: 0xb08050, roughness: 0.85 }),  // 标准棕
-  new THREE.MeshStandardMaterial({ color: 0x9a7040, roughness: 0.88 }),  // 深旧棕
-  new THREE.MeshStandardMaterial({ color: 0xc09060, roughness: 0.82 }),  // 浅新棕
-];
-const tapeVariants = [
-  new THREE.MeshStandardMaterial({ color: 0x8a6a40, roughness: 0.8 }),   // 标准
-  new THREE.MeshStandardMaterial({ color: 0x7a5a30, roughness: 0.8 }),   // 深
-  new THREE.MeshStandardMaterial({ color: 0x9a7a50, roughness: 0.8 }),   // 浅
-];
-
 /**
  * 纸箱堆 — 鸭科夫仓库核心道具
+ * Materials created per-cluster to avoid cross-contamination on open/tint.
  * @param {number} count 箱子数量 (3-8)
  * @returns {THREE.Group}
  */
 export function createCrateCluster(count = 5) {
+  const labelMat = new THREE.MeshStandardMaterial({ color: 0x665533, roughness: 0.9 });
+  const stencilMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.85 });
+  const damageMat = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.95 });
+  const cardboardVariants = [
+    new THREE.MeshStandardMaterial({ color: 0xb08050, roughness: 0.85 }),
+    new THREE.MeshStandardMaterial({ color: 0x9a7040, roughness: 0.88 }),
+    new THREE.MeshStandardMaterial({ color: 0xc09060, roughness: 0.82 }),
+  ];
+  const tapeVariants = [
+    new THREE.MeshStandardMaterial({ color: 0x8a6a40, roughness: 0.8 }),
+    new THREE.MeshStandardMaterial({ color: 0x7a5a30, roughness: 0.8 }),
+    new THREE.MeshStandardMaterial({ color: 0x9a7a50, roughness: 0.8 }),
+  ];
   const group = new THREE.Group();
   const sizes = [
     [0.5, 0.4, 0.5],

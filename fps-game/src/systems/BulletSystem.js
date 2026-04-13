@@ -224,24 +224,7 @@ export class BulletSystem {
 
       let hit = false;
 
-      if (p.owner === 'player') {
-        // Check enemy hits — range covers this frame's travel + enemy radius
-        const enemy = aiSystem.checkPlayerHit(p.pos, p.dir, step + 1.0);
-        if (enemy) {
-          hits.push({ target: 'enemy', enemy, damage: Math.round(dmg), pos: p.pos.clone() });
-          hit = true;
-        }
-      } else {
-        // Enemy bullet → check player hit (also use step-aware range)
-        const dx = player.position.x - p.pos.x;
-        const dz = player.position.z - p.pos.z;
-        if (Math.sqrt(dx * dx + dz * dz) < 0.65 + step) {
-          hits.push({ target: 'player', damage: Math.round(dmg), pos: p.pos.clone() });
-          hit = true;
-        }
-      }
-
-      // Check wall hits
+      // Check wall hits FIRST — prevents shooting through walls
       if (!hit) {
         this._projRay.set(p.pos, p.dir);
         this._projRay.near = 0;
@@ -249,6 +232,23 @@ export class BulletSystem {
         const wallHits = this._projRay.intersectObjects(collidables, false);
         if (wallHits.length > 0 && wallHits[0].object.name !== 'Floor') {
           this.spawnHitEffect(wallHits[0].point);
+          hit = true;
+        }
+      }
+
+      if (!hit && p.owner === 'player') {
+        // Check enemy hits — range covers this frame's travel + enemy radius
+        const enemy = aiSystem.checkPlayerHit(p.pos, p.dir, step + 0.6);
+        if (enemy) {
+          hits.push({ target: 'enemy', enemy, damage: Math.round(dmg), pos: p.pos.clone() });
+          hit = true;
+        }
+      } else if (!hit) {
+        // Enemy bullet → check player hit
+        const dx = player.position.x - p.pos.x;
+        const dz = player.position.z - p.pos.z;
+        if (Math.sqrt(dx * dx + dz * dz) < 0.65 + step * 0.5) {
+          hits.push({ target: 'player', damage: Math.round(dmg), pos: p.pos.clone() });
           hit = true;
         }
       }

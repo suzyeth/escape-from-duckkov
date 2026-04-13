@@ -1272,6 +1272,10 @@ const loop = new GameLoop(
       // Derive facing angle from player→mouse in world space (same source as fog overlay)
       const facingDx = _aimWorldPos.x - player.position.x;
       const facingDz = _aimWorldPos.z - player.position.z;
+      // Skip if aim not yet initialized (first frame before mouse move)
+      if (facingDx === 0 && facingDz === 0) {
+        for (const enemy of aiSystem.enemies) enemy.mesh.visible = true;
+      } else {
       const pAngle = Math.atan2(facingDx, facingDz);
       for (const enemy of aiSystem.enemies) {
         if (enemy.state === 4) continue; // DEAD — keep as-is
@@ -1290,6 +1294,7 @@ const loop = new GameLoop(
         while (diff < -Math.PI) diff += Math.PI * 2;
         enemy.mesh.visible = Math.abs(diff) < halfFov;
       }
+      } // end else (aim initialized)
     } else {
       for (const enemy of aiSystem.enemies) enemy.mesh.visible = true;
     }
@@ -1317,7 +1322,12 @@ const loop = new GameLoop(
     } catch (err) {
       _errorCount = (_errorCount ?? 0) + 1;
       if (_errorCount <= 3) console.error('Game loop error:', err);
-      if (_errorCount >= 10) { loop.stop(); console.error('Too many errors, game loop stopped'); }
+      if (_errorCount >= 10) {
+        loop.stop();
+        console.error('Too many errors, game loop stopped');
+        _showEndScreen(false);
+        return;
+      }
       // Reset stuck states
       player.isHealing = false;
       _healTimer = 0;
