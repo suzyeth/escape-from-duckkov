@@ -40,6 +40,12 @@ export class HUD {
     this._onTimerExpire = null;
     this._killCountEl   = document.getElementById('kill-count');
     this._lowHpVignette = document.getElementById('low-health-vignette');
+
+    // Cache weapon slot elements
+    this._wslots = [];
+    for (let i = 0; i < 8; i++) {
+      this._wslots.push(document.getElementById(`wslot-${i}`));
+    }
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -248,8 +254,8 @@ export class HUD {
    * @param {number} idx
    */
   setActiveWeaponSlot(idx) {
-    for (let i = 0; i < 8; i++) {
-      const el = document.getElementById(`wslot-${i}`);
+    for (let i = 0; i < this._wslots.length; i++) {
+      const el = this._wslots[i];
       if (el) el.classList.toggle('active', i === idx);
     }
   }

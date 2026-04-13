@@ -51,6 +51,9 @@ export class Player {
     // Set true while using a medical item — halves movement speed
     this.isHealing = false;
 
+    // Sprint lockout — prevents flickering when stamina hovers near 0
+    this._sprintLocked = false;
+
     // ADS (aim down sights)
     this.isAiming = false;
 
@@ -129,10 +132,13 @@ export class Player {
     this._isCrouching = input.isDown('ControlLeft') || input.isDown('ControlRight');
 
     // Sprint only while stamina > 0; once drained, must regen to 15 before sprinting again
+    if (this.stamina <= 0) this._sprintLocked = true;
+    if (this.stamina >= 15) this._sprintLocked = false;
+
     const wantsToSprint = input.isDown('ShiftLeft') && !this._isCrouching;
-    if (wantsToSprint && this.stamina > 0) {
+    if (wantsToSprint && this.stamina > 0 && !this._sprintLocked) {
       this._isSprinting = true;
-    } else if (this.stamina <= 0) {
+    } else if (this.stamina <= 0 || this._sprintLocked) {
       this._isSprinting = false;
     } else if (!wantsToSprint) {
       this._isSprinting = false;

@@ -211,13 +211,17 @@ let   _aimWorldPos  = new THREE.Vector3(0, 0, -5);
 let   _aimMoved     = false;
 
 // Scratch vectors for hot paths (avoid per-frame allocations)
-const _scratchMuzzle  = new THREE.Vector3();
-const _scratchDir     = new THREE.Vector3();
-const _scratchMissRay = new THREE.Raycaster();
+const _scratchMuzzle    = new THREE.Vector3();
+const _scratchDir       = new THREE.Vector3();
+const _scratchMissRay   = new THREE.Raycaster();
 const _scratchCamTarget = new THREE.Vector3();
+const _scratchFogProj   = new THREE.Vector3();
 
 // Cached DOM refs
 const _crosshairEl = document.getElementById('crosshair');
+const _bossWrap    = document.getElementById('boss-health-wrap');
+const _bossBar     = document.getElementById('boss-health-inner');
+const _bossNameEl  = document.getElementById('boss-name');
 
 // Weapon constants (hoisted from handlePlayerShoot)
 const RECOIL_STR = { rifle: 0.22, pistol: 0.12, shotgun: 0.45, vss: 0.40, mp5: 0.10 };
@@ -364,6 +368,8 @@ document.getElementById('setting-shake')?.addEventListener('change', (e) => {
 function _showDamageDirection(fromX, fromZ) {
   const container = document.getElementById('damage-direction');
   if (!container) return;
+  // Cap at 5 simultaneous indicators
+  while (container.children.length >= 5) container.firstChild.remove();
 
   const dx = fromX - player.position.x;
   const dz = fromZ - player.position.z;
@@ -388,6 +394,10 @@ function _gainXP(amount, reason) {
   _xp += amount;
   const xpEl = document.getElementById('xp-value');
   if (xpEl) xpEl.textContent = _xp;
+
+  // Cap XP popups
+  const existing = document.querySelectorAll('.xp-popup');
+  if (existing.length >= 5) existing[0].remove();
 
   // Floating XP popup
   const popup = document.createElement('div');
@@ -448,14 +458,14 @@ function handlePlayerShoot() {
 
   for (let p = 0; p < def.pellets; p++) {
     const spread = def.spread * spreadMult;
-    const dir = new THREE.Vector3(
+    _scratchDir.set(
       Math.sin(angle) + (Math.random() - 0.5) * spread,
       0,
       Math.cos(angle) + (Math.random() - 0.5) * spread
     ).normalize();
 
     // Spawn physical projectile instead of hitscan
-    bullets.spawnProjectile(muzzlePos, dir, def, 'player', def.tracerColor);
+    bullets.spawnProjectile(muzzlePos, _scratchDir, def, 'player', def.tracerColor);
   }
 }
 
@@ -1104,18 +1114,15 @@ const loop = new GameLoop(
     }
 
     // Boss health bar
-    const bossWrap = document.getElementById('boss-health-wrap');
-    const bossBar = document.getElementById('boss-health-inner');
-    const bossNameEl = document.getElementById('boss-name');
-    if (bossWrap && bossBar) {
+    if (_bossWrap && _bossBar) {
       const boss = aiSystem.enemies.find(e => e.enemyType === 'boss' && e.isAlive);
       if (boss) {
-        bossWrap.style.display = 'block';
-        bossBar.style.width = `${(boss.health / boss.maxHealth) * 100}%`;
+        _bossWrap.style.display = 'block';
+        _bossBar.style.width = `${(boss.health / boss.maxHealth) * 100}%`;
         const typeDef = ENEMY_TYPES[boss.enemyType];
-        if (bossNameEl) bossNameEl.textContent = (typeDef && typeDef.label) || 'BOSS 鸭王';
+        if (_bossNameEl) _bossNameEl.textContent = (typeDef && typeDef.label) || 'BOSS 鸭王';
       } else {
-        bossWrap.style.display = 'none';
+        _bossWrap.style.display = 'none';
       }
     }
 
@@ -1262,8 +1269,8 @@ const loop = new GameLoop(
     camera.lookAt(player.position);
 
     // Fog of war — project player world position to screen
-    const _fogProj = player.position.clone().project(camera);
-    fogOfWar.update((_fogProj.x + 1) / 2, (-_fogProj.y + 1) / 2);
+    _scratchFogProj.copy(player.position).project(camera);
+    fogOfWar.update((_scratchFogProj.x + 1) / 2, (-_scratchFogProj.y + 1) / 2);
 
     // Hide enemies outside player's vision cone (must match fog-of-war direction)
     if (fogOfWar.enabled) {

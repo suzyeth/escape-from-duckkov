@@ -226,6 +226,7 @@ export class Enemy {
       }
     });
     setTimeout(() => {
+      if (!this.mesh.parent) return; // already removed from scene
       this.mesh.traverse(child => {
         if (child.isMesh && child !== this._hpBar && child.material.emissive) {
           child.material.emissive.set(0x000000);
@@ -378,11 +379,13 @@ export class Enemy {
     // Lay flat (rotate 90° around Z)
     this.mesh.rotation.z = Math.PI / 2;
     this.mesh.position.y = 0.15;
-    // Grey out
+    // Grey out — dispose original material before replacing with clone
     this.mesh.traverse(child => {
       if (child.isMesh) {
-        child.material = child.material.clone();
+        const orig = child.material;
+        child.material = orig.clone();
         child.material.color.set(0x444444);
+        orig.dispose();
       }
     });
     // Hide patrol visualisation

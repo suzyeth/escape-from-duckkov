@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { Enemy, ENEMY_TYPES } from '../entities/Enemy.js';
 
+// Module-level spawn points — avoids re-creating Vector3s every wave
+const SPAWN_POINTS = [
+  new THREE.Vector3(-60, 0, -60),
+  new THREE.Vector3( 60, 0, -60),
+  new THREE.Vector3(-60, 0,  60),
+  new THREE.Vector3( 60, 0,  60),
+  new THREE.Vector3(  0, 0, -70),
+  new THREE.Vector3(  0, 0,  70),
+];
+
 /**
  * AISystem
  * Spawns and manages all Scav (鸭卒) enemies.
@@ -88,15 +98,6 @@ export class AISystem {
    * @param {THREE.Vector3} playerPos
    */
   _spawnWave(playerPos) {
-    const SPAWN_POINTS = [
-      new THREE.Vector3(-60, 0, -60),
-      new THREE.Vector3( 60, 0, -60),
-      new THREE.Vector3(-60, 0,  60),
-      new THREE.Vector3( 60, 0,  60),
-      new THREE.Vector3(  0, 0, -70),
-      new THREE.Vector3(  0, 0,  70),
-    ];
-
     // Pick 2-3 spawn points far from player
     const farPoints = SPAWN_POINTS
       .filter(p => p.distanceTo(playerPos) > 30)
