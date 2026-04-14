@@ -483,6 +483,11 @@ export class Level {
     roof.name = `${name}_Roof`;
     this._scene.add(roof);
 
+    // Indoor warm light per spec
+    const indoorLight = new THREE.PointLight(0xfff5e0, 3, 12, 1.5);
+    indoorLight.position.set(cx, h * 0.7, cz);
+    this._scene.add(indoorLight);
+
     // Register for per-frame reveal updates
     this._buildings.push({
       roof,

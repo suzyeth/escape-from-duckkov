@@ -29,7 +29,7 @@ export class DoorSystem {
    */
   addDoor({ cx, cz, gapW, h, color = 0x8b6040, name = 'Door' }) {
     const geo = new THREE.BoxGeometry(gapW - 0.1, h, 0.14);
-    const mat = new THREE.MeshLambertMaterial({ color });
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.1 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow    = true;
     mesh.receiveShadow = true;

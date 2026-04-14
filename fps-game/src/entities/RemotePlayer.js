@@ -73,7 +73,7 @@ export class RemotePlayer {
 
     // Body — blue tint to distinguish from local player (green)
     const bodyGeo = new THREE.BoxGeometry(0.52, 0.65, 0.35);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3a4a6a });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3a4a6a, roughness: 0.6, metalness: 0.1 });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0.05;
     body.castShadow = true;
@@ -81,7 +81,7 @@ export class RemotePlayer {
 
     // Head
     const headGeo = new THREE.SphereGeometry(0.22, 8, 6);
-    const headMat = new THREE.MeshLambertMaterial({ color: 0xf5c87a });
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xf5c87a, roughness: 0.6, metalness: 0.1 });
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 0.58;
     head.castShadow = true;
@@ -89,19 +89,19 @@ export class RemotePlayer {
 
     // Helmet — blue
     const helmetGeo = new THREE.SphereGeometry(0.25, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.6);
-    const helmetMat = new THREE.MeshLambertMaterial({ color: 0x3a3a5a });
+    const helmetMat = new THREE.MeshStandardMaterial({ color: 0x3a3a5a, roughness: 0.6, metalness: 0.1 });
     const helmet = new THREE.Mesh(helmetGeo, helmetMat);
     helmet.position.y = 0.62;
     group.add(helmet);
 
     // Weapon
-    const gunMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.1 });
     const gun = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.55), gunMat);
     gun.position.set(0.18, 0.0, 0.42);
     group.add(gun);
 
     // Legs
-    const legMat = new THREE.MeshLambertMaterial({ color: 0x2a3a4a });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, roughness: 0.6, metalness: 0.1 });
     const ll = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 6), legMat);
     ll.position.set(-0.15, -0.35, 0); ll.castShadow = true; group.add(ll);
     const rl = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 6), legMat);
