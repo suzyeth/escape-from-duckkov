@@ -218,7 +218,7 @@ export class Player {
     const group = new THREE.Group();
 
     // Legs (two cylinders)
-    const legMat = new THREE.MeshLambertMaterial({ color: 0x2a3a2a });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x2a6a6a, roughness: 0.6, metalness: 0.1 });
     const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 6), legMat);
     leftLeg.position.set(-0.15, -0.35, 0);
     leftLeg.castShadow = true;
@@ -229,7 +229,7 @@ export class Player {
     group.add(rightLeg);
 
     // Boots
-    const bootMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    const bootMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6, metalness: 0.1 });
     const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.24), bootMat);
     leftBoot.position.set(-0.15, -0.62, 0.04);
     group.add(leftBoot);
@@ -239,20 +239,20 @@ export class Player {
 
     // Body (torso — tactical vest, saturated green for low-poly look)
     const bodyGeo = new THREE.BoxGeometry(0.52, 0.65, 0.35);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4a7a4a, flatShading: true });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x44cccc, roughness: 0.6, metalness: 0.1 });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0.05;
     body.castShadow = true;
     group.add(body);
 
     // Vest plate (front)
-    const plateMat = new THREE.MeshLambertMaterial({ color: 0x5a8a5a, flatShading: true });
+    const plateMat = new THREE.MeshStandardMaterial({ color: 0x55dddd, roughness: 0.6, metalness: 0.1 });
     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.06), plateMat);
     plate.position.set(0, 0.08, 0.2);
     group.add(plate);
 
     // Arms
-    const armMat = new THREE.MeshLambertMaterial({ color: 0x3a5a3a });
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x338888, roughness: 0.6, metalness: 0.1 });
     const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.5, 6), armMat);
     leftArm.position.set(-0.34, 0.0, 0.08);
     leftArm.rotation.x = 0.3;
@@ -266,7 +266,7 @@ export class Player {
 
     // Head
     const headGeo = new THREE.SphereGeometry(0.22, 5, 4);
-    const headMat = new THREE.MeshLambertMaterial({ color: 0xf5c87a, flatShading: true });
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xf5c87a, roughness: 0.6, metalness: 0.1 });
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 0.58;
     head.castShadow = true;
@@ -274,16 +274,16 @@ export class Player {
 
     // Helmet — low-poly faceted look
     const helmetGeo = new THREE.SphereGeometry(0.25, 6, 4, 0, Math.PI * 2, 0, Math.PI * 0.6);
-    const helmetMat = new THREE.MeshLambertMaterial({ color: 0x4a5a3a, flatShading: true });
+    const helmetMat = new THREE.MeshStandardMaterial({ color: 0x4a5a3a, roughness: 0.6, metalness: 0.1 });
     const helmet = new THREE.Mesh(helmetGeo, helmetMat);
     helmet.position.y = 0.62;
     helmet.castShadow = true;
     group.add(helmet);
 
     // Weapon — low-poly gun model
-    const gunMat  = new THREE.MeshLambertMaterial({ color: 0x2a2a2a, flatShading: true });
-    const gunMat2 = new THREE.MeshLambertMaterial({ color: 0x3a3a3a, flatShading: true });
-    const woodMat = new THREE.MeshLambertMaterial({ color: 0x6a4a2a, flatShading: true });
+    const gunMat  = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.1 });
+    const gunMat2 = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.6, metalness: 0.1 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 0.6, metalness: 0.1 });
 
     // Receiver (main body)
     const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.10, 0.35), gunMat);
@@ -308,14 +308,14 @@ export class Player {
     group.add(stock);
 
     // Magazine
-    const magMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, flatShading: true });
+    const magMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6, metalness: 0.1 });
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.06), magMat);
     mag.rotation.z = 0.1; // slight angle
     mag.position.set(0.20, -0.10, 0.30);
     group.add(mag);
 
     // Sight / scope rail
-    const sightMat = new THREE.MeshLambertMaterial({ color: 0x444444, flatShading: true });
+    const sightMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.6, metalness: 0.1 });
     const sight = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.04, 0.12), sightMat);
     sight.position.set(0.20, 0.09, 0.36);
     group.add(sight);
@@ -332,7 +332,7 @@ export class Player {
     group.add(flashPt);
 
     // Backpack
-    const bpMat = new THREE.MeshLambertMaterial({ color: 0x4a5a3a });
+    const bpMat = new THREE.MeshStandardMaterial({ color: 0x338888, roughness: 0.6, metalness: 0.1 });
     const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.18), bpMat);
     backpack.position.set(0, 0.05, -0.26);
     backpack.castShadow = true;

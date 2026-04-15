@@ -483,9 +483,19 @@ export class Level {
     roof.name = `${name}_Roof`;
     this._scene.add(roof);
 
+    // Indoor warm light — max 4 to avoid shader overload
+    let indoorLight = null;
+    if ((this._buildings?.length ?? 0) < 4) {
+      indoorLight = new THREE.PointLight(0xfff5e0, 3, 12, 1.5);
+      indoorLight.position.set(cx, h * 0.7, cz);
+      indoorLight.visible = false; // hidden until player enters (roof reveals)
+      this._scene.add(indoorLight);
+    }
+
     // Register for per-frame reveal updates
     this._buildings.push({
       roof,
+      indoorLight,
       minX: cx - hw,
       maxX: cx + hw,
       minZ: cz - hd,
@@ -518,6 +528,8 @@ export class Level {
       // Lerp: fade in/out over ~10 frames
       b.roof.material.opacity = cur + (target - cur) * 0.14;
       b.roof.visible = b.roof.material.opacity > 0.02;
+      // Indoor light: visible only when player is inside
+      if (b.indoorLight) b.indoorLight.visible = inside;
     }
   }
 

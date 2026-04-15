@@ -34,7 +34,7 @@ const container = document.getElementById('canvas-container');
 const renderer  = new Renderer(container);
 const scene     = new THREE.Scene();
 const camera    = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 300);
-const CAM_OFFSET = new THREE.Vector3(0, 28, 16);
+const CAM_OFFSET = new THREE.Vector3(0, 20, 12);
 
 renderer.onResize((w, h) => { camera.aspect = w / h; camera.updateProjectionMatrix(); });
 

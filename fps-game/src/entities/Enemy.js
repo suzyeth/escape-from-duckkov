@@ -25,11 +25,11 @@ const ELITE_SHOOT_RANGE    = 22;
  * 'normal' and 'elite' are legacy types; new types extend the system.
  */
 export const ENEMY_TYPES = {
-  normal:  { hp: 80,  speed: 3.8, damage: 10, interval: 1.3,  range: 16, vision: 18, melee: false, color: 0x7a3a1e, headColor: 0xf0c060, label: '鸭卒' },
-  elite:   { hp: 160, speed: 3.8, damage: 16, interval: 0.85, range: 22, vision: 24, melee: false, color: 0x3a0a0a, headColor: 0xcc9944, label: '★精英鸭卒' },
-  rusher:  { hp: 60,  speed: 6.5, damage: 25, interval: 0.8,  range: 4,  vision: 20, melee: true,  color: 0x8a2a1a, headColor: 0xee8844, label: '暴走鸭' },
-  tank:    { hp: 300, speed: 2.0, damage: 20, interval: 1.0,  range: 18, vision: 16, melee: false, color: 0x2a2a3a, headColor: 0x8888aa, label: '重甲鸭' },
-  boss:    { hp: 600, speed: 3.0, damage: 30, interval: 0.6,  range: 25, vision: 30, melee: false, color: 0x1a0a1a, headColor: 0xff4444, label: 'BOSS 鸭王' },
+  normal:  { hp: 80,  speed: 3.8, damage: 10, interval: 1.3,  range: 16, vision: 18, melee: false, color: 0xdd5544, headColor: 0xf5c87a, label: '鸭卒' },
+  elite:   { hp: 160, speed: 3.8, damage: 16, interval: 0.85, range: 22, vision: 24, melee: false, color: 0xcc2222, headColor: 0xf0c060, label: '★精英鸭卒' },
+  rusher:  { hp: 60,  speed: 6.5, damage: 25, interval: 0.8,  range: 4,  vision: 20, melee: true,  color: 0xff6633, headColor: 0xf5c87a, label: '暴走鸭' },
+  tank:    { hp: 300, speed: 2.0, damage: 20, interval: 1.0,  range: 18, vision: 16, melee: false, color: 0x5566aa, headColor: 0xaabbcc, label: '重甲鸭' },
+  boss:    { hp: 600, speed: 3.0, damage: 30, interval: 0.6,  range: 25, vision: 30, melee: false, color: 0x882288, headColor: 0xff6666, label: 'BOSS 鸭王' },
 };
 
 const WALL_DIRS = [
@@ -522,7 +522,7 @@ export class Enemy {
     const isBoss = this.isBoss;
 
     // Legs
-    const legMat = new THREE.MeshLambertMaterial({ color: elite ? 0x2a1a1a : 0x4a3a2a });
+    const legMat = new THREE.MeshStandardMaterial({ color: elite ? 0x2a1a1a : 0x4a3a2a, roughness: 0.6, metalness: 0.1 });
     const ll = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.12, 0.45, 6), legMat);
     ll.position.set(-0.12, -0.32, 0); ll.castShadow = true; g.add(ll);
     const rl = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.12, 0.45, 6), legMat);
@@ -531,19 +531,19 @@ export class Enemy {
     // Body
     const bodyW = elite ? 0.55 : 0.46;
     const bodyH = elite ? 0.70 : 0.58;
-    const bMat = new THREE.MeshLambertMaterial({ color: bodyC, flatShading: true });
+    const bMat = new THREE.MeshStandardMaterial({ color: bodyC, roughness: 0.6, metalness: 0.1 });
     const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, 0.30), bMat);
     body.position.y = 0.05; body.castShadow = true; g.add(body);
 
     // Vest/armor (elite only)
     if (elite) {
-      const vestMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+      const vestMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.1 });
       const vest = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.45, 0.08), vestMat);
       vest.position.set(0, 0.08, 0.18); g.add(vest);
     }
 
     // Arms with weapon
-    const armMat = new THREE.MeshLambertMaterial({ color: bodyC, flatShading: true });
+    const armMat = new THREE.MeshStandardMaterial({ color: bodyC, roughness: 0.6, metalness: 0.1 });
     const la = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.42, 6), armMat);
     la.position.set(-(bodyW/2 + 0.06), 0.0, 0.06); la.rotation.x = 0.4; la.castShadow = true; g.add(la);
     const ra = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.42, 6), armMat);
@@ -551,7 +551,7 @@ export class Enemy {
 
     // Weapon — melee types get a blade, ranged get a gun
     if (this.isMelee) {
-      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+      const bladeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.6, metalness: 0.1 });
       const blade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.45), bladeMat);
       blade.position.set(bodyW/2 + 0.06, -0.05, 0.35); g.add(blade);
       // Red glow on blade tip (attack indicator)
@@ -559,14 +559,14 @@ export class Enemy {
       const tip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), tipMat);
       tip.position.set(bodyW/2 + 0.06, -0.05, 0.60); g.add(tip);
     } else {
-      const gunMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+      const gunMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.1 });
       const gun = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, elite ? 0.50 : 0.40), gunMat);
       gun.position.set(bodyW/2 + 0.06, -0.05, 0.35); g.add(gun);
     }
 
     // Head
     const headR = elite ? 0.26 : 0.22;
-    const hMat = new THREE.MeshLambertMaterial({ color: headC, flatShading: true });
+    const hMat = new THREE.MeshStandardMaterial({ color: headC, roughness: 0.6, metalness: 0.1 });
     const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 5, 4), hMat);
     head.position.y = elite ? 0.68 : 0.58; head.castShadow = true; g.add(head);
 
@@ -581,7 +581,7 @@ export class Enemy {
     // Headgear
     if (elite) {
       // Beret — bright red for visibility
-      const beretMat = new THREE.MeshLambertMaterial({ color: 0xcc0000 });
+      const beretMat = new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.6, metalness: 0.1 });
       const beret = new THREE.Mesh(new THREE.SphereGeometry(0.30, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.5), beretMat);
       beret.position.y = 0.74; g.add(beret);
       // Shoulder badge — larger
@@ -590,7 +590,7 @@ export class Enemy {
       badge.position.set(bodyW/2 + 0.01, 0.22, 0.16); g.add(badge);
     } else {
       // Bandana
-      const bandMat = new THREE.MeshLambertMaterial({ color: 0x6a4a2a });
+      const bandMat = new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 0.6, metalness: 0.1 });
       const band = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.08, 8), bandMat);
       band.position.y = 0.54; g.add(band);
     }
