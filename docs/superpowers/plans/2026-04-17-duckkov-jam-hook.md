@@ -2,7 +2,32 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 14 天内把现有"Q 版塔科夫"改造为"Indie Hacker 名人堂朝圣"，赶在 2026-05-01 13:37 UTC 前提交 Cursor Vibe Jam 2026。
+---
+
+## 📌 Revision · 2026-04-17 晚（D0 收尾）
+
+**现状：** Phase 0 + Phase 1 一天全部完成（提前 2 天）。
+
+**方向调整：** Playtest 后用户反馈 "现有场景是程序化随机放置，建筑/道具/敌人摆放不够 handcraft"。判官第一眼印象 > boss 数量，所以优先做**场景编辑器 + 人工摆放**。
+
+**新排期：**
+
+| 日期 | 内容 |
+|---|---|
+| D1 (Apr 18) | **Snapshot Level.js → `scene.json`** + loader 改成读 JSON（0.5 天）→ 开工编辑器（0.5 天）|
+| D2 (Apr 19) | **场景编辑器** 完成：俯视 ortho、prop palette、点击放置、拖拽、R 旋转、Del 删、Save/Load |
+| D3-4 (Apr 20-21) | **用户亲自摆场景**（2 天关卡设计，期间 AI 待命改 bug） |
+| D5-11 | Phase 2-5（Boss），**目标仍是 5 个**，掉进度才砍到 3（合体方案）|
+| D12-14 | Playtest + 素材 + 提交（不变）|
+
+**Boss 减量预案（仅在进度告急触发）：**
+- 赞助 2v1 合体成"Sponsor Duck"（Cursor 压制射击 + Bolt 紫色皮肤）
+- 评委三人合体成"Judge Panel"（取 s13k 头弱点 + timsoret 弹幕元素，共用血条）
+- @levelsio 三阶段**不砍**（核心记忆点）
+
+**不变：** Spec 的 hook 概念 / tribute 基调 / 语音管线 / 提交素材 / 硬 Gate。
+
+---
 
 **Architecture:** 在现有撤离地图的主撤离点前加入名人堂 boss 门——3 波遭遇（赞助商 / 评委 / @levelsio）共 5 个 boss，复用现有 Enemy/AISystem，用扩展而非重写。所有新 boss 通过 `BossController` 挂载到现有 Enemy 实例上，不触动战斗主循环。
 
