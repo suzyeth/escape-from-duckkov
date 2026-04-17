@@ -293,8 +293,17 @@ export class LootSystem {
     mesh.castShadow = true;
     this._scene.add(mesh);
 
-    // Extra meshes array (medkit cross is now built inside _buildItemMesh)
-    const extraMeshes = [];
+    // Ground indicator ring — so loot is visible from far away.
+    const ringColor = vis.glow ? vis.color : 0xffee66;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.55, 0.85, 24),
+      new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(pos.x, 0.03, pos.z);
+    this._scene.add(ring);
+
+    const extraMeshes = [ring];
 
     this._items.push({ mesh, defId, count, pos: pos.clone(), extraMeshes, spawnTime: performance.now() });
   }
@@ -325,7 +334,7 @@ export class LootSystem {
     const creator = PROPS_MAP[defId];
     if (creator) {
       const mesh = creator();
-      mesh.scale.setScalar(2);
+      mesh.scale.setScalar(3.2);
       return mesh;
     }
 
