@@ -933,7 +933,7 @@ stash.onSelect((loadout) => {
   camera.lookAt(spawn);
 
   // Reset raid timer
-  hud.resetRaid(45 * 60);
+  hud.resetRaid(8 * 60);  // Jam: 8-min raid (was 45 min)
   hud.onTimerExpire(() => {
     hud.pushKillFeed('⚠ 时间耗尽！突袭失败');
     _onPlayerDied();
