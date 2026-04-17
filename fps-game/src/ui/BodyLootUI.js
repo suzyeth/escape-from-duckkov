@@ -32,16 +32,22 @@ export class BodyLootUI {
     this._body = body;
     this._visible = true;
     this._panel.style.display = 'flex';
-    document.body.style.cursor = 'default';
+    // Keep crosshair hidden state so game view feels live; cursor stays as game's norm.
     this.refresh();
   }
 
   close() {
     this._visible = false;
     this._panel.style.display = 'none';
-    // Restore crosshair/hidden cursor (game convention)
-    document.body.style.cursor = 'none';
     this._body = null;
+  }
+
+  /** Called when player takes damage — slam the UI shut so they can react. */
+  notifyPlayerHit() {
+    if (this._visible) {
+      this.close();
+      this.hud?.showBubble?.('受击 · 搜索中断', 1.0);
+    }
   }
 
   /** Re-render both panels from the current body + player inventory. */
@@ -105,26 +111,26 @@ export class BodyLootUI {
   _build() {
     const panel = document.createElement('div');
     panel.id = 'body-loot-ui';
+    // Docked at bottom of screen; no full-screen backdrop so player can see threats.
     panel.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;display:none;' +
-      'align-items:center;justify-content:center;' +
+      'position:fixed;left:0;right:0;bottom:0;z-index:600;display:none;' +
+      'justify-content:center;gap:14px;padding:0 24px 16px 24px;pointer-events:none;' +
       'font-family:"Courier New",monospace;color:#fff';
+    const itemBox = 'max-height:220px;overflow-y:auto;padding-right:4px';
     panel.innerHTML = `
-      <div style="display:flex;gap:24px">
-        <div style="background:rgba(40,30,30,.95);border:2px solid #ff6633;padding:18px;min-width:320px;min-height:440px;box-shadow:0 0 24px rgba(255,102,51,.25)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div style="font-size:18px;letter-spacing:2px">尸体物品</div>
-            <button id="body-loot-takeall" style="background:#ff6633;color:#fff;border:0;padding:6px 12px;font:inherit;cursor:pointer;letter-spacing:1px">全部拾取</button>
-          </div>
-          <div id="body-loot-left-items"></div>
+      <div style="background:rgba(40,30,30,.88);border:2px solid #ff6633;padding:12px 14px;width:340px;box-shadow:0 0 18px rgba(255,102,51,.3);pointer-events:auto;backdrop-filter:blur(4px)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:14px;letter-spacing:2px;color:#ffb08a">尸体物品</div>
+          <button id="body-loot-takeall" style="background:#ff6633;color:#fff;border:0;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer;letter-spacing:1px">全部拾取</button>
         </div>
-        <div style="background:rgba(20,30,40,.95);border:2px solid #4488cc;padding:18px;min-width:320px;min-height:440px;box-shadow:0 0 24px rgba(68,136,204,.25)">
-          <div style="font-size:18px;letter-spacing:2px;margin-bottom:12px">我的背包</div>
-          <div id="body-loot-right-items"></div>
-        </div>
+        <div id="body-loot-left-items" style="${itemBox}"></div>
       </div>
-      <div style="position:absolute;bottom:24px;color:#aaa;font-size:12px;letter-spacing:1px">
-        左键点击物品转移 · ESC 关闭 · 走远自动关闭
+      <div style="background:rgba(20,30,40,.88);border:2px solid #4488cc;padding:12px 14px;width:340px;box-shadow:0 0 18px rgba(68,136,204,.3);pointer-events:auto;backdrop-filter:blur(4px)">
+        <div style="font-size:14px;letter-spacing:2px;color:#9ac8ff;margin-bottom:8px">我的背包</div>
+        <div id="body-loot-right-items" style="${itemBox}"></div>
+      </div>
+      <div style="position:absolute;top:-20px;left:50%;transform:translateX(-50%);color:#aaa;font-size:11px;letter-spacing:1px;white-space:nowrap">
+        点击转移 · ESC 关 · 走远自动关
       </div>
     `;
     document.body.appendChild(panel);

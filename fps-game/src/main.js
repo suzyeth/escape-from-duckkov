@@ -554,6 +554,7 @@ function handleEnemyShots(shots) {
       _addScreenShake(0.8);
       _showDamageDirection(shot.origin.x, shot.origin.z);
       hud.pushKillFeed(`被近战攻击！(${_partLabel(partHit)}) -${shot.damage}HP`);
+      bodyLootUI.notifyPlayerHit();
       if (!health.isAlive) _onPlayerDied();
     } else {
       // Ranged: spawn enemy projectile
@@ -1144,6 +1145,7 @@ const loop = new GameLoop(
         _showDamageDirection(hit.pos.x, hit.pos.z);
         hud.pushKillFeed(`中弹！(${_partLabel(partHit)}) -${hit.damage}HP`);
         if (health.armorJustBroke) hud.pushKillFeed('⚠ 护甲已损毁！');
+        bodyLootUI.notifyPlayerHit();
         if (!health.isAlive) _onPlayerDied();
       }
     }
