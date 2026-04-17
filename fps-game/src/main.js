@@ -27,6 +27,7 @@ import { BaseScreen }        from './ui/BaseScreen.js';
 import { NetworkSystem }     from './systems/NetworkSystem.js';
 import { LobbyScreen }       from './ui/LobbyScreen.js';
 import { RemotePlayer }      from './entities/RemotePlayer.js';
+import { isFirstRun, markPlayed, DEMO_SEED } from './systems/DemoSeed.js';
 
 // ── Scene ─────────────────────────────────────────────────────────────────────
 
@@ -839,11 +840,13 @@ function _getRaidRating(survived, kills, loot, seconds) {
 }
 
 function _onExtracted() {
+  markPlayed();
   _gainXP(XP_REWARDS.extract, '撤离');
   _showEndScreen(true);
 }
 
 function _onPlayerDied() {
+  markPlayed();
   _showEndScreen(false);
 }
 
@@ -872,21 +875,37 @@ stash.onSelect((loadout) => {
   sound.init();
   sound.resume();
 
-  // Apply weapon loadout
-  weapons.applyLoadout(loadout.weaponSlot);
+  // First-run demo seed: judges see identical opening state.
+  const firstRun = isFirstRun();
+
+  // Apply weapon loadout (first run: force AK-74 / rifle slot = 0)
+  weapons.applyLoadout(firstRun ? 0 : loadout.weaponSlot);
 
   // Apply inventory loadout (clear starting gear, apply preset)
   inventory.reset();
-  for (const item of loadout.items) {
-    inventory.addItem(item.defId, item.count);
-    // Auto-equip armor from starting loadout
-    const def = ITEM_DEFS[item.defId];
-    if (def?.armor) health.equipArmor(def.armor, talentSystem.getStats().armorBonus);
+  if (firstRun) {
+    // Deterministic first-run loadout: starting armor only. Ammo override below.
+    inventory.addItem(DEMO_SEED.startingArmor, 1);
+    const armorDef = ITEM_DEFS[DEMO_SEED.startingArmor];
+    if (armorDef?.armor) health.equipArmor(armorDef.armor, talentSystem.getStats().armorBonus);
+    // Override reserve ammo on the active weapon to the seeded amount.
+    const activeWeapon = weapons.slots[weapons.activeSlot];
+    activeWeapon.reserve = Math.min(activeWeapon.def.reserveMax, DEMO_SEED.startingAmmo);
+  } else {
+    for (const item of loadout.items) {
+      inventory.addItem(item.defId, item.count);
+      // Auto-equip armor from starting loadout
+      const def = ITEM_DEFS[item.defId];
+      if (def?.armor) health.equipArmor(def.armor, talentSystem.getStats().armorBonus);
+    }
   }
 
-  // Random spawn point
+  // Spawn point — first run forces DEMO_SEED.spawnPointIndex; otherwise random.
   const spawnPoints = level.playerSpawnPoints;
-  const spawn = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
+  const spIdx = firstRun
+    ? Math.min(DEMO_SEED.spawnPointIndex, spawnPoints.length - 1)
+    : Math.floor(Math.random() * spawnPoints.length);
+  const spawn = spawnPoints[spIdx];
   player.position.copy(spawn);
   player.position.y = 0;
 
