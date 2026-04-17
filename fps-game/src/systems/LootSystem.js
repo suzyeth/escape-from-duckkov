@@ -176,9 +176,9 @@ export class LootSystem {
         item.mesh.visible = Math.sin(t * 0.01) > 0;
       }
 
-      // Pulse scale when near
-      const scale = dist < PICKUP_RANGE ? 1.0 + Math.sin(t * 0.005 + i * 0.7) * 0.12 : 1.0;
-      item.mesh.scale.setScalar(scale);
+      // Pulse scale when near (multiplies the spawn-time baseline instead of overwriting it)
+      const pulse = dist < PICKUP_RANGE ? 1.0 + Math.sin(t * 0.005 + i * 0.7) * 0.12 : 1.0;
+      item.mesh.scale.setScalar(item.baseScale * pulse);
 
       // Sync extra meshes (medkit cross)
       if (item.extraMeshes) {
@@ -355,7 +355,7 @@ export class LootSystem {
 
     const extraMeshes = [ring];
 
-    this._items.push({ mesh, defId, count, pos: pos.clone(), extraMeshes, spawnTime: performance.now() });
+    this._items.push({ mesh, defId, count, pos: pos.clone(), extraMeshes, spawnTime: performance.now(), baseScale: mesh.scale.x });
   }
 
   /**
