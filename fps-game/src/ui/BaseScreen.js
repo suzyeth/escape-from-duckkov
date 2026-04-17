@@ -5,6 +5,7 @@
 import { ITEM_DEFS } from '../systems/InventorySystem.js';
 import { TALENTS } from '../systems/TalentSystem.js';
 import { RECIPES } from '../systems/CraftingSystem.js';
+import { isFirstRun } from '../systems/DemoSeed.js';
 
 const LEVELS = [
   { id: 0, name: '工业区',   desc: '废弃工厂与仓库，中等难度',   enemies: 20, unlockDesc: '初始解锁',       unlockFn: () => true },
@@ -182,10 +183,11 @@ export class BaseScreen {
     content.appendChild(stashGrid);
 
     // Talents
-    const talTitle = document.createElement('h2');
-    talTitle.className = 'base-subtitle';
-    talTitle.textContent = '天赋升级 (PerkPalace)';
-    content.appendChild(talTitle);
+    if (!isFirstRun()) {
+      const talTitle = document.createElement('h2');
+      talTitle.className = 'base-subtitle';
+      talTitle.textContent = '天赋升级 (PerkPalace)';
+      content.appendChild(talTitle);
 
     // Group talents by category
     const categories = new Map();
@@ -252,12 +254,14 @@ export class BaseScreen {
       talGrid.appendChild(catDiv);
     }
     content.appendChild(talGrid);
+    }
 
     // Crafting
-    const craftTitle = document.createElement('h2');
-    craftTitle.className = 'base-subtitle';
-    craftTitle.textContent = '工作台';
-    content.appendChild(craftTitle);
+    if (!isFirstRun()) {
+      const craftTitle = document.createElement('h2');
+      craftTitle.className = 'base-subtitle';
+      craftTitle.textContent = '工作台';
+      content.appendChild(craftTitle);
 
     const craftGrid = document.createElement('div');
     craftGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:.5rem';
@@ -308,6 +312,7 @@ export class BaseScreen {
       craftGrid.appendChild(card);
     }
     content.appendChild(craftGrid);
+    }
 
     this._el.appendChild(content);
   }

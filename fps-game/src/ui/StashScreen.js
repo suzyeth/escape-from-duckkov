@@ -8,6 +8,8 @@
  *   散弹手  – MP-133  + shotgun ammo×24 + painkillers×1 + bandage×2
  */
 
+import { isFirstRun } from '../systems/DemoSeed.js';
+
 const LOADOUTS = [
   {
     id:          'assault',
@@ -109,28 +111,30 @@ export class StashScreen {
     header.appendChild(p);
     this._el.appendChild(header);
 
-    // Difficulty selector
-    const diffDiv = document.createElement('div');
-    diffDiv.style.cssText = 'display:flex;gap:.8rem;justify-content:center;margin-bottom:1.5rem';
-    const DIFFS = [
-      { id: 0, name: '简单', desc: '敌人弱50%', color: '#44aa44' },
-      { id: 1, name: '普通', desc: '标准难度',   color: '#c8a96e' },
-      { id: 2, name: '困难', desc: '敌人强50%', color: '#cc4444' },
-    ];
-    for (const d of DIFFS) {
-      const btn = document.createElement('button');
-      btn.className = 'stash-select-btn';
-      btn.style.cssText = `min-width:80px;border-color:${d.color};color:${d.color}`;
-      btn.textContent = d.name;
-      if (d.id === 1) btn.style.background = 'rgba(200,169,110,0.15)';
-      btn.addEventListener('click', () => {
-        this._selectedDifficulty = d.id;
-        diffDiv.querySelectorAll('button').forEach(b => b.style.background = 'transparent');
-        btn.style.background = `rgba(200,169,110,0.15)`;
-      });
-      diffDiv.appendChild(btn);
+    // Difficulty selector (hidden on first run)
+    if (!isFirstRun()) {
+      const diffDiv = document.createElement('div');
+      diffDiv.style.cssText = 'display:flex;gap:.8rem;justify-content:center;margin-bottom:1.5rem';
+      const DIFFS = [
+        { id: 0, name: '简单', desc: '敌人弱50%', color: '#44aa44' },
+        { id: 1, name: '普通', desc: '标准难度',   color: '#c8a96e' },
+        { id: 2, name: '困难', desc: '敌人强50%', color: '#cc4444' },
+      ];
+      for (const d of DIFFS) {
+        const btn = document.createElement('button');
+        btn.className = 'stash-select-btn';
+        btn.style.cssText = `min-width:80px;border-color:${d.color};color:${d.color}`;
+        btn.textContent = d.name;
+        if (d.id === 1) btn.style.background = 'rgba(200,169,110,0.15)';
+        btn.addEventListener('click', () => {
+          this._selectedDifficulty = d.id;
+          diffDiv.querySelectorAll('button').forEach(b => b.style.background = 'transparent');
+          btn.style.background = `rgba(200,169,110,0.15)`;
+        });
+        diffDiv.appendChild(btn);
+      }
+      this._el.appendChild(diffDiv);
     }
-    this._el.appendChild(diffDiv);
 
     const grid = document.createElement('div');
     grid.className = 'stash-grid';
