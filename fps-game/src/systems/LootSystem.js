@@ -72,9 +72,52 @@ export class LootSystem {
      * @type {{ mesh: THREE.Mesh, pos: THREE.Vector3, opened: boolean, tier: string }[]}
      */
     this._containers = [];
+    /**
+     * Dead-enemy bodies carrying inventory (Tarkov-style body loot).
+     * Parallel to _containers — bodies are registered on enemy death via registerBody().
+     * @type {{ enemyRef: object, items: { defId: string, count: number }[], pos: THREE.Vector3 }[]}
+     */
+    this._bodies = [];
 
     this._spawnItems();
     this._spawnContainers();
+  }
+
+  /**
+   * Register a dead enemy as a lootable body with an inventory.
+   * Replaces the scattered-drop behavior on enemy death.
+   * @param {object} enemy — enemy instance (used as identity ref, position snapshot is taken immediately)
+   * @param {{ defId: string, count: number }[]} drops
+   */
+  registerBody(enemy, drops) {
+    if (!drops || !drops.length) return;
+    // Filter out zero-count entries (loot tables occasionally roll 0)
+    const items = drops.filter(d => d && d.count > 0).map(d => ({ defId: d.defId, count: d.count }));
+    if (!items.length) return;
+    this._bodies.push({
+      enemyRef: enemy,
+      items,
+      pos: enemy.position.clone(),
+    });
+  }
+
+  /**
+   * Return the nearest non-empty body within range, or null.
+   * @param {THREE.Vector3} playerPos
+   * @param {number} range
+   */
+  getNearbyBody(playerPos, range = 2.0) {
+    let best = null;
+    let bestDist = range;
+    for (const b of this._bodies) {
+      if (b.items.length === 0) continue;
+      const d = playerPos.distanceTo(b.pos);
+      if (d < bestDist) {
+        best = b;
+        bestDist = d;
+      }
+    }
+    return best;
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
@@ -197,6 +240,13 @@ export class LootSystem {
       if (!c.opened && playerPos.distanceTo(c.pos) < CONTAINER_RANGE) {
         return `[箱子] 按E开箱`;
       }
+    }
+    // Bodies (non-empty only)
+    const body = this.getNearbyBody(playerPos, PICKUP_RANGE);
+    if (body) {
+      let totalCount = 0;
+      for (const it of body.items) totalCount += it.count;
+      return `搜索尸体 (${totalCount}件物品)`;
     }
     // Loose items
     for (const item of this._items) {

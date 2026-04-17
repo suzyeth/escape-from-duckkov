@@ -17,6 +17,7 @@ import { TutorialSystem }    from './systems/TutorialSystem.js';
 import { SoundSystem }       from './systems/SoundSystem.js';
 import { DoorSystem }        from './systems/DoorSystem.js';
 import { InventoryUI }       from './ui/InventoryUI.js';
+import { BodyLootUI }        from './ui/BodyLootUI.js';
 import { StashScreen }       from './ui/StashScreen.js';
 import { MinimapUI }         from './ui/MinimapUI.js';
 import { SaveSystem }        from './systems/SaveSystem.js';
@@ -65,6 +66,7 @@ const baseScreen = new BaseScreen(saveSystem, talentSystem, craftingSystem);
 const network    = new NetworkSystem();
 const lobbyScreen = new LobbyScreen();
 const invUI     = new InventoryUI(inventory);
+const bodyLootUI = new BodyLootUI(inventory, ITEM_DEFS, hud);
 
 // ── Art Debug GUI (lil-gui) ───────────────────────────────────────────────────
 // Toggle with G key. Lets you adjust colors, lighting, fog in real-time.
@@ -118,6 +120,12 @@ _miscFolder.add(_miscParams, 'fogOfWar').name('Fog of War').onChange(v => { fogO
 _artGUI.close();
 let _guiVisible = true;
 window.addEventListener('keydown', (e) => {
+  // ESC closes body-loot UI before it reaches the pause toggle
+  if (e.code === 'Escape' && bodyLootUI.isOpen) {
+    bodyLootUI.close();
+    e.stopPropagation();
+    return;
+  }
   if (e.code === 'Escape') { _togglePause(); return; }
   if (e.code === 'KeyG' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     _guiVisible = !_guiVisible;
@@ -570,7 +578,19 @@ function handleLootPickup(dt) {
   hud.setPickupHint(name ? `[E] 拾取 ${name}` : null);
   if (name) tutorial.notifyNearLoot();
 
-  const pickup = loot.update(player.position, input.justPressed('KeyE'));
+  // Body loot takes priority over loose items / containers when player is in range.
+  // Opening the dual-panel UI suppresses the E-press for the rest of this frame
+  // so loot.update() doesn't also pick up a co-located loose item.
+  const ePressed = input.justPressed('KeyE');
+  if (ePressed && !bodyLootUI.isOpen) {
+    const body = loot.getNearbyBody(player.position);
+    if (body) {
+      bodyLootUI.open(body);
+      return;
+    }
+  }
+
+  const pickup = loot.update(player.position, ePressed);
   if (pickup) {
     if (pickup.defId === '__container__') {
       // Container opened — add each drop to inventory
@@ -1110,7 +1130,9 @@ const loop = new GameLoop(
           sound.playKillConfirm();
           _addScreenShake(hit.enemy.isElite ? 0.5 : 0.3);
           _hitstopTimer = hit.enemy.isElite ? 0.08 : 0.05;
-          loot.dropLoot(hit.enemy.position, _randomEnemyDrop(hit.enemy.enemyType));
+          // Tarkov-style body loot: enemy carries inventory until searched.
+          // Containers (crates) still use dropLoot; only enemy deaths go through registerBody.
+          loot.registerBody(hit.enemy, _randomEnemyDrop(hit.enemy.enemyType));
         }
       } else if (hit.target === 'player') {
         const partHit = health.takeDamage(hit.damage);
@@ -1154,6 +1176,12 @@ const loop = new GameLoop(
       _lastWaveCount = aiSystem.waveCount;
       hud.pushKillFeed(`⚠ 新一波鸭卒增援到达！`);
       sound.playEliteAlert();
+    }
+
+    // Auto-close body loot UI if player walks too far from the body
+    if (bodyLootUI.isOpen) {
+      const body = bodyLootUI._body;
+      if (!body || player.position.distanceTo(body.pos) > 3.0) bodyLootUI.close();
     }
 
     // Loot
