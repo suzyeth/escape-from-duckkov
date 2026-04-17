@@ -319,6 +319,26 @@ export class HUD {
     setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, 2800);
   }
 
+  /**
+   * Show a transient onboarding bubble near the top-centre of the screen.
+   * @param {string} text
+   * @param {number} seconds
+   */
+  showBubble(text, seconds = 3) {
+    let el = this._bubble;
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'hud-bubble';
+      el.style.cssText = 'position:fixed;top:12%;left:50%;transform:translateX(-50%);padding:12px 24px;background:rgba(0,0,0,.75);color:#fff;font-family:"Courier New",monospace;font-size:18px;border:2px solid #fff;border-radius:8px;z-index:500;pointer-events:none;opacity:0;transition:opacity .3s';
+      document.body.appendChild(el);
+      this._bubble = el;
+    }
+    el.textContent = text;
+    el.style.opacity = '1';
+    clearTimeout(this._bubbleT);
+    this._bubbleT = setTimeout(() => { el.style.opacity = '0'; }, seconds * 1000);
+  }
+
   // ── Private ───────────────────────────────────────────────────────────────
 
   _updateTimer() {

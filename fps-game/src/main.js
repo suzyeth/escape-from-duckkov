@@ -50,8 +50,8 @@ const aiSystem  = new AISystem(scene);
 const inventory = new InventorySystem();
 const loot      = new LootSystem(scene);
 const health    = new HealthSystem();
-const tutorial  = new TutorialSystem();
 const hud       = new HUD();
+const tutorial  = new TutorialSystem(hud);
 const sound     = new SoundSystem();
 const doors     = new DoorSystem(scene, level.collidables);
 // Populate doors from building front-wall gaps recorded by Level
@@ -568,6 +568,7 @@ let _lootedThisSession = false;
 function handleLootPickup(dt) {
   const name = loot.getNearbyItemName(player.position);
   hud.setPickupHint(name ? `[E] 拾取 ${name}` : null);
+  if (name) tutorial.notifyNearLoot();
 
   const pickup = loot.update(player.position, input.justPressed('KeyE'));
   if (pickup) {
@@ -1041,7 +1042,10 @@ const loop = new GameLoop(
       // Footstep sound while moving
       const moving = input.isDown('KeyW') || input.isDown('KeyS')
                   || input.isDown('KeyA') || input.isDown('KeyD');
-      if (moving) sound.playFootstep(player._isSprinting);
+      if (moving) {
+        sound.playFootstep(player._isSprinting);
+        tutorial.notifyMove();
+      }
     }
 
     // Weapons
@@ -1220,18 +1224,9 @@ const loop = new GameLoop(
       _ambientTimer = 20 + Math.random() * 25;
     }
 
-    // Tutorial
-    if (tutorial.isActive) {
-      const hint = tutorial.update({
-        playerPos: player.position,
-        aimMoved:  _aimMoved,
-        fired:     _playerFiredThisFrame,
-        looted:    _lootedThisSession,
-        inExtract: _getActiveExtractPoint() !== null,
-      });
-      hud.setTutorialHint(hint);
-      _aimMoved = false;  // consume flag each frame
-    }
+    // Tutorial (first-run onboarding bubbles; no-op after first run)
+    tutorial.update(dt);
+    _aimMoved = false;  // consume flag each frame
 
     // Bleeding DOT
     if (health.isBleeding && health.isAlive) {

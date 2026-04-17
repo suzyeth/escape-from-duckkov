@@ -1,123 +1,63 @@
-/**
- * TutorialSystem
- * 5-step in-game overlay tutorial shown only on first play.
- * Progress state stored in localStorage under 'duckovTutorialDone'.
- *
- * Steps (auto-advance on condition met):
- *   0 MOVE    – move > 3 units from spawn
- *   1 AIM     – mouse moved (aimWorldPos updated)
- *   2 SHOOT   – fired at least once
- *   3 LOOT    – picked up an item
- *   4 EXTRACT – entered an extraction zone
- *
- * Each step shows a hint bar at the top-centre of the HUD.
- */
+import { isFirstRun } from './DemoSeed.js';
 
 const STEPS = [
-  {
-    key:  'MOVE',
-    text: '🦆 WASD 移动角色 — 探索地图',
-  },
-  {
-    key:  'AIM',
-    text: '🎯 移动鼠标 瞄准方向',
-  },
-  {
-    key:  'SHOOT',
-    text: '🔫 左键 射击 — 先动手者先生还',
-  },
-  {
-    key:  'LOOT',
-    text: '📦 靠近物品，按 E 拾取战利品',
-  },
-  {
-    key:  'EXTRACT',
-    text: '🚁 找到绿色撤离区，按住 E 撤离',
-  },
+  { id: 'move',    text: 'WASD 移动',              trigger: 'time',     delay: 1.0  },
+  { id: 'shoot',   text: '左键射击',                trigger: 'move',     delay: 3.0  },
+  { id: 'pickup',  text: 'E 拾取',                  trigger: 'nearLoot', delay: 0    },
+  { id: 'extract', text: '到撤离点按 E 撤离',        trigger: 'time',     delay: 45.0 },
 ];
 
-const STORAGE_KEY = 'duckovTutorialDone';
-
 export class TutorialSystem {
-  constructor() {
-    this._step    = 0;
-    this._done    = false;
-    this._spawnPos = null;  // set on first update to detect MOVE trigger
-
-    // Skip tutorial if already completed
-    if (localStorage.getItem(STORAGE_KEY) === '1') {
-      this._done = true;
-    }
-  }
-
-  // ── Queries ────────────────────────────────────────────────────────────────
-
-  get isActive()       { return !this._done; }
-  get currentStep()    { return this._step; }
-  get currentText()    { return this._done ? null : STEPS[this._step]?.text ?? null; }
-
-  // ── Per-frame ──────────────────────────────────────────────────────────────
-
   /**
-   * Update tutorial state; returns hint text to display (or null).
-   * @param {{
-   *   playerPos: THREE.Vector3,
-   *   aimMoved:  boolean,
-   *   fired:     boolean,
-   *   looted:    boolean,
-   *   inExtract: boolean,
-   * }} state
-   * @returns {string|null}
+   * @param {{ showBubble: (text: string, seconds: number) => void }} hud
    */
-  update(state) {
-    if (this._done) return null;
-
-    // Record spawn position once
-    if (!this._spawnPos) {
-      this._spawnPos = state.playerPos.clone();
-    }
-
-    switch (this._step) {
-      case 0: // MOVE
-        if (state.playerPos.distanceTo(this._spawnPos) > 3) this._advance();
-        break;
-      case 1: // AIM
-        if (state.aimMoved) this._advance();
-        break;
-      case 2: // SHOOT
-        if (state.fired) this._advance();
-        break;
-      case 3: // LOOT
-        if (state.looted) this._advance();
-        break;
-      case 4: // EXTRACT
-        if (state.inExtract) this._advance();
-        break;
-    }
-
-    return this.currentText;
+  constructor(hud) {
+    this.hud = hud;
+    this.active = isFirstRun();
+    this.stepIdx = 0;
+    this.t = 0;
+    this._moveT = null;   // wall-clock seconds since first move detected
+    this._sawLoot = false;
   }
 
-  /** Mark tutorial complete (e.g., player extracted or died) */
+  notifyMove() {
+    if (!this.active) return;
+    if (this._moveT === null) this._moveT = 0;
+  }
+
+  notifyNearLoot() {
+    if (!this.active) return;
+    this._sawLoot = true;
+  }
+
+  update(dt) {
+    if (!this.active) return;
+    this.t += dt;
+    if (this._moveT !== null) this._moveT += dt;
+    const s = STEPS[this.stepIdx];
+    if (!s) { this.active = false; return; }
+    let ready = false;
+    if (s.trigger === 'time')     ready = this.t >= s.delay;
+    else if (s.trigger === 'move')    ready = this._moveT !== null && this._moveT >= s.delay;
+    else if (s.trigger === 'nearLoot') ready = this._sawLoot;
+    if (ready) this._show(s);
+  }
+
+  _show(step) {
+    this.hud.showBubble?.(step.text, 4.0);
+    this.stepIdx++;
+    // Reset timers relative to next step so `delay` means "after this step showed"
+    // EXCEPT for step 4 (extract) which intentionally fires 45s from spawn — reset only for step 2.
+    if (step.id === 'move') this._moveT = 0;
+  }
+
+  /** Backward-compat no-op for existing callers (e.g., raid-end cleanup). */
   complete() {
-    this._done = true;
-    localStorage.setItem(STORAGE_KEY, '1');
+    this.active = false;
   }
 
-  /** Reset for testing (clears localStorage) */
-  reset() {
-    this._done  = false;
-    this._step  = 0;
-    this._spawnPos = null;
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  // ── Private ────────────────────────────────────────────────────────────────
-
-  _advance() {
-    this._step++;
-    if (this._step >= STEPS.length) {
-      this.complete();
-    }
+  /** Backward-compat getter for existing callers. */
+  get isActive() {
+    return this.active;
   }
 }
