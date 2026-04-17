@@ -878,8 +878,8 @@ stash.onSelect((loadout) => {
   // First-run demo seed: judges see identical opening state.
   const firstRun = isFirstRun();
 
-  // Apply weapon loadout (first run: force AK-74 / rifle slot = 0)
-  weapons.applyLoadout(firstRun ? 0 : loadout.weaponSlot);
+  // Apply weapon loadout (first run: force DEMO_SEED slot)
+  weapons.applyLoadout(firstRun ? DEMO_SEED.startingWeaponSlot : loadout.weaponSlot);
 
   // Apply inventory loadout (clear starting gear, apply preset)
   inventory.reset();

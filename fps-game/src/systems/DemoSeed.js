@@ -11,11 +11,10 @@ export function markPlayed() {
   try { localStorage.setItem(SEEN_KEY, '1'); } catch {}
 }
 
-// Fixed values for first run — indices into existing arrays.
-// All IDs must match existing WeaponSystem/InventorySystem IDs.
+// Fixed values for first run. Indices reference existing arrays; IDs reference InventorySystem defs.
 export const DEMO_SEED = {
   spawnPointIndex: 0,        // Level.playerSpawnPoints[0]
-  startingWeaponId: 'ak74',
+  startingWeaponSlot: 0,     // WeaponSystem slot index (rifle = AK-74)
   startingAmmo: 60,
   startingArmor: 'vest_light',
 };
