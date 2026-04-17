@@ -1,3 +1,5 @@
+import { renderTributeNotice } from './TributeNotice.js';
+
 /**
  * LobbyScreen
  * Multiplayer lobby: create or join a room, wait for players, start game.
@@ -76,6 +78,8 @@ export class LobbyScreen {
     status.className = 'lobby-status';
     status.id = 'lobby-status';
     content.appendChild(status);
+
+    renderTributeNotice(content);
 
     this._el.appendChild(content);
   }
