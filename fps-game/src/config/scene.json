@@ -1,0 +1,14 @@
+{
+  "_schema": "scene/v1",
+  "_note": "Edit this file to change scene layout. Coordinates: x,z (y is auto). Colors: hex string '#RRGGBB' or integer.",
+  "buildings": [
+    { "cx": -40, "cz": -50, "w": 32, "d": 20, "h": 3.0, "color": "#5a5248", "name": "Factory" },
+    { "cx": -20, "cz": -60, "w": 14, "d": 10, "h": 2.5, "color": "#706858", "name": "FactoryOut" },
+    { "cx":  40, "cz": -50, "w": 40, "d": 28, "h": 3.2, "color": "#4e5258", "name": "Warehouse" },
+    { "cx": -48, "cz":  40, "w": 28, "d": 18, "h": 3.0, "color": "#5c5040", "name": "AptA" },
+    { "cx":  12, "cz":  25, "w":  5, "d":  5, "h": 2.2, "color": "#6c6258", "name": "ParkBooth" },
+    { "cx":  56, "cz":  50, "w": 12, "d": 10, "h": 2.2, "color": "#5e6050", "name": "ParkShed" },
+    { "cx":   0, "cz":  78, "w": 30, "d": 20, "h": 2.5, "color": "#2a2a32", "name": "BasMain" },
+    { "cx": -10, "cz":  92, "w": 14, "d": 10, "h": 2.5, "color": "#28282e", "name": "BasStorage" }
+  ]
+}

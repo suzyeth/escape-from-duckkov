@@ -9,6 +9,14 @@ import { createBarrel } from '../props/barrel.js';
 import { createBuilding, createUmbrella, createStreetLight, createBench } from '../props/building.js';
 import { createShelf } from '../props/shelf.js';
 import { createExtinguisher } from '../props/extinguisher.js';
+import sceneConfig from '../config/scene.json';
+
+// Parse '#rrggbb' or integer into a THREE-compatible color int.
+function parseColor(v) {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.startsWith('#')) return parseInt(v.slice(1), 16);
+  return 0xffffff;
+}
 
 /**
  * Level — 150×150 Extraction Map
@@ -64,6 +72,7 @@ export class Level {
     this._buildLighting();
     this._buildGround();
     this._buildBoundaryWalls();
+    this._placeBuildingsFromConfig(sceneConfig.buildings ?? []);
     this._buildFactoryZone();
     this._buildWarehouseZone();
     this._buildCentralSquare();
@@ -209,12 +218,14 @@ export class Level {
 
   // ── NW: Factory Zone ──────────────────────────────────────────────────────
 
+  _placeBuildingsFromConfig(buildings) {
+    for (const b of buildings) {
+      this._building(b.cx, b.cz, b.w, b.d, b.h, parseColor(b.color), b.name);
+    }
+  }
+
   _buildFactoryZone() {
     const C = 0x5a5248;
-    // Main factory building (hollow: 4 walls + roof)
-    this._building(-40, -50, 32, 20, 3.0, C, 'Factory');
-    // Smaller outbuilding
-    this._building(-20, -60, 14, 10, 2.5, 0x706858, 'FactoryOut');
     // Chimney stub
     this._box(-50, -44, 2, 2, 8, 0x3a3530, 'Chimney');
     // Crates near factory
@@ -230,7 +241,6 @@ export class Level {
 
   _buildWarehouseZone() {
     const C = 0x4e5258;
-    this._building(40, -50, 40, 28, 3.2, C, 'Warehouse');
     // Dock area
     this._box(58, -38, 14, 0.4, 3, C, 'DockWall');
     // Stacked crates
@@ -269,8 +279,6 @@ export class Level {
 
   _buildApartmentZone() {
     const C = 0x5c5040;
-    // Apartment block A
-    this._building(-48, 40, 28, 18, 3.0, C, 'AptA');
     // Apartment block B (more damaged — open walls)
     this._wall(-35, 56, 16, 0.5, 2.5, C, 'AptB_N');
     this._wall(-43, 62, 0.5, 12, 2.5, C, 'AptB_W');
@@ -293,10 +301,7 @@ export class Level {
     carPos.forEach(([x,z],i)=>this._box(x,z,4+(i%2),1.4,2,0x2e2e2e,`Car${i}`));
     // Concrete dividers
     [[24,36],[32,36],[40,36],[48,36]].forEach(([x,z],i)=>this._box(x,z,0.3,0.7,6,0x807060,`ParkDiv${i}`));
-    // Guard booth at entrance
-    this._building(12, 25, 5, 5, 2.2, 0x6c6258, 'ParkBooth');
-    // Storage shed
-    this._building(56, 50, 12, 10, 2.2, 0x5e6050, 'ParkShed');
+    // (Guard booth + storage shed now loaded from scene.json)
   }
 
   // ── S: Basement Entrance ──────────────────────────────────────────────────
@@ -328,11 +333,9 @@ export class Level {
     // Main hall: -15 to 15, z: 68 to 88
     // Side room: -15 to -5, z: 82 to 96
 
-    // Main hall
-    this._building(-0, 78, 30, 20, 2.5, 0x2a2a32, 'BasMain');
+    // Main hall + side storage now loaded from scene.json
 
-    // Side room (storage)
-    this._building(-10, 92, 14, 10, 2.5, 0x28282e, 'BasStorage');
+    // (Side storage now loaded from scene.json)
 
     // Connecting corridor between main hall and side room
     this._wall(-17, 85, 0.5, 6, 2.5, C, 'BasCorrW');
