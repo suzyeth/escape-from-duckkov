@@ -520,264 +520,11 @@ export class Level {
 
   _buildEnvironmentProps() {
     // ═══════════════════════════════════════════════════════════════════════
-    // 摆放规则：
-    //   自然物(树/岩石/灌木)     → 草地/地图边缘，禁止混凝土区
-    //   工业物(货架/纸箱/油桶)   → 建筑内部或紧贴外墙
-    //   市政物(路灯/长椅/遮阳伞) → 道路旁/广场
-    //   军事物(沙袋/集装箱/围栏) → 区域边界/战术要点
-    //   同类道具成组摆放，不单独散落
+    // Data-driven props (trees/rocks/barrels/...) come from scene.json.
+    // Pads + ground markings stay hardcoded below — they're style, not content.
     // ═══════════════════════════════════════════════════════════════════════
 
-    // ── 1. 自然物：地图边缘 + 区域间草地过渡带 ─────────────────────────
-
-    // 树丛 — 只在草地区域（地图边缘、区域间过渡带）
-    const treeSpots = [
-      // NW 工厂外围 — 工厂西/北侧树林带
-      [-65, -55, 'round'], [-62, -50, 'cone'], [-68, -48, 'bush'],
-      [-60, -62, 'cone'],  [-66, -42, 'round'], [-70, -35, 'bush'],
-      // NE 仓库外围 — 仓库东侧
-      [68, -55, 'round'], [70, -45, 'cone'], [66, -65, 'bush'],
-      // SW 公寓外围 — 西侧和南侧
-      [-68, 55, 'round'], [-65, 50, 'cone'], [-62, 62, 'round'],
-      [-70, 45, 'bush'],  [-58, 68, 'cone'],
-      // SE 停车场外围 — 东侧
-      [68, 55, 'cone'], [70, 48, 'round'], [65, 62, 'bush'],
-      // 西边界树带
-      [-72, 0, 'round'], [-70, 10, 'cone'], [-72, -15, 'bush'], [-68, 20, 'round'],
-      // 东边界树带
-      [72, 5, 'round'], [70, -10, 'cone'], [72, 18, 'bush'],
-      // 区域间过渡 — 工厂/公寓之间的草地（X:-60~-20, Z:0~20）
-      [-55, 8, 'round'], [-50, 14, 'cone'], [-58, 3, 'bush'],
-      // 仓库/停车场之间的草地（X:60~70, Z:-10~10）
-      [65, 0, 'round'], [68, 8, 'bush'],
-    ];
-    for (const [x, z, type] of treeSpots) {
-      const tree = createTree(type);
-      tree.position.set(x, 0, z);
-      tree.scale.setScalar(2.5 + Math.random() * 1.5);
-      tree.rotation.y = Math.random() * Math.PI * 2;
-      this._scene.add(tree);
-    }
-
-    // 岩石群 — 草地区域，做地形分割和天然掩体
-    const rockSpots = [
-      // 工厂和公寓之间（西侧过渡带）
-      [-55, -15, 5], [-48, 5, 4],
-      // 仓库北侧空地
-      [10, -65, 3],
-      // 停车场东南角外
-      [65, 38, 4],
-      // 地下室南侧（自然地形）
-      [-15, 68, 5], [8, 70, 3],
-      // 中央广场外围过渡（广场边缘有几块零星岩石）
-      [-22, -18, 2], [22, 18, 2],
-    ];
-    for (const [x, z, count] of rockSpots) {
-      const rocks = createRockCluster(count);
-      rocks.position.set(x, 0, z);
-      rocks.scale.setScalar(2);
-      this._scene.add(rocks);
-    }
-
-    // ── 2. 工业物：建筑内部/紧贴外墙 ──────────────────────────────────
-
-    // 纸箱堆 — 工厂和仓库内部
-    const crateSpots = [
-      // 工厂内部（-56~-24, -60~-40）
-      [-38, -45, 5], [-48, -52, 3], [-30, -55, 4],
-      // 仓库内部（20~60, -64~-36）
-      [30, -48, 6], [45, -55, 4], [52, -42, 3],
-      // 公寓内部（-62~-34, 31~49）
-      [-48, 38, 3], [-42, 44, 2],
-    ];
-    for (const [x, z, count] of crateSpots) {
-      const crates = createCrateCluster(count);
-      crates.position.set(x, 0, z);
-      crates.scale.setScalar(1.5);
-      this._scene.add(crates);
-    }
-
-    // 油桶 — 工厂外墙旁、仓库码头、停车场边
-    const barrelData = [
-      // 工厂外墙旁 2组
-      [-22, -42, false], [-22, -44, false], [-24, -43, true],
-      // 仓库码头 2组
-      [56, -38, false], [58, -38, false], [57, -40, true],
-      // 停车场入口旁
-      [14, 28, false], [16, 28, false],
-      // 公寓废墟旁
-      [-52, 34, false], [-52, 36, true],
-      // 地下室入口
-      [-8, 58, false],
-    ];
-    const barrelColors = [0x4a7a3a, 0x5a3a2a, 0x4a4a4a, 0xcc6633];
-    for (const [x, z, fallen] of barrelData) {
-      const color = barrelColors[Math.floor(Math.random() * barrelColors.length)];
-      const barrel = createBarrel({ color, fallen });
-      barrel.position.x = x;
-      barrel.position.z = z;
-      this._scene.add(barrel);
-      this.collidables.push(barrel);
-    }
-
-    // 货架 — 工厂和仓库内部
-    const shelfSpots = [
-      // 工厂内 — 靠墙
-      [-50, -45], [-50, -50],
-      // 仓库内 — 靠墙
-      [25, -52], [25, -46],
-    ];
-    for (const [x, z] of shelfSpots) {
-      const shelf = createShelf();
-      shelf.position.set(x, 0, z);
-      shelf.scale.setScalar(1.5);
-      this._scene.add(shelf);
-    }
-
-    // 灭火器 — 建筑内部靠墙
-    const extSpots = [
-      [-26, -42],  // 工厂入口内
-      [22, -38],   // 仓库入口内
-      [-36, 40],   // 公寓内
-    ];
-    for (const [x, z] of extSpots) {
-      const ext = createExtinguisher();
-      ext.position.set(x, 0, z);
-      ext.scale.setScalar(1.5);
-      this._scene.add(ext);
-    }
-
-    // 集装箱 — 仓库码头区域
-    const containerSpots = [
-      [58, -55, 0],                // 仓库东侧码头
-      [58, -48, Math.PI / 2],     // 码头并排
-      [22, -62, 0.2],             // 仓库北侧外
-    ];
-    for (const [x, z, rot] of containerSpots) {
-      const c = createContainer();
-      c.position.set(x, 0, z);
-      c.rotation.y = rot;
-      c.scale.setScalar(2);
-      this._scene.add(c);
-    }
-
-    // 叉车 — 仓库内部
-    const fl = createForklift();
-    fl.position.set(35, 0, -50);
-    fl.rotation.y = Math.PI / 6;
-    fl.scale.setScalar(2);
-    this._scene.add(fl);
-
-    // ── 3. 市政物：道路旁/广场 ─────────────────────────────────────────
-
-    // 路灯 — 沿主干道和广场周围
-    const streetLightSpots = [
-      // 中央广场四角
-      [-15, -15], [15, -15], [-15, 15], [15, 15],
-      // 南北主路
-      [0, -35], [0, 35],
-      // 东西横路
-      [-35, 0], [35, 0],
-    ];
-    for (const [x, z] of streetLightSpots) {
-      const sl = createStreetLight();
-      sl.position.set(x, 0, z);
-      sl.rotation.y = Math.random() * Math.PI * 2;
-      sl.scale.setScalar(2);
-      this._scene.add(sl);
-    }
-
-    // 长椅 — 广场喷泉周围
-    const benchSpots = [
-      { x: -6, z: -8, rot: Math.PI / 4 },       // 面向喷泉
-      { x:  6, z:  8, rot: Math.PI + Math.PI / 4 },
-      { x: -8, z:  6, rot: -Math.PI / 4 },
-    ];
-    for (const b of benchSpots) {
-      const bench = createBench();
-      bench.position.set(b.x, 0, b.z);
-      bench.rotation.y = b.rot;
-      bench.scale.setScalar(2);
-      this._scene.add(bench);
-    }
-
-    // 遮阳伞 — 广场长椅旁
-    const umbrellaSpots = [[-7, -9], [7, 9]];
-    for (const [x, z] of umbrellaSpots) {
-      const umb = createUmbrella();
-      umb.position.set(x, 0, z);
-      umb.scale.setScalar(2);
-      this._scene.add(umb);
-    }
-
-    // 木桩绳索 — 沿泥地路径引导
-    const stakeSpots = [
-      { x: -3, z: -30, rot: 0 },          // 北路旁
-      { x:  3, z:  30, rot: 0 },           // 南路旁
-      { x: -32, z: -3, rot: Math.PI / 2 }, // 西路旁
-    ];
-    for (const s of stakeSpots) {
-      const stake = createStakeRope(6);
-      stake.position.set(s.x, 0, s.z);
-      stake.rotation.y = s.rot;
-      stake.scale.setScalar(2);
-      this._scene.add(stake);
-    }
-
-    // ── 4. 军事物：区域边界/战术要点 ───────────────────────────────────
-
-    // 沙袋 — 区域入口、关键通道
-    const sandbagSpots = [
-      { x: -10, z: -22, rot: 0 },           // 工厂区南入口
-      { x:  10, z: -22, rot: 0 },           // 仓库区南入口
-      { x: -20, z:  22, rot: Math.PI / 2 }, // 公寓区北入口
-      { x:  20, z:  22, rot: Math.PI / 2 }, // 停车场北入口
-    ];
-    for (const sb of sandbagSpots) {
-      const bags = createSandbags(5);
-      bags.position.set(sb.x, 0, sb.z);
-      bags.rotation.y = sb.rot;
-      bags.scale.setScalar(2.5);
-      this._scene.add(bags);
-    }
-
-    // 木围栏 — 区域边界/草地与建筑过渡
-    const fenceSpots = [
-      // 工厂区南侧边界
-      { x: -35, z: -20, len: 5, rot: 0, broken: false },
-      // 仓库区西侧边界
-      { x: 15,  z: -40, len: 4, rot: Math.PI / 2, broken: true },
-      // 公寓区北侧（废墟破损围栏）
-      { x: -40, z: 22, len: 4, rot: 0, broken: true },
-      // 停车场西侧
-      { x: 12, z: 35, len: 3, rot: Math.PI / 2, broken: false },
-      // 地图西边界附近
-      { x: -65, z: -5, len: 5, rot: Math.PI / 8, broken: false },
-    ];
-    for (const f of fenceSpots) {
-      const fence = createWoodFence(f.len, f.broken);
-      fence.position.set(f.x, 0, f.z);
-      fence.rotation.y = f.rot;
-      fence.scale.setScalar(2);
-      this._scene.add(fence);
-    }
-
-    // ── 5. 建筑小品 — 与区域功能匹配 ──────────────────────────────────
-
-    // 村庄建筑 — 公寓废墟区域旁（SW的废弃民居）
-    const buildingSpots = [
-      { x: -58, z: 30, rot: 0, color: 0x5a6a8a, w: 3, d: 2.5 },           // 公寓区西侧民居
-      { x: -38, z: 62, rot: Math.PI / 2, color: 0x7a6a5a, w: 2.5, d: 2 }, // 公寓区南侧
-      // 仓库区旁小办公楼
-      { x: 50, z: -66, rot: 0, color: 0x6a6a7a, w: 2.5, d: 2 },
-    ];
-    for (const b of buildingSpots) {
-      const bld = createBuilding({ w: b.w, d: b.d, color: b.color });
-      bld.position.set(b.x, 0, b.z);
-      bld.rotation.y = b.rot;
-      bld.scale.setScalar(2);
-      this._scene.add(bld);
-    }
+    this._placeEnvPropsFromConfig(sceneConfig);
 
     // ── 6. 地面标记 ───────────────────────────────────────────────────
 
@@ -812,6 +559,144 @@ export class Level {
       pad.position.set(p.x, 0.003, p.z);
       pad.receiveShadow = true;
       this._scene.add(pad);
+    }
+  }
+
+  /**
+   * Place every data-driven env prop from the scene config.
+   * All arrays are optional — use `?? []` to tolerate missing sections.
+   *
+   * @param {object} cfg — parsed scene.json
+   */
+  _placeEnvPropsFromConfig(cfg) {
+    // Trees (deterministic scale/rotY baked into JSON)
+    for (const t of cfg.trees ?? []) {
+      const tree = createTree(t.type);
+      tree.position.set(t.x, 0, t.z);
+      tree.scale.setScalar(t.scale);
+      tree.rotation.y = t.rotY;
+      this._scene.add(tree);
+    }
+
+    // Rock clusters
+    for (const r of cfg.rockClusters ?? []) {
+      const rocks = createRockCluster(r.count);
+      rocks.position.set(r.x, 0, r.z);
+      rocks.scale.setScalar(r.scale);
+      this._scene.add(rocks);
+    }
+
+    // Crate clusters
+    for (const c of cfg.crateClusters ?? []) {
+      const crates = createCrateCluster(c.count);
+      crates.position.set(c.x, 0, c.z);
+      crates.scale.setScalar(c.scale);
+      this._scene.add(crates);
+    }
+
+    // Barrels (with deterministic color cycle baked into JSON)
+    for (const b of cfg.barrels ?? []) {
+      const barrel = createBarrel({ color: parseColor(b.color), fallen: b.fallen });
+      barrel.position.x = b.x;
+      barrel.position.z = b.z;
+      this._scene.add(barrel);
+      this.collidables.push(barrel);
+    }
+
+    // Shelves
+    for (const s of cfg.shelves ?? []) {
+      const shelf = createShelf();
+      shelf.position.set(s.x, 0, s.z);
+      shelf.scale.setScalar(s.scale);
+      this._scene.add(shelf);
+    }
+
+    // Extinguishers
+    for (const e of cfg.extinguishers ?? []) {
+      const ext = createExtinguisher();
+      ext.position.set(e.x, 0, e.z);
+      ext.scale.setScalar(e.scale);
+      this._scene.add(ext);
+    }
+
+    // Containers
+    for (const c of cfg.containers ?? []) {
+      const container = createContainer();
+      container.position.set(c.x, 0, c.z);
+      container.rotation.y = c.rotY;
+      container.scale.setScalar(c.scale);
+      this._scene.add(container);
+    }
+
+    // Forklifts
+    for (const f of cfg.forklifts ?? []) {
+      const fl = createForklift();
+      fl.position.set(f.x, 0, f.z);
+      fl.rotation.y = f.rotY;
+      fl.scale.setScalar(f.scale);
+      this._scene.add(fl);
+    }
+
+    // Street lights (deterministic rotY baked into JSON)
+    for (const sl of cfg.streetLights ?? []) {
+      const light = createStreetLight();
+      light.position.set(sl.x, 0, sl.z);
+      light.rotation.y = sl.rotY;
+      light.scale.setScalar(sl.scale);
+      this._scene.add(light);
+    }
+
+    // Benches
+    for (const b of cfg.benches ?? []) {
+      const bench = createBench();
+      bench.position.set(b.x, 0, b.z);
+      bench.rotation.y = b.rotY;
+      bench.scale.setScalar(b.scale);
+      this._scene.add(bench);
+    }
+
+    // Umbrellas
+    for (const u of cfg.umbrellas ?? []) {
+      const umb = createUmbrella();
+      umb.position.set(u.x, 0, u.z);
+      umb.scale.setScalar(u.scale);
+      this._scene.add(umb);
+    }
+
+    // Stake ropes (length configurable per entry)
+    for (const s of cfg.stakeRopes ?? []) {
+      const stake = createStakeRope(s.length);
+      stake.position.set(s.x, 0, s.z);
+      stake.rotation.y = s.rotY;
+      stake.scale.setScalar(s.scale);
+      this._scene.add(stake);
+    }
+
+    // Sandbags (count configurable per entry)
+    for (const sb of cfg.sandbags ?? []) {
+      const bags = createSandbags(sb.count);
+      bags.position.set(sb.x, 0, sb.z);
+      bags.rotation.y = sb.rotY;
+      bags.scale.setScalar(sb.scale);
+      this._scene.add(bags);
+    }
+
+    // Wood fences (length + broken flag per entry)
+    for (const f of cfg.fences ?? []) {
+      const fence = createWoodFence(f.len, f.broken);
+      fence.position.set(f.x, 0, f.z);
+      fence.rotation.y = f.rotY;
+      fence.scale.setScalar(f.scale);
+      this._scene.add(fence);
+    }
+
+    // Village buildings (distinct from main buildings — uses createBuilding)
+    for (const vb of cfg.villageBuildings ?? []) {
+      const bld = createBuilding({ w: vb.w, d: vb.d, color: parseColor(vb.color) });
+      bld.position.set(vb.x, 0, vb.z);
+      bld.rotation.y = vb.rotY;
+      bld.scale.setScalar(vb.scale);
+      this._scene.add(bld);
     }
   }
 

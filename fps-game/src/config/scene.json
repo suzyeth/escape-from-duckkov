@@ -85,5 +85,145 @@
     { "cx":  -6, "cz":  94, "w":  1.2, "h": 1.2, "d": 1.2, "color": "#2a2a2a", "name": "BasSafe" },
     { "cx": -12, "cz":  96, "w":  1.5, "h": 0.8, "d": 1,   "color": "#5a6a3a", "name": "BasAmmo1" },
     { "cx": -10, "cz":  96, "w":  1.5, "h": 0.8, "d": 1,   "color": "#5a6a3a", "name": "BasAmmo2" }
+  ],
+
+  "trees": [
+    { "x": -65, "z": -55, "type": "round", "scale": 2.5,   "rotY": 0.0    },
+    { "x": -62, "z": -50, "type": "cone",  "scale": 3.055, "rotY": 0.73   },
+    { "x": -68, "z": -48, "type": "bush",  "scale": 3.61,  "rotY": 1.46   },
+    { "x": -60, "z": -62, "type": "cone",  "scale": 2.665, "rotY": 2.19   },
+    { "x": -66, "z": -42, "type": "round", "scale": 3.22,  "rotY": 2.92   },
+    { "x": -70, "z": -35, "type": "bush",  "scale": 3.775, "rotY": 3.65   },
+    { "x":  68, "z": -55, "type": "round", "scale": 2.83,  "rotY": 4.38   },
+    { "x":  70, "z": -45, "type": "cone",  "scale": 3.385, "rotY": 5.11   },
+    { "x":  66, "z": -65, "type": "bush",  "scale": 3.94,  "rotY": 5.84   },
+    { "x": -68, "z":  55, "type": "round", "scale": 2.995, "rotY": 0.2868 },
+    { "x": -65, "z":  50, "type": "cone",  "scale": 3.55,  "rotY": 1.0168 },
+    { "x": -62, "z":  62, "type": "round", "scale": 2.605, "rotY": 1.7468 },
+    { "x": -70, "z":  45, "type": "bush",  "scale": 3.16,  "rotY": 2.4768 },
+    { "x": -58, "z":  68, "type": "cone",  "scale": 3.715, "rotY": 3.2068 },
+    { "x":  68, "z":  55, "type": "cone",  "scale": 2.77,  "rotY": 3.9368 },
+    { "x":  70, "z":  48, "type": "round", "scale": 3.325, "rotY": 4.6668 },
+    { "x":  65, "z":  62, "type": "bush",  "scale": 3.88,  "rotY": 5.3968 },
+    { "x": -72, "z":   0, "type": "round", "scale": 2.935, "rotY": 6.1268 },
+    { "x": -70, "z":  10, "type": "cone",  "scale": 3.49,  "rotY": 0.5736 },
+    { "x": -72, "z": -15, "type": "bush",  "scale": 2.545, "rotY": 1.3036 },
+    { "x": -68, "z":  20, "type": "round", "scale": 3.1,   "rotY": 2.0336 },
+    { "x":  72, "z":   5, "type": "round", "scale": 3.655, "rotY": 2.7636 },
+    { "x":  70, "z": -10, "type": "cone",  "scale": 2.71,  "rotY": 3.4936 },
+    { "x":  72, "z":  18, "type": "bush",  "scale": 3.265, "rotY": 4.2236 },
+    { "x": -55, "z":   8, "type": "round", "scale": 3.82,  "rotY": 4.9536 },
+    { "x": -50, "z":  14, "type": "cone",  "scale": 2.875, "rotY": 5.6836 },
+    { "x": -58, "z":   3, "type": "bush",  "scale": 3.43,  "rotY": 0.1304 },
+    { "x":  65, "z":   0, "type": "round", "scale": 3.985, "rotY": 0.8604 },
+    { "x":  68, "z":   8, "type": "bush",  "scale": 3.04,  "rotY": 1.5904 }
+  ],
+
+  "rockClusters": [
+    { "x": -55, "z": -15, "count": 5, "scale": 2 },
+    { "x": -48, "z":   5, "count": 4, "scale": 2 },
+    { "x":  10, "z": -65, "count": 3, "scale": 2 },
+    { "x":  65, "z":  38, "count": 4, "scale": 2 },
+    { "x": -15, "z":  68, "count": 5, "scale": 2 },
+    { "x":   8, "z":  70, "count": 3, "scale": 2 },
+    { "x": -22, "z": -18, "count": 2, "scale": 2 },
+    { "x":  22, "z":  18, "count": 2, "scale": 2 }
+  ],
+
+  "crateClusters": [
+    { "x": -38, "z": -45, "count": 5, "scale": 1.5 },
+    { "x": -48, "z": -52, "count": 3, "scale": 1.5 },
+    { "x": -30, "z": -55, "count": 4, "scale": 1.5 },
+    { "x":  30, "z": -48, "count": 6, "scale": 1.5 },
+    { "x":  45, "z": -55, "count": 4, "scale": 1.5 },
+    { "x":  52, "z": -42, "count": 3, "scale": 1.5 },
+    { "x": -48, "z":  38, "count": 3, "scale": 1.5 },
+    { "x": -42, "z":  44, "count": 2, "scale": 1.5 }
+  ],
+
+  "barrels": [
+    { "x": -22, "z": -42, "fallen": false, "color": "#4a7a3a" },
+    { "x": -22, "z": -44, "fallen": false, "color": "#5a3a2a" },
+    { "x": -24, "z": -43, "fallen": true,  "color": "#4a4a4a" },
+    { "x":  56, "z": -38, "fallen": false, "color": "#cc6633" },
+    { "x":  58, "z": -38, "fallen": false, "color": "#4a7a3a" },
+    { "x":  57, "z": -40, "fallen": true,  "color": "#5a3a2a" },
+    { "x":  14, "z":  28, "fallen": false, "color": "#4a4a4a" },
+    { "x":  16, "z":  28, "fallen": false, "color": "#cc6633" },
+    { "x": -52, "z":  34, "fallen": false, "color": "#4a7a3a" },
+    { "x": -52, "z":  36, "fallen": true,  "color": "#5a3a2a" },
+    { "x":  -8, "z":  58, "fallen": false, "color": "#4a4a4a" }
+  ],
+
+  "shelves": [
+    { "x": -50, "z": -45, "scale": 1.5 },
+    { "x": -50, "z": -50, "scale": 1.5 },
+    { "x":  25, "z": -52, "scale": 1.5 },
+    { "x":  25, "z": -46, "scale": 1.5 }
+  ],
+
+  "extinguishers": [
+    { "x": -26, "z": -42, "scale": 1.5 },
+    { "x":  22, "z": -38, "scale": 1.5 },
+    { "x": -36, "z":  40, "scale": 1.5 }
+  ],
+
+  "containers": [
+    { "x": 58, "z": -55, "rotY": 0.0,    "scale": 2 },
+    { "x": 58, "z": -48, "rotY": 1.5708, "scale": 2 },
+    { "x": 22, "z": -62, "rotY": 0.2,    "scale": 2 }
+  ],
+
+  "forklifts": [
+    { "x": 35, "z": -50, "rotY": 0.5236, "scale": 2 }
+  ],
+
+  "streetLights": [
+    { "x": -15, "z": -15, "rotY": 0.0,    "scale": 2 },
+    { "x":  15, "z": -15, "rotY": 1.23,   "scale": 2 },
+    { "x": -15, "z":  15, "rotY": 2.46,   "scale": 2 },
+    { "x":  15, "z":  15, "rotY": 3.69,   "scale": 2 },
+    { "x":   0, "z": -35, "rotY": 4.92,   "scale": 2 },
+    { "x":   0, "z":  35, "rotY": 6.15,   "scale": 2 },
+    { "x": -35, "z":   0, "rotY": 1.0968, "scale": 2 },
+    { "x":  35, "z":   0, "rotY": 2.3268, "scale": 2 }
+  ],
+
+  "benches": [
+    { "x": -6, "z": -8, "rotY": 0.7854, "scale": 2 },
+    { "x":  6, "z":  8, "rotY": 3.9270, "scale": 2 },
+    { "x": -8, "z":  6, "rotY": -0.7854, "scale": 2 }
+  ],
+
+  "umbrellas": [
+    { "x": -7, "z": -9, "scale": 2 },
+    { "x":  7, "z":  9, "scale": 2 }
+  ],
+
+  "stakeRopes": [
+    { "x":  -3, "z": -30, "rotY": 0.0,    "length": 6, "scale": 2 },
+    { "x":   3, "z":  30, "rotY": 0.0,    "length": 6, "scale": 2 },
+    { "x": -32, "z":  -3, "rotY": 1.5708, "length": 6, "scale": 2 }
+  ],
+
+  "sandbags": [
+    { "x": -10, "z": -22, "rotY": 0.0,    "count": 5, "scale": 2.5 },
+    { "x":  10, "z": -22, "rotY": 0.0,    "count": 5, "scale": 2.5 },
+    { "x": -20, "z":  22, "rotY": 1.5708, "count": 5, "scale": 2.5 },
+    { "x":  20, "z":  22, "rotY": 1.5708, "count": 5, "scale": 2.5 }
+  ],
+
+  "fences": [
+    { "x": -35, "z": -20, "len": 5, "rotY": 0.0,    "broken": false, "scale": 2 },
+    { "x":  15, "z": -40, "len": 4, "rotY": 1.5708, "broken": true,  "scale": 2 },
+    { "x": -40, "z":  22, "len": 4, "rotY": 0.0,    "broken": true,  "scale": 2 },
+    { "x":  12, "z":  35, "len": 3, "rotY": 1.5708, "broken": false, "scale": 2 },
+    { "x": -65, "z":  -5, "len": 5, "rotY": 0.3927, "broken": false, "scale": 2 }
+  ],
+
+  "villageBuildings": [
+    { "x": -58, "z":  30, "rotY": 0.0,    "color": "#5a6a8a", "w": 3,   "d": 2.5, "scale": 2 },
+    { "x": -38, "z":  62, "rotY": 1.5708, "color": "#7a6a5a", "w": 2.5, "d": 2,   "scale": 2 },
+    { "x":  50, "z": -66, "rotY": 0.0,    "color": "#6a6a7a", "w": 2.5, "d": 2,   "scale": 2 }
   ]
 }
