@@ -1,6 +1,7 @@
 {
   "_schema": "scene/v1",
-  "_note": "Edit this file to change scene layout. Coordinates: x,z (y is auto). Colors: hex string '#RRGGBB' or integer.",
+  "_note": "Edit this file to change scene layout. Coordinates: cx,cz (y auto). Colors: '#RRGGBB' or integer.",
+
   "buildings": [
     { "cx": -40, "cz": -50, "w": 32, "d": 20, "h": 3.0, "color": "#5a5248", "name": "Factory" },
     { "cx": -20, "cz": -60, "w": 14, "d": 10, "h": 2.5, "color": "#706858", "name": "FactoryOut" },
@@ -10,5 +11,79 @@
     { "cx":  56, "cz":  50, "w": 12, "d": 10, "h": 2.2, "color": "#5e6050", "name": "ParkShed" },
     { "cx":   0, "cz":  78, "w": 30, "d": 20, "h": 2.5, "color": "#2a2a32", "name": "BasMain" },
     { "cx": -10, "cz":  92, "w": 14, "d": 10, "h": 2.5, "color": "#28282e", "name": "BasStorage" }
+  ],
+
+  "boxes": [
+    { "cx": -50, "cz": -44, "w":  2,   "h": 2,   "d": 8,   "color": "#3a3530", "name": "Chimney" },
+
+    { "cx": -28, "cz": -42, "w":  1,   "h": 1,   "d": 1,   "color": "#8b6f47", "name": "FactCrate0" },
+    { "cx": -30, "cz": -42, "w":  1,   "h": 1,   "d": 1,   "color": "#8b6f47", "name": "FactCrate1" },
+    { "cx": -28, "cz": -40, "w":  1,   "h": 1,   "d": 1,   "color": "#8b6f47", "name": "FactCrate2" },
+    { "cx": -18, "cz": -48, "w":  2.5, "h": 0.9, "d": 0.5, "color": "#707060", "name": "FactBar0" },
+    { "cx": -14, "cz": -48, "w":  2.5, "h": 0.9, "d": 0.5, "color": "#707060", "name": "FactBar1" },
+    { "cx": -10, "cz": -48, "w":  2.5, "h": 0.9, "d": 0.5, "color": "#707060", "name": "FactBar2" },
+
+    { "cx":  58, "cz": -38, "w": 14,   "h": 0.4, "d": 3,   "color": "#4e5258", "name": "DockWall" },
+    { "cx":  24, "cz": -42, "w":  1.8, "h": 1.8, "d": 1.8, "color": "#7a6040", "name": "WhCrate0" },
+    { "cx":  26, "cz": -42, "w":  1.8, "h": 1.8, "d": 1.8, "color": "#7a6040", "name": "WhCrate1" },
+    { "cx":  24, "cz": -40, "w":  1.8, "h": 1.8, "d": 1.8, "color": "#7a6040", "name": "WhCrate2" },
+    { "cx":  26, "cz": -40, "w":  1.8, "h": 1.8, "d": 1.8, "color": "#7a6040", "name": "WhCrate3" },
+    { "cx":  25, "cz": -38, "w":  1.8, "h": 1.8, "d": 1.8, "color": "#7a6040", "name": "WhCrate4" },
+    { "cx":  18, "cz": -58, "w":  3,   "h": 3,   "d": 2.5, "color": "#5a5248", "name": "GuardPost" },
+    { "cx":  20, "cz": -70, "w":  0.3, "h": 2.5, "d": 1.2, "color": "#3a3a3a", "name": "Fence0" },
+    { "cx":  26, "cz": -70, "w":  0.3, "h": 2.5, "d": 1.2, "color": "#3a3a3a", "name": "Fence1" },
+    { "cx":  32, "cz": -70, "w":  0.3, "h": 2.5, "d": 1.2, "color": "#3a3a3a", "name": "Fence2" },
+    { "cx":  38, "cz": -70, "w":  0.3, "h": 2.5, "d": 1.2, "color": "#3a3a3a", "name": "Fence3" },
+    { "cx":  44, "cz": -70, "w":  0.3, "h": 2.5, "d": 1.2, "color": "#3a3a3a", "name": "Fence4" },
+
+    { "cx":   8, "cz":   8, "w":  2.5, "h": 0.8, "d": 0.5, "color": "#808070", "name": "SqBar0" },
+    { "cx":   8, "cz":  -8, "w":  2.5, "h": 0.8, "d": 0.5, "color": "#808070", "name": "SqBar1" },
+    { "cx":  -8, "cz":   8, "w":  2.5, "h": 0.8, "d": 0.5, "color": "#808070", "name": "SqBar2" },
+    { "cx":  -8, "cz":  -8, "w":  2.5, "h": 0.8, "d": 0.5, "color": "#808070", "name": "SqBar3" },
+    { "cx":   0, "cz":  12, "w":  2.5, "h": 0.8, "d": 0.5, "color": "#808070", "name": "SqBar4" },
+    { "cx":   0, "cz": -12, "w":  2.5, "h": 0.8, "d": 0.5, "color": "#808070", "name": "SqBar5" },
+    { "cx":  12, "cz":   0, "w":  2.5, "h": 0.8, "d": 0.5, "color": "#808070", "name": "SqBar6" },
+    { "cx": -12, "cz":   0, "w":  2.5, "h": 0.8, "d": 0.5, "color": "#808070", "name": "SqBar7" },
+    { "cx":   5, "cz":  -5, "w":  4,   "h": 1.2, "d": 2,   "color": "#2a2a2a", "name": "BurntCar1" },
+    { "cx":  -6, "cz":   6, "w":  4,   "h": 1.2, "d": 2,   "color": "#2a2a2a", "name": "BurntCar2" },
+    { "cx": -16, "cz": -16, "w":  0.6, "h": 0.8, "d": 2,   "color": "#9a8a6a", "name": "Sand0" },
+    { "cx": -16, "cz": -12, "w":  0.6, "h": 0.8, "d": 2,   "color": "#9a8a6a", "name": "Sand1" },
+    { "cx": -16, "cz":  -8, "w":  0.6, "h": 0.8, "d": 2,   "color": "#9a8a6a", "name": "Sand2" },
+
+    { "cx": -55, "cz":  28, "w":  2,   "h": 0.7, "d": 2,   "color": "#6a5a48", "name": "Rubble0" },
+    { "cx": -52, "cz":  30, "w":  2,   "h": 0.7, "d": 2,   "color": "#6a5a48", "name": "Rubble1" },
+    { "cx": -48, "cz":  27, "w":  2,   "h": 0.7, "d": 2,   "color": "#6a5a48", "name": "Rubble2" },
+    { "cx": -40, "cz":  35, "w":  2,   "h": 0.7, "d": 2,   "color": "#6a5a48", "name": "Rubble3" },
+    { "cx": -32, "cz":  30, "w":  2,   "h": 0.7, "d": 2,   "color": "#6a5a48", "name": "Rubble4" },
+    { "cx": -20, "cz":  28, "w":  2.5, "h": 0.9, "d": 0.5, "color": "#707060", "name": "AptBar0" },
+    { "cx": -14, "cz":  28, "w":  2.5, "h": 0.9, "d": 0.5, "color": "#707060", "name": "AptBar1" },
+    { "cx":  -8, "cz":  28, "w":  2.5, "h": 0.9, "d": 0.5, "color": "#707060", "name": "AptBar2" },
+    { "cx": -30, "cz":  44, "w":  4,   "h": 1.5, "d": 2,   "color": "#3a3030", "name": "AptCar" },
+
+    { "cx":  20, "cz":  30, "w":  4,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car0" },
+    { "cx":  28, "cz":  30, "w":  5,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car1" },
+    { "cx":  36, "cz":  30, "w":  4,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car2" },
+    { "cx":  44, "cz":  30, "w":  5,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car3" },
+    { "cx":  52, "cz":  30, "w":  4,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car4" },
+    { "cx":  20, "cz":  40, "w":  5,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car5" },
+    { "cx":  36, "cz":  45, "w":  4,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car6" },
+    { "cx":  52, "cz":  42, "w":  5,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car7" },
+    { "cx":  44, "cz":  55, "w":  4,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car8" },
+    { "cx":  20, "cz":  55, "w":  5,   "h": 1.4, "d": 2,   "color": "#2e2e2e", "name": "Car9" },
+    { "cx":  24, "cz":  36, "w":  0.3, "h": 0.7, "d": 6,   "color": "#807060", "name": "ParkDiv0" },
+    { "cx":  32, "cz":  36, "w":  0.3, "h": 0.7, "d": 6,   "color": "#807060", "name": "ParkDiv1" },
+    { "cx":  40, "cz":  36, "w":  0.3, "h": 0.7, "d": 6,   "color": "#807060", "name": "ParkDiv2" },
+    { "cx":  48, "cz":  36, "w":  0.3, "h": 0.7, "d": 6,   "color": "#807060", "name": "ParkDiv3" },
+
+    { "cx":  -8, "cz":  74, "w":  4,   "h": 0.8, "d": 1.5, "color": "#4a4a50", "name": "BasTable1" },
+    { "cx":   8, "cz":  74, "w":  4,   "h": 0.8, "d": 1.5, "color": "#4a4a50", "name": "BasTable2" },
+    { "cx": -12, "cz":  70, "w":  1.5, "h": 1.8, "d": 1.2, "color": "#3a4a3a", "name": "BasCabinet1" },
+    { "cx": -12, "cz":  73, "w":  1.5, "h": 1.8, "d": 1.2, "color": "#3a4a3a", "name": "BasCabinet2" },
+    { "cx":  12, "cz":  82, "w":  2,   "h": 2,   "d": 2,   "color": "#6a5a3a", "name": "BasCrate1" },
+    { "cx":  10, "cz":  84, "w":  1.5, "h": 1.5, "d": 1.5, "color": "#7a6a4a", "name": "BasCrate2" },
+    { "cx": -14, "cz":  90, "w":  1,   "h": 2.2, "d": 3,   "color": "#3a3a3a", "name": "BasWeaponRack" },
+    { "cx":  -6, "cz":  94, "w":  1.2, "h": 1.2, "d": 1.2, "color": "#2a2a2a", "name": "BasSafe" },
+    { "cx": -12, "cz":  96, "w":  1.5, "h": 0.8, "d": 1,   "color": "#5a6a3a", "name": "BasAmmo1" },
+    { "cx": -10, "cz":  96, "w":  1.5, "h": 0.8, "d": 1,   "color": "#5a6a3a", "name": "BasAmmo2" }
   ]
 }

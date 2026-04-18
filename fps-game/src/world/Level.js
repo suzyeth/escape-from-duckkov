@@ -73,6 +73,7 @@ export class Level {
     this._buildGround();
     this._buildBoundaryWalls();
     this._placeBuildingsFromConfig(sceneConfig.buildings ?? []);
+    this._placeBoxesFromConfig(sceneConfig.boxes ?? []);
     this._buildFactoryZone();
     this._buildWarehouseZone();
     this._buildCentralSquare();
@@ -224,15 +225,15 @@ export class Level {
     }
   }
 
+  _placeBoxesFromConfig(boxes) {
+    for (const b of boxes) {
+      this._box(b.cx, b.cz, b.w, b.h, b.d, parseColor(b.color), b.name);
+    }
+  }
+
   _buildFactoryZone() {
     const C = 0x5a5248;
-    // Chimney stub
-    this._box(-50, -44, 2, 2, 8, 0x3a3530, 'Chimney');
-    // Crates near factory
-    [[-28,-42],[-30,-42],[-28,-40]].forEach(([x,z],i)=>this._box(x,z,1,1,1,0x8b6f47,`FactCrate${i}`));
-    // Metal barriers
-    [[-18,-48],[-14,-48],[-10,-48]].forEach(([x,z],i)=>this._box(x,z,2.5,0.9,0.5,0x707060,`FactBar${i}`));
-    // Zone divider wall (partial, with gaps)
+    // Zone divider wall (partial, with gaps) — boxes/crates now in scene.json
     this._wall(-10, -45, 0.5, 20, 3, C, 'FactDiv1');
     this._wall(-10, -22, 0.5,  8, 3, C, 'FactDiv2');
   }
@@ -240,15 +241,7 @@ export class Level {
   // ── NE: Warehouse Zone ────────────────────────────────────────────────────
 
   _buildWarehouseZone() {
-    const C = 0x4e5258;
-    // Dock area
-    this._box(58, -38, 14, 0.4, 3, C, 'DockWall');
-    // Stacked crates
-    [[24,-42],[26,-42],[24,-40],[26,-40],[25,-38]].forEach(([x,z],i)=>this._box(x,z,1.8,1.8,1.8,0x7a6040,`WhCrate${i}`));
-    // Guard post
-    this._box(18, -58, 3, 3, 2.5, 0x5a5248, 'GuardPost');
-    // Fence line
-    for (let i = 0; i < 5; i++) this._box(20 + i*6, -70, 0.3, 2.5, 1.2, 0x3a3a3a, `Fence${i}`);
+    // Dock wall, crates, guard post, fence — now in scene.json
   }
 
   // ── C: Central Square ─────────────────────────────────────────────────────
@@ -262,17 +255,7 @@ export class Level {
     fnt.castShadow = true;
     this._scene.add(fnt);
     this.collidables.push(fnt);
-
-    // Benches / barriers around square
-    const bPos = [[8,8],[8,-8],[-8,8],[-8,-8],[0,12],[0,-12],[12,0],[-12,0]];
-    bPos.forEach(([x,z],i)=>this._box(x,z,2.5,0.8,0.5,0x808070,`SqBar${i}`));
-
-    // Burnt-out vehicle (asymmetric cover)
-    this._box(5, -5, 4, 1.2, 2, 0x2a2a2a, 'BurntCar1');
-    this._box(-6, 6, 4, 1.2, 2, 0x2a2a2a, 'BurntCar2');
-
-    // Sandbag wall
-    [[-16,-16],[-16,-12],[-16,-8]].forEach(([x,z],i)=>this._box(x,z,0.6,0.8,2,0x9a8a6a,`Sand${i}`));
+    // Benches, burnt cars, sandbags — now in scene.json
   }
 
   // ── SW: Apartment Ruins ───────────────────────────────────────────────────
@@ -283,25 +266,13 @@ export class Level {
     this._wall(-35, 56, 16, 0.5, 2.5, C, 'AptB_N');
     this._wall(-43, 62, 0.5, 12, 2.5, C, 'AptB_W');
     this._wall(-27, 60, 0.5, 8,  2.5, C, 'AptB_E');
-    // Rubble piles
-    [[-55,28],[-52,30],[-48,27],[-40,35],[-32,30]].forEach(([x,z],i)=>
-      this._box(x,z,1.5+Math.random(),0.7,1.5+Math.random(),0x6a5a48,`Rubble${i}`)
-    );
-    // Street barriers
-    [[-20,28],[-14,28],[-8,28]].forEach(([x,z],i)=>this._box(x,z,2.5,0.9,0.5,0x707060,`AptBar${i}`));
-    // Abandoned car
-    this._box(-30, 44, 4, 1.5, 2, 0x3a3030, 'AptCar');
+    // Rubble / barriers / abandoned car — now in scene.json
   }
 
   // ── SE: Parking Lot ───────────────────────────────────────────────────────
 
   _buildParkingZone() {
-    // Car wrecks as cover
-    const carPos = [[20,30],[28,30],[36,30],[44,30],[52,30],[20,40],[36,45],[52,42],[44,55],[20,55]];
-    carPos.forEach(([x,z],i)=>this._box(x,z,4+(i%2),1.4,2,0x2e2e2e,`Car${i}`));
-    // Concrete dividers
-    [[24,36],[32,36],[40,36],[48,36]].forEach(([x,z],i)=>this._box(x,z,0.3,0.7,6,0x807060,`ParkDiv${i}`));
-    // (Guard booth + storage shed now loaded from scene.json)
+    // Cars, dividers, guard booth, storage shed — now in scene.json
   }
 
   // ── S: Basement Entrance ──────────────────────────────────────────────────
@@ -341,25 +312,7 @@ export class Level {
     this._wall(-17, 85, 0.5, 6, 2.5, C, 'BasCorrW');
     this._wall( -3, 85, 0.5, 6, 2.5, C, 'BasCorrE');
 
-    // Interior details — main hall
-    // Operating tables / workbenches
-    this._box(-8, 74, 4, 0.8, 1.5, 0x4a4a50, 'BasTable1');
-    this._box( 8, 74, 4, 0.8, 1.5, 0x4a4a50, 'BasTable2');
-    // Filing cabinets along wall
-    this._box(-12, 70, 1.5, 1.8, 1.2, 0x3a4a3a, 'BasCabinet1');
-    this._box(-12, 73, 1.5, 1.8, 1.2, 0x3a4a3a, 'BasCabinet2');
-    // Crate stack
-    this._box(12, 82, 2, 2, 2, 0x6a5a3a, 'BasCrate1');
-    this._box(10, 84, 1.5, 1.5, 1.5, 0x7a6a4a, 'BasCrate2');
-
-    // Interior details — side room (high-value loot area)
-    // Weapon rack
-    this._box(-14, 90, 1, 2.2, 3, 0x3a3a3a, 'BasWeaponRack');
-    // Safe (small, valuable)
-    this._box(-6, 94, 1.2, 1.2, 1.2, 0x2a2a2a, 'BasSafe');
-    // Ammo boxes
-    this._box(-12, 96, 1.5, 0.8, 1, 0x5a6a3a, 'BasAmmo1');
-    this._box(-10, 96, 1.5, 0.8, 1, 0x5a6a3a, 'BasAmmo2');
+    // Interior details (tables / cabinets / crates / weapon rack / safe / ammo) — now in scene.json
   }
 
   // ── Extraction points ────────────────────────────────────────────────────
