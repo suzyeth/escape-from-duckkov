@@ -29,6 +29,7 @@ import { NetworkSystem }     from './systems/NetworkSystem.js';
 import { LobbyScreen }       from './ui/LobbyScreen.js';
 import { RemotePlayer }      from './entities/RemotePlayer.js';
 import { isFirstRun, markPlayed, DEMO_SEED } from './systems/DemoSeed.js';
+import { SceneEditor }        from './editor/SceneEditor.js';
 
 // ── Scene ─────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,23 @@ const network    = new NetworkSystem();
 const lobbyScreen = new LobbyScreen();
 const invUI     = new InventoryUI(inventory);
 const bodyLootUI = new BodyLootUI(inventory, ITEM_DEFS, hud);
+
+// ── Scene Editor (F2) ────────────────────────────────────────────────────────
+let _editorPaused = false;
+const pauseController = {
+  pause()  { _editorPaused = true;  },
+  resume() { _editorPaused = false; },
+  get paused() { return _editorPaused; },
+};
+const sceneEditor = new SceneEditor({
+  scene,
+  gameCamera: camera,
+  renderer,
+  input,
+  level,
+  aiSystem,
+  pauseController,
+});
 
 // ── Art Debug GUI (lil-gui) ───────────────────────────────────────────────────
 // Toggle with G key. Lets you adjust colors, lighting, fog in real-time.
@@ -120,13 +138,24 @@ _miscFolder.add(_miscParams, 'fogOfWar').name('Fog of War').onChange(v => { fogO
 _artGUI.close();
 let _guiVisible = true;
 window.addEventListener('keydown', (e) => {
+  // F2 toggles the scene editor (takes priority over other handlers).
+  if (e.code === 'F2' && !e.ctrlKey && !e.metaKey) {
+    sceneEditor.toggle();
+    e.preventDefault();
+    return;
+  }
   // ESC closes body-loot UI before it reaches the pause toggle
   if (e.code === 'Escape' && bodyLootUI.isOpen) {
     bodyLootUI.close();
     e.stopPropagation();
     return;
   }
-  if (e.code === 'Escape') { _togglePause(); return; }
+  if (e.code === 'Escape') {
+    // When the editor is active, let it handle Escape (cancel arm/selection).
+    if (sceneEditor.isActive) return;
+    _togglePause();
+    return;
+  }
   if (e.code === 'KeyG' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     _guiVisible = !_guiVisible;
     _artGUI.domElement.style.display = _guiVisible ? '' : 'none';
@@ -1039,6 +1068,14 @@ baseScreen.onStartRaid((levelId) => {
 const loop = new GameLoop(
   // update
   (dt) => {
+    // Scene editor runs regardless of gameStarted — you can edit the scene
+    // from the main menu. It handles its own pause gating via pauseController.
+    sceneEditor.update(dt);
+    if (pauseController.paused) {
+      // Editor is active: skip the entire game loop this frame.
+      input.endFrame();
+      return;
+    }
     if (!gameStarted) return;
     if (_isPaused) return;
     try {
@@ -1388,7 +1425,7 @@ const loop = new GameLoop(
     }
   },
   // render
-  () => renderer.render(scene, camera)
+  () => renderer.render(scene, sceneEditor.isActive ? sceneEditor.orthoCam : camera)
 );
 
 // Post-processing

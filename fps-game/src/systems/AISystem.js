@@ -170,7 +170,53 @@ export class AISystem {
       const type = cfg.type ?? 'normal';
       const pos = new THREE.Vector3(cfg.pos[0], 0, cfg.pos[1]);
       const waypoints = cfg.waypoints.map(([x, z]) => new THREE.Vector3(x, 0, z));
-      this.enemies.push(new Enemy(this._scene, pos, waypoints, type));
+      const enemy = new Enemy(this._scene, pos, waypoints, type);
+      if (enemy.mesh) {
+        enemy.mesh.userData.editable = true;
+        enemy.mesh.userData.configRef = cfg;
+        enemy.mesh.userData.configKey = 'enemies';
+      }
+      this.enemies.push(enemy);
+    }
+  }
+
+  // ── Editor support ────────────────────────────────────────────────────────
+
+  /** Remove every live enemy and dispose resources. */
+  clearEnemies() {
+    for (const e of this.enemies) {
+      if (e.mesh) {
+        this._scene.remove(e.mesh);
+        e.mesh.traverse?.(ch => {
+          if (ch.isMesh) {
+            ch.geometry?.dispose?.();
+            if (ch.material?.dispose) ch.material.dispose();
+          }
+        });
+      }
+      if (e._patrolLine)   { this._scene.remove(e._patrolLine);   e._patrolLine.geometry?.dispose?.();   e._patrolLine.material?.dispose?.(); }
+      if (e._stateRing)    { this._scene.remove(e._stateRing);    e._stateRing.geometry?.dispose?.();    e._stateRing.material?.dispose?.(); }
+      if (e._targetMarker) { this._scene.remove(e._targetMarker); e._targetMarker.geometry?.dispose?.(); e._targetMarker.material?.dispose?.(); }
+      e._waypointMarkers?.forEach(m => { this._scene.remove(m); m.geometry?.dispose?.(); m.material?.dispose?.(); });
+    }
+    this.enemies = [];
+  }
+
+  /** Rebuild enemies from a fresh scene config (caller already swapped liveConfig). */
+  rebuildFromConfig(cfg) {
+    this.clearEnemies();
+    const enemies = cfg.enemies ?? [];
+    for (const entry of enemies) {
+      const type = entry.type ?? 'normal';
+      const pos = new THREE.Vector3(entry.pos[0], 0, entry.pos[1]);
+      const waypoints = (entry.waypoints ?? [entry.pos]).map(([x, z]) => new THREE.Vector3(x, 0, z));
+      const enemy = new Enemy(this._scene, pos, waypoints, type);
+      if (enemy.mesh) {
+        enemy.mesh.userData.editable = true;
+        enemy.mesh.userData.configRef = entry;
+        enemy.mesh.userData.configKey = 'enemies';
+      }
+      this.enemies.push(enemy);
     }
   }
 

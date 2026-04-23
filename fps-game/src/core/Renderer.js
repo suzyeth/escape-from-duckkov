@@ -53,6 +53,7 @@ export class Renderer {
     // 1. Render pass
     const renderPass = new RenderPass(scene, camera);
     this._composer.addPass(renderPass);
+    this._renderPass = renderPass;
 
     // 2. Bloom — subtle glow on bright objects (muzzle flash, lamps, emissive items)
     this._bloomPass = new UnrealBloomPass(
@@ -72,6 +73,10 @@ export class Renderer {
 
   render(scene, camera) {
     if (this._composer) {
+      // Swap the composer's camera if caller passes a different one (e.g. editor ortho cam).
+      if (camera && this._renderPass && this._renderPass.camera !== camera) {
+        this._renderPass.camera = camera;
+      }
       this._composer.render();
     } else {
       this._renderer.render(scene, camera);

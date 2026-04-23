@@ -44,6 +44,13 @@ export class Level {
     this.collidables = [];
 
     /**
+     * All meshes placed from the data-driven scene config. Tracked so the
+     * scene editor can remove them cleanly on rebuild.
+     * @type {THREE.Object3D[]}
+     */
+    this._configPlaced = [];
+
+    /**
      * Registered buildings for the roof-reveal system.
      * @type {{ roof: THREE.Mesh, minX: number, maxX: number, minZ: number, maxZ: number }[]}
      */
@@ -221,13 +228,32 @@ export class Level {
 
   _placeBuildingsFromConfig(buildings) {
     for (const b of buildings) {
+      const before = this._scene.children.length;
+      const buildingsBefore = this._buildings.length;
       this._building(b.cx, b.cz, b.w, b.d, b.h, parseColor(b.color), b.name);
+      // Tag the roof (most visible anchor) for editor selection.
+      const rec = this._buildings[buildingsBefore];
+      if (rec && rec.roof) {
+        rec.roof.userData.editable = true;
+        rec.roof.userData.configRef = b;
+        rec.roof.userData.configKey = 'buildings';
+      }
+      // Track every newly-added scene child so we can remove them on rebuild.
+      for (let i = before; i < this._scene.children.length; i++) {
+        this._configPlaced.push(this._scene.children[i]);
+      }
     }
   }
 
   _placeBoxesFromConfig(boxes) {
     for (const b of boxes) {
-      this._box(b.cx, b.cz, b.w, b.h, b.d, parseColor(b.color), b.name);
+      const mesh = this._box(b.cx, b.cz, b.w, b.h, b.d, parseColor(b.color), b.name);
+      if (mesh) {
+        mesh.userData.editable = true;
+        mesh.userData.configRef = b;
+        mesh.userData.configKey = 'boxes';
+        this._configPlaced.push(mesh);
+      }
     }
   }
 
@@ -569,6 +595,13 @@ export class Level {
    * @param {object} cfg — parsed scene.json
    */
   _placeEnvPropsFromConfig(cfg) {
+    const tag = (obj, ref, key) => {
+      obj.userData.editable = true;
+      obj.userData.configRef = ref;
+      obj.userData.configKey = key;
+      this._configPlaced.push(obj);
+    };
+
     // Trees (deterministic scale/rotY baked into JSON)
     for (const t of cfg.trees ?? []) {
       const tree = createTree(t.type);
@@ -576,6 +609,7 @@ export class Level {
       tree.scale.setScalar(t.scale);
       tree.rotation.y = t.rotY;
       this._scene.add(tree);
+      tag(tree, t, 'trees');
     }
 
     // Rock clusters
@@ -584,6 +618,7 @@ export class Level {
       rocks.position.set(r.x, 0, r.z);
       rocks.scale.setScalar(r.scale);
       this._scene.add(rocks);
+      tag(rocks, r, 'rockClusters');
     }
 
     // Crate clusters
@@ -592,6 +627,7 @@ export class Level {
       crates.position.set(c.x, 0, c.z);
       crates.scale.setScalar(c.scale);
       this._scene.add(crates);
+      tag(crates, c, 'crateClusters');
     }
 
     // Barrels (with deterministic color cycle baked into JSON)
@@ -601,6 +637,7 @@ export class Level {
       barrel.position.z = b.z;
       this._scene.add(barrel);
       this.collidables.push(barrel);
+      tag(barrel, b, 'barrels');
     }
 
     // Shelves
@@ -609,6 +646,7 @@ export class Level {
       shelf.position.set(s.x, 0, s.z);
       shelf.scale.setScalar(s.scale);
       this._scene.add(shelf);
+      tag(shelf, s, 'shelves');
     }
 
     // Extinguishers
@@ -617,6 +655,7 @@ export class Level {
       ext.position.set(e.x, 0, e.z);
       ext.scale.setScalar(e.scale);
       this._scene.add(ext);
+      tag(ext, e, 'extinguishers');
     }
 
     // Containers
@@ -626,6 +665,7 @@ export class Level {
       container.rotation.y = c.rotY;
       container.scale.setScalar(c.scale);
       this._scene.add(container);
+      tag(container, c, 'containers');
     }
 
     // Forklifts
@@ -635,6 +675,7 @@ export class Level {
       fl.rotation.y = f.rotY;
       fl.scale.setScalar(f.scale);
       this._scene.add(fl);
+      tag(fl, f, 'forklifts');
     }
 
     // Street lights (deterministic rotY baked into JSON)
@@ -644,6 +685,7 @@ export class Level {
       light.rotation.y = sl.rotY;
       light.scale.setScalar(sl.scale);
       this._scene.add(light);
+      tag(light, sl, 'streetLights');
     }
 
     // Benches
@@ -653,6 +695,7 @@ export class Level {
       bench.rotation.y = b.rotY;
       bench.scale.setScalar(b.scale);
       this._scene.add(bench);
+      tag(bench, b, 'benches');
     }
 
     // Umbrellas
@@ -661,6 +704,7 @@ export class Level {
       umb.position.set(u.x, 0, u.z);
       umb.scale.setScalar(u.scale);
       this._scene.add(umb);
+      tag(umb, u, 'umbrellas');
     }
 
     // Stake ropes (length configurable per entry)
@@ -670,6 +714,7 @@ export class Level {
       stake.rotation.y = s.rotY;
       stake.scale.setScalar(s.scale);
       this._scene.add(stake);
+      tag(stake, s, 'stakeRopes');
     }
 
     // Sandbags (count configurable per entry)
@@ -679,6 +724,7 @@ export class Level {
       bags.rotation.y = sb.rotY;
       bags.scale.setScalar(sb.scale);
       this._scene.add(bags);
+      tag(bags, sb, 'sandbags');
     }
 
     // Wood fences (length + broken flag per entry)
@@ -688,6 +734,7 @@ export class Level {
       fence.rotation.y = f.rotY;
       fence.scale.setScalar(f.scale);
       this._scene.add(fence);
+      tag(fence, f, 'fences');
     }
 
     // Village buildings (distinct from main buildings — uses createBuilding)
@@ -697,7 +744,43 @@ export class Level {
       bld.rotation.y = vb.rotY;
       bld.scale.setScalar(vb.scale);
       this._scene.add(bld);
+      tag(bld, vb, 'villageBuildings');
     }
+  }
+
+  // ── Editor support ────────────────────────────────────────────────────────
+
+  /**
+   * Remove every mesh placed by config-driven placement so the editor can
+   * rebuild from a fresh config. Called by SceneEditor.
+   */
+  clearConfigDriven() {
+    for (const m of this._configPlaced ?? []) {
+      this._scene.remove(m);
+      m.traverse?.(ch => {
+        if (ch.isMesh) {
+          ch.geometry?.dispose?.();
+          if (ch.material?.dispose) ch.material.dispose();
+        }
+      });
+      const ci = this.collidables.indexOf(m);
+      if (ci >= 0) this.collidables.splice(ci, 1);
+    }
+    this._configPlaced = [];
+    // Buildings array also needs reset so next rebuild doesn't double-track.
+    this._buildings = [];
+    // Door slots from buildings also need reset.
+    this.doorSlots.length = 0;
+  }
+
+  /**
+   * Rebuild every config-driven section of the level from a fresh cfg object.
+   * Caller is responsible for clearing first.
+   */
+  rebuildFromConfig(cfg) {
+    this._placeBuildingsFromConfig(cfg.buildings ?? []);
+    this._placeBoxesFromConfig(cfg.boxes ?? []);
+    this._placeEnvPropsFromConfig(cfg);
   }
 
   // ── Floating dust particles ──────────────────────────────────────────────
