@@ -21,12 +21,33 @@ export class BodyLootUI {
     this.hud       = hud;
     this._body     = null;
     this._visible  = false;
+    this._busy     = false;
+    this._onBodyChanged = null;
+    this._onTakeOne = null;
+    this._onGiveOne = null;
+    this._onTakeAll = null;
     this._build();
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
 
   get isOpen() { return this._visible; }
+
+  onBodyChanged(fn) {
+    this._onBodyChanged = fn;
+  }
+
+  onTakeOne(fn) {
+    this._onTakeOne = fn;
+  }
+
+  onGiveOne(fn) {
+    this._onGiveOne = fn;
+  }
+
+  onTakeAll(fn) {
+    this._onTakeAll = fn;
+  }
 
   open(body) {
     this._body = body;
@@ -38,7 +59,9 @@ export class BodyLootUI {
 
   close() {
     this._visible = false;
+    this._busy = false;
     this._panel.style.display = 'none';
+    this._panel.style.opacity = '1';
     this._body = null;
   }
 
@@ -82,7 +105,8 @@ export class BodyLootUI {
     /** @type {Map<string, number>} */
     const grouped = new Map();
     for (const [, item] of this.playerInv.items) {
-      grouped.set(item.defId, (grouped.get(item.defId) || 0) + item.count);
+      const defId = item.def.id;
+      grouped.set(defId, (grouped.get(defId) || 0) + item.count);
     }
     if (grouped.size === 0) {
       const empty = document.createElement('div');
@@ -140,14 +164,31 @@ export class BodyLootUI {
     panel.querySelector('#body-loot-takeall').onclick = () => this._takeAll();
   }
 
+  _setBusy(next) {
+    this._busy = next;
+    this._panel.style.opacity = next ? '0.7' : '1';
+  }
+
   /**
    * Move one unit of {defId} from body → player inventory.
    * InventorySystem.addItem returns true on success, false if inventory is full.
    */
-  _takeOne(defId) {
+  async _takeOne(defId) {
     if (!this._body) return;
+    if (this._busy) return;
     const entry = this._body.items.find(x => x.defId === defId);
     if (!entry || entry.count <= 0) return;
+
+    if (this._onTakeOne) {
+      this._setBusy(true);
+      try {
+        await this._onTakeOne(this._body, defId);
+      } finally {
+        this._setBusy(false);
+      }
+      this.refresh();
+      return;
+    }
 
     const ok = this.playerInv.addItem(defId, 1);
     if (!ok) {
@@ -159,6 +200,7 @@ export class BodyLootUI {
     if (entry.count <= 0) {
       this._body.items = this._body.items.filter(x => x.count > 0);
     }
+    this._onBodyChanged?.(this._body);
     this.refresh();
   }
 
@@ -167,13 +209,25 @@ export class BodyLootUI {
    * Uses the Map-of-instances structure: pick any instance of that defId and
    * decrement (or remove) it. Non-stackable items consume the whole slot.
    */
-  _giveOne(defId) {
+  async _giveOne(defId) {
     if (!this._body) return;
+    if (this._busy) return;
+
+    if (this._onGiveOne) {
+      this._setBusy(true);
+      try {
+        await this._onGiveOne(this._body, defId);
+      } finally {
+        this._setBusy(false);
+      }
+      this.refresh();
+      return;
+    }
 
     // Find an instance in the player's inventory matching defId
     let chosen = null;
     for (const [, item] of this.playerInv.items) {
-      if (item.defId === defId) { chosen = item; break; }
+      if (item.def.id === defId) { chosen = item; break; }
     }
     if (!chosen) return;
 
@@ -191,6 +245,7 @@ export class BodyLootUI {
     } else {
       this._body.items.push({ defId, count: 1 });
     }
+    this._onBodyChanged?.(this._body);
     this.refresh();
   }
 
@@ -198,8 +253,21 @@ export class BodyLootUI {
    * Transfer as many body items as will fit into the player's inventory.
    * Stops adding a given stack as soon as addItem returns false (inventory full).
    */
-  _takeAll() {
+  async _takeAll() {
     if (!this._body) return;
+    if (this._busy) return;
+
+    if (this._onTakeAll) {
+      this._setBusy(true);
+      try {
+        await this._onTakeAll(this._body);
+      } finally {
+        this._setBusy(false);
+      }
+      this.refresh();
+      return;
+    }
+
     const remaining = [];
     let partialFail = false;
     for (const it of this._body.items) {
@@ -216,6 +284,7 @@ export class BodyLootUI {
     }
     this._body.items = remaining;
     if (partialFail) this.hud?.showBubble?.('背包已满', 1.5);
+    this._onBodyChanged?.(this._body);
     this.refresh();
   }
 }

@@ -13,6 +13,8 @@ export class BulletSystem {
     this._flashes  = [];   // { mesh, life }
     this._projectiles = []; // { mesh, pos, dir, speed, damage, range, traveled, def, owner }
     this._projRay = new THREE.Raycaster(); // reused for wall checks
+    this._segStart = new THREE.Vector3();
+    this._segHitPos = new THREE.Vector3();
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
@@ -209,6 +211,7 @@ export class BulletSystem {
     for (let i = this._projectiles.length - 1; i >= 0; i--) {
       const p = this._projectiles[i];
       const step = p.speed * dt;
+      this._segStart.copy(p.pos);
       p.pos.addScaledVector(p.dir, step);
       p.traveled += step;
       p.mesh.position.copy(p.pos);
@@ -224,9 +227,9 @@ export class BulletSystem {
 
       let hit = false;
 
-      // Check wall hits FIRST — prevents shooting through walls
+      // Check the entire segment traveled this frame to avoid tunneling through walls/targets.
       if (!hit) {
-        this._projRay.set(p.pos, p.dir);
+        this._projRay.set(this._segStart, p.dir);
         this._projRay.near = 0;
         this._projRay.far = step + 0.3;
         const wallHits = this._projRay.intersectObjects(collidables, false);
@@ -237,18 +240,18 @@ export class BulletSystem {
       }
 
       if (!hit && p.owner === 'player') {
-        // Check enemy hits — range covers this frame's travel + enemy radius
-        const enemy = aiSystem.checkPlayerHit(p.pos, p.dir, step + 0.6);
+        // Check enemy hits against the full travel segment this frame.
+        const enemy = aiSystem.checkPlayerHit(this._segStart, p.dir, step + 0.6);
         if (enemy) {
           hits.push({ target: 'enemy', enemy, damage: Math.round(dmg), pos: p.pos.clone() });
           hit = true;
         }
       } else if (!hit) {
-        // Enemy bullet → check player hit
-        const dx = player.position.x - p.pos.x;
-        const dz = player.position.z - p.pos.z;
-        if (Math.sqrt(dx * dx + dz * dz) < 0.65 + step * 0.5) {
-          hits.push({ target: 'player', damage: Math.round(dmg), pos: p.pos.clone() });
+        // Enemy bullet → check player hit against the full travel segment.
+        const playerHitDist = this._rayHitsCircle(this._segStart, p.dir, player.position, 0.65, step + 0.3);
+        if (playerHitDist !== null) {
+          this._segHitPos.copy(this._segStart).addScaledVector(p.dir, playerHitDist);
+          hits.push({ target: 'player', damage: Math.round(dmg), pos: this._segHitPos.clone() });
           hit = true;
         }
       }
@@ -263,6 +266,23 @@ export class BulletSystem {
     }
 
     return { hits };
+  }
+
+  _rayHitsCircle(origin, dir, center, radius, maxRange) {
+    const ox = origin.x - center.x;
+    const oz = origin.z - center.z;
+    const dx = dir.x;
+    const dz = dir.z;
+
+    const a = dx * dx + dz * dz;
+    const b = 2 * (ox * dx + oz * dz);
+    const c = ox * ox + oz * oz - radius * radius;
+    const disc = b * b - 4 * a * c;
+
+    if (disc < 0) return null;
+    const t = (-b - Math.sqrt(disc)) / (2 * a);
+    if (t < 0 || t > maxRange) return null;
+    return t;
   }
 
   // ── Per-frame update ───────────────────────────────────────────────────────

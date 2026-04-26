@@ -5,6 +5,7 @@
  */
 
 const SEND_INTERVAL_MS = 50; // 20 updates/sec
+const AI_SEND_INTERVAL_MS = 100;
 
 export class NetworkSystem {
   constructor() {
@@ -23,11 +24,18 @@ export class NetworkSystem {
     this._onGameStart    = null;
     this._onRemoteState  = null;
     this._onRemoteShoot  = null;
+    this._onRemoteHit    = null;
+    this._onAIStateUpdate = null;
+    this._onBodyStateUpdate = null;
     this._onError        = null;
     this._onDisconnect   = null;
 
     // Send throttle
     this._lastSendTime = 0;
+    this._lastAiSendTime = 0;
+    this._nextBodyActionId = 1;
+    this._pendingBodyActions = new Map();
+    this._onHostChanged = null;
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
@@ -45,8 +53,12 @@ export class NetworkSystem {
   onGameStart(fn)    { this._onGameStart = fn; }
   onRemoteState(fn)  { this._onRemoteState = fn; }
   onRemoteShoot(fn)  { this._onRemoteShoot = fn; }
+  onRemoteHit(fn)    { this._onRemoteHit = fn; }
+  onAIStateUpdate(fn) { this._onAIStateUpdate = fn; }
+  onBodyStateUpdate(fn) { this._onBodyStateUpdate = fn; }
   onError(fn)        { this._onError = fn; }
   onDisconnect(fn)   { this._onDisconnect = fn; }
+  onHostChanged(fn)  { this._onHostChanged = fn; }
 
   /**
    * Connect to the multiplayer server.
@@ -85,6 +97,7 @@ export class NetworkSystem {
         this._playerId = null;
         this._roomCode = null;
         this._isHost = false;
+        this._rejectPendingBodyActions();
         if (this._onDisconnect) this._onDisconnect();
       };
 
@@ -101,6 +114,7 @@ export class NetworkSystem {
     if (this._ws) {
       this._ws.onmessage = null;
       this._ws.onclose = null;
+      this._ws.onerror = null;
       this._ws.close();
       this._ws = null;
     }
@@ -108,6 +122,10 @@ export class NetworkSystem {
     this._playerId = null;
     this._roomCode = null;
     this._isHost = false;
+    this._lastSendTime = 0;
+    this._lastAiSendTime = 0;
+    this._rejectPendingBodyActions();
+    if (this._onDisconnect) this._onDisconnect();
   }
 
   createRoom() {
@@ -137,12 +155,56 @@ export class NetworkSystem {
     this._send({ type: 'player_hit', targetType, targetId, damage: +damage || 0 });
   }
 
+  sendAIState(enemies, shots = [], eliteAlerted = false, waveCount = 0) {
+    const now = performance.now();
+    if (shots.length === 0 && !eliteAlerted && now - this._lastAiSendTime < AI_SEND_INTERVAL_MS) return;
+    this._lastAiSendTime = now;
+
+    const serializedShots = shots.map((shot) => ({
+      origin: { x: +shot.origin?.x || 0, z: +shot.origin?.z || 0 },
+      dir: { x: +shot.dir?.x || 0, z: +shot.dir?.z || 0 },
+      damage: +shot.damage || 0,
+      isMelee: !!shot.isMelee,
+    }));
+
+    this._send({
+      type: 'ai_state',
+      enemies,
+      shots: serializedShots,
+      eliteAlerted: !!eliteAlerted,
+      waveCount: +waveCount || 0,
+    });
+  }
+
+  sendBodyState(body) {
+    if (!body?.id) return;
+    this._send({ type: 'body_state', body });
+  }
+
+  sendBodyAction(bodyId, action, defId, count = 1) {
+    if (!bodyId || !action || !this._ws || this._ws.readyState !== 1) {
+      return Promise.resolve({ accepted: false, body: null, message: 'Not connected' });
+    }
+    const requestId = `ba${this._nextBodyActionId++}`;
+    this._send({ type: 'body_action', requestId, bodyId, action, defId, count: +count || 1 });
+    return new Promise((resolve, reject) => {
+      this._pendingBodyActions.set(requestId, { resolve, reject });
+    });
+  }
+
   // ── Private ────────────────────────────────────────────────────────────────
 
   _send(msg) {
     if (this._ws && this._ws.readyState === 1) {
       this._ws.send(JSON.stringify(msg));
     }
+  }
+
+  _rejectPendingBodyActions() {
+    for (const pending of this._pendingBodyActions.values()) {
+      pending.reject?.(new Error('Body action cancelled'));
+    }
+    this._pendingBodyActions.clear();
   }
 
   _handleMessage(msg) {
@@ -166,11 +228,16 @@ export class NetworkSystem {
         break;
 
       case 'player_left':
-        if (this._onPlayerLeft) this._onPlayerLeft(String(msg.playerId || ''));
+        if (this._onPlayerLeft) this._onPlayerLeft(String(msg.playerId || ''), msg.playerCount || 0);
         break;
 
       case 'game_start':
         if (this._onGameStart) this._onGameStart(msg.hostId);
+        break;
+
+      case 'host_changed':
+        this._isHost = msg.hostId === this._playerId;
+        if (this._onHostChanged) this._onHostChanged(String(msg.hostId || ''), this._isHost);
         break;
 
       case 'remote_player_state': {
@@ -185,6 +252,48 @@ export class NetworkSystem {
         const x = Number(msg.x); const z = Number(msg.z);
         if (!isFinite(x) || !isFinite(z)) break;
         if (this._onRemoteShoot) this._onRemoteShoot({ ...msg, x, z, angle: Number(msg.angle) || 0 });
+        break;
+      }
+
+      case 'remote_player_hit':
+        if (this._onRemoteHit) {
+          this._onRemoteHit({
+            ...msg,
+            damage: Number(msg.damage) || 0,
+            targetId: String(msg.targetId || ''),
+            targetType: String(msg.targetType || ''),
+          });
+        }
+        break;
+
+      case 'ai_state_update':
+        if (this._onAIStateUpdate) {
+          this._onAIStateUpdate({
+            enemies: Array.isArray(msg.enemies) ? msg.enemies : [],
+            shots: Array.isArray(msg.shots) ? msg.shots : [],
+            eliteAlerted: !!msg.eliteAlerted,
+            waveCount: Number(msg.waveCount) || 0,
+          });
+        }
+        break;
+
+      case 'body_state_update':
+        if (this._onBodyStateUpdate && msg.body) this._onBodyStateUpdate(msg.body);
+        break;
+
+      case 'body_action_result': {
+        const requestId = String(msg.requestId || '');
+        const pending = this._pendingBodyActions.get(requestId);
+        if (!pending) break;
+        this._pendingBodyActions.delete(requestId);
+        pending.resolve({
+          accepted: !!msg.accepted,
+          message: String(msg.message || ''),
+          body: msg.body || null,
+          action: String(msg.action || ''),
+          defId: String(msg.defId || ''),
+          count: Number(msg.count) || 0,
+        });
         break;
       }
 

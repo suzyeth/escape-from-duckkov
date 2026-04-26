@@ -75,9 +75,10 @@ export class LootSystem {
     /**
      * Dead-enemy bodies carrying inventory (Tarkov-style body loot).
      * Parallel to _containers — bodies are registered on enemy death via registerBody().
-     * @type {{ enemyRef: object, items: { defId: string, count: number }[], pos: THREE.Vector3 }[]}
+     * @type {{ id: string, enemyRef: object, items: { defId: string, count: number }[], pos: THREE.Vector3 }[]}
      */
     this._bodies = [];
+    this._nextBodyId = 1;
 
     this._spawnItems();
     this._spawnContainers();
@@ -94,11 +95,71 @@ export class LootSystem {
     // Filter out zero-count entries (loot tables occasionally roll 0)
     const items = drops.filter(d => d && d.count > 0).map(d => ({ defId: d.defId, count: d.count }));
     if (!items.length) return;
-    this._bodies.push({
+    const id = enemy?.networkId ? `body:${enemy.networkId}` : `body:local:${this._nextBodyId++}`;
+    const existing = this.getBodyById(id);
+    if (existing) {
+      existing.enemyRef = enemy;
+      existing.items = items;
+      existing.pos.copy(enemy.position);
+      return existing;
+    }
+
+    const body = {
+      id,
       enemyRef: enemy,
       items,
       pos: enemy.position.clone(),
-    });
+    };
+    this._bodies.push(body);
+    return body;
+  }
+
+  getBodyById(id) {
+    if (!id) return null;
+    return this._bodies.find(body => body.id === id) || null;
+  }
+
+  serializeBody(body) {
+    if (!body) return null;
+    return {
+      id: body.id,
+      pos: { x: body.pos.x, z: body.pos.z },
+      items: body.items.map(item => ({ defId: item.defId, count: item.count })),
+    };
+  }
+
+  applyBodySnapshot(snapshot) {
+    if (!snapshot?.id) return null;
+    const items = Array.isArray(snapshot.items)
+      ? snapshot.items
+          .filter(item => item?.defId && Number(item.count) > 0)
+          .map(item => ({ defId: item.defId, count: Number(item.count) }))
+      : [];
+
+    let body = this.getBodyById(snapshot.id);
+    if (!body) {
+      body = {
+        id: snapshot.id,
+        enemyRef: null,
+        items: [],
+        pos: new THREE.Vector3(),
+      };
+      this._bodies.push(body);
+    }
+
+    body.items = items;
+    body.pos.set(Number(snapshot.pos?.x) || 0, 0, Number(snapshot.pos?.z) || 0);
+
+    if (body.items.length === 0) {
+      this._bodies = this._bodies.filter(entry => entry !== body);
+      return null;
+    }
+    return body;
+  }
+
+  clearBodies() {
+    this._bodies = [];
+    this._nextBodyId = 1;
   }
 
   /**
@@ -233,12 +294,12 @@ export class LootSystem {
     }
   }
 
-  /** Returns hint text for the nearest interactive object, or null */
+  /** Returns full interaction hint text for the nearest interactive object, or null */
   getNearbyItemName(playerPos) {
     // Closed containers first
     for (const c of this._containers) {
       if (!c.opened && playerPos.distanceTo(c.pos) < CONTAINER_RANGE) {
-        return `[箱子] 按E开箱`;
+        return '[E] 开箱';
       }
     }
     // Bodies (non-empty only)
@@ -246,13 +307,13 @@ export class LootSystem {
     if (body) {
       let totalCount = 0;
       for (const it of body.items) totalCount += it.count;
-      return `搜索尸体 (${totalCount}件物品)`;
+      return `[E] 搜索尸体 (${totalCount}件物品)`;
     }
     // Loose items
     for (const item of this._items) {
       if (playerPos.distanceTo(item.pos) < PICKUP_RANGE) {
         const def = ITEM_DEFS[item.defId];
-        return def ? def.name : item.defId;
+        return `[E] 拾取 ${def ? def.name : item.defId}`;
       }
     }
     return null;

@@ -4,11 +4,13 @@
  * Stores: stash items, currency, stats, unlocks, death recovery.
  */
 
+import { ITEM_DEFS } from './InventorySystem.js';
+
 const SAVE_KEY = 'duckkov_save';
 
 const DEFAULT_SAVE = {
   currency: 500,           // starting duckbucks
-  stash: [],               // { defId, count }[]
+  stash: [],               // { defId, count, armorHp? }[]
   stats: {
     totalKills: 0,
     totalExtracts: 0,
@@ -17,7 +19,7 @@ const DEFAULT_SAVE = {
     totalXP: 0,
   },
   unlockedLevels: [0],     // level indices: 0=industrial, 1=port, 2=lab
-  deathRecovery: null,     // { levelId, x, z, items: [{defId, count}] } or null
+  deathRecovery: null,     // { levelId, x, z, items: [{defId, count, armorHp?}] } or null
   talents: [],             // unlocked talent IDs
   blueprints: [],          // registered blueprint IDs
 };
@@ -51,23 +53,44 @@ export class SaveSystem {
 
   // ── Stash ──────────────────────────────────────────────────────────────────
 
-  addToStash(defId, count = 1) {
-    const existing = this._data.stash.find(s => s.defId === defId);
+  addToStash(defIdOrItem, count = 1) {
+    const entry = typeof defIdOrItem === 'string'
+      ? { defId: defIdOrItem, count }
+      : { ...defIdOrItem };
+    const def = ITEM_DEFS[entry.defId];
+    if (!def) return false;
+
+    if (def.armor) {
+      const armorHp = Math.max(0, Math.min(def.armor.armorHp, entry.armorHp ?? def.armor.armorHp));
+      if (armorHp <= 0) return false;
+      this._data.stash.push({ defId: entry.defId, count: 1, armorHp });
+      this._save();
+      return true;
+    }
+
+    const stackCount = entry.count ?? count;
+    const existing = this._data.stash.find(s => s.defId === entry.defId && s.armorHp == null);
     if (existing) {
-      existing.count += count;
+      existing.count += stackCount;
     } else {
-      this._data.stash.push({ defId, count });
+      this._data.stash.push({ defId: entry.defId, count: stackCount });
     }
     this._save();
+    return true;
   }
 
   removeFromStash(defId, count = 1) {
-    const idx = this._data.stash.findIndex(s => s.defId === defId);
-    if (idx === -1) return false;
-    this._data.stash[idx].count -= count;
-    if (this._data.stash[idx].count <= 0) {
-      this._data.stash.splice(idx, 1);
+    let remaining = count;
+    for (let i = this._data.stash.length - 1; i >= 0 && remaining > 0; i--) {
+      const item = this._data.stash[i];
+      if (item.defId !== defId) continue;
+
+      const take = Math.min(item.count ?? 1, remaining);
+      item.count = (item.count ?? 1) - take;
+      remaining -= take;
+      if (item.count <= 0) this._data.stash.splice(i, 1);
     }
+    if (remaining > 0) return false;
     this._save();
     return true;
   }
@@ -75,7 +98,7 @@ export class SaveSystem {
   /** Transfer all items from inventory to stash (on successful extraction) */
   depositInventory(items) {
     for (const item of items) {
-      this.addToStash(item.defId, item.count);
+      this.addToStash(item);
     }
   }
 
@@ -165,7 +188,13 @@ export class SaveSystem {
           ...parsed,
           stats: { ...defaults.stats, ...(parsed.stats || {}) },
           unlockedLevels: parsed.unlockedLevels || defaults.unlockedLevels,
-          stash: Array.isArray(parsed.stash) ? parsed.stash : defaults.stash,
+          stash: Array.isArray(parsed.stash)
+            ? parsed.stash.map(item => ({
+                defId: item.defId,
+                count: Math.max(1, Number(item.count) || 1),
+                ...(item.armorHp != null ? { armorHp: Number(item.armorHp) || 0 } : {}),
+              }))
+            : defaults.stash,
           talents: Array.isArray(parsed.talents) ? parsed.talents : defaults.talents,
           blueprints: Array.isArray(parsed.blueprints) ? parsed.blueprints : defaults.blueprints,
         };

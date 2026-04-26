@@ -176,7 +176,11 @@ export class BaseScreen {
         const def = ITEM_DEFS[item.defId];
         const el = document.createElement('div');
         el.className = 'stash-item';
-        el.textContent = `${def ? def.name : item.defId} ×${item.count}`;
+        if (item.armorHp != null && def?.armor) {
+          el.textContent = `${def.name} ${Math.max(0, Math.round(item.armorHp))}/${def.armor.armorHp}`;
+        } else {
+          el.textContent = `${def ? def.name : item.defId} ×${item.count}`;
+        }
         stashGrid.appendChild(el);
       }
     }

@@ -33,6 +33,7 @@ function createRoom(ws) {
   const room = {
     code,
     players: new Map(),
+    bodies: new Map(),
     hostId: null,
     started: false,
   };
@@ -49,7 +50,7 @@ function removePlayerFromRoom(playerId) {
     if (room.players.has(playerId)) {
       room.players.delete(playerId);
       // Notify remaining players
-      broadcast(room, { type: 'player_left', playerId });
+      broadcast(room, { type: 'player_left', playerId, playerCount: room.players.size });
       // Clean up empty rooms
       if (room.players.size === 0) {
         rooms.delete(code);
@@ -110,6 +111,10 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({ type: 'error', message: '房间不存在' }));
           break;
         }
+        if (room.started) {
+          ws.send(JSON.stringify({ type: 'error', message: '对局已开始' }));
+          break;
+        }
         if (room.players.size >= MAX_PLAYERS) {
           ws.send(JSON.stringify({ type: 'error', message: '房间已满' }));
           break;
@@ -136,6 +141,14 @@ wss.on('connection', (ws) => {
 
       case 'start_game': {
         if (!currentRoom || currentRoom.hostId !== playerId) break;
+        if (currentRoom.started) {
+          ws.send(JSON.stringify({ type: 'error', message: '对局已开始' }));
+          break;
+        }
+        if (currentRoom.players.size < MAX_PLAYERS) {
+          ws.send(JSON.stringify({ type: 'error', message: '需要 2 名玩家才能开始' }));
+          break;
+        }
         currentRoom.started = true;
         broadcast(currentRoom, { type: 'game_start', hostId: currentRoom.hostId });
         break;
@@ -189,7 +202,80 @@ wss.on('connection', (ws) => {
         broadcast(currentRoom, {
           type: 'ai_state_update',
           enemies: msg.enemies,
+          shots: msg.shots,
+          eliteAlerted: !!msg.eliteAlerted,
+          waveCount: msg.waveCount,
         }, playerId);
+        break;
+      }
+
+      case 'body_state': {
+        if (!currentRoom || !msg.body?.id) break;
+        currentRoom.bodies.set(msg.body.id, msg.body);
+        broadcast(currentRoom, {
+          type: 'body_state_update',
+          body: msg.body,
+        }, playerId);
+        break;
+      }
+
+      case 'body_action': {
+        if (!currentRoom || !msg.bodyId || !msg.action) break;
+        const body = currentRoom.bodies.get(msg.bodyId);
+        if (!body) {
+          ws.send(JSON.stringify({
+            type: 'body_action_result',
+            requestId: msg.requestId,
+            accepted: false,
+            action: msg.action,
+            defId: msg.defId,
+            count: 0,
+            message: '尸体已被搜空',
+            body: null,
+          }));
+          break;
+        }
+
+        let accepted = false;
+        let message = '';
+        const count = Math.max(1, Number(msg.count) || 1);
+
+        if (msg.action === 'take_one') {
+          const item = body.items.find(entry => entry.defId === msg.defId && entry.count > 0);
+          if (item) {
+            item.count -= 1;
+            accepted = true;
+            if (item.count <= 0) body.items = body.items.filter(entry => entry.count > 0);
+          } else {
+            message = '物品已被拿走';
+          }
+        } else if (msg.action === 'give_one') {
+          const item = body.items.find(entry => entry.defId === msg.defId);
+          if (item) item.count += count;
+          else body.items.push({ defId: msg.defId, count });
+          accepted = true;
+        } else {
+          message = '未知尸体操作';
+        }
+
+        const snapshot = {
+          id: body.id,
+          pos: body.pos,
+          items: body.items,
+        };
+        if (body.items.length === 0) currentRoom.bodies.delete(body.id);
+
+        ws.send(JSON.stringify({
+          type: 'body_action_result',
+          requestId: msg.requestId,
+          accepted,
+          action: msg.action,
+          defId: msg.defId,
+          count: accepted ? count : 0,
+          message,
+          body: snapshot,
+        }));
+        broadcast(currentRoom, { type: 'body_state_update', body: snapshot });
         break;
       }
     }

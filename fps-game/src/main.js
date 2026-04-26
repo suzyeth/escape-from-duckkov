@@ -186,6 +186,32 @@ network.onRemoteShoot((msg) => {
   sound.playShot(msg.weaponId);
 });
 
+network.onRemoteHit((msg) => {
+  if (msg.targetType !== 'enemy') return;
+  const enemy = aiSystem.getEnemyById(msg.targetId);
+  if (!enemy) return;
+  _applyEnemyHit(enemy, msg.damage, enemy.position, { rewardPlayer: false, showHitFeedback: false });
+});
+
+network.onAIStateUpdate((msg) => {
+  if (!_isMultiplayer || network.isHost) return;
+  aiSystem.applyNetworkSnapshot(msg.enemies, msg.waveCount);
+  if (msg.waveCount > _lastWaveCount) {
+    _lastWaveCount = msg.waveCount;
+    hud.pushKillFeed('⚠ 新一波鸭卒增援到达！');
+    sound.playEliteAlert();
+  }
+  if (msg.shots?.length) handleEnemyShots(msg.shots);
+  if (msg.eliteAlerted) {
+    sound.playEliteAlert();
+    hud.pushKillFeed('⚠ 精英鸭卒发现你！');
+  }
+});
+
+network.onBodyStateUpdate((body) => {
+  _applyAuthoritativeBodyState(body);
+});
+
 network.onPlayerLeft((playerId) => {
   const rp = remotePlayers.get(playerId);
   if (rp) {
@@ -205,6 +231,130 @@ function _cleanupRemotePlayers() {
   for (const rp of remotePlayers.values()) rp.destroy();
   remotePlayers.clear();
 }
+
+function _syncBodyState(body, {
+  hostOnly = false,
+} = {}) {
+  if (!_isMultiplayer || !network.connected || !body) return;
+  if (hostOnly && !network.isHost) return;
+  const snapshot = loot.serializeBody(body);
+  if (snapshot) network.sendBodyState(snapshot);
+}
+
+function _applyAuthoritativeBodyState(body) {
+  if (!body?.id) return null;
+  const nextBody = loot.applyBodySnapshot(body);
+  if (bodyLootUI.isOpen && bodyLootUI._body?.id === body.id) {
+    if (!nextBody) bodyLootUI.close();
+    else bodyLootUI.open(nextBody);
+  }
+  return nextBody;
+}
+
+bodyLootUI.onBodyChanged((body) => {
+  if (!_isMultiplayer) return;
+  _syncBodyState(body);
+  if (!body?.items?.length && bodyLootUI.isOpen) bodyLootUI.close();
+});
+
+bodyLootUI.onTakeOne(async (body, defId) => {
+  if (!_isMultiplayer || !network.connected) {
+    if (!inventory.addItem(defId, 1)) {
+      hud.showBubble?.('背包已满', 1.5);
+      return;
+    }
+    const entry = body.items.find(item => item.defId === defId);
+    if (!entry) return;
+    entry.count -= 1;
+    if (entry.count <= 0) body.items = body.items.filter(item => item.count > 0);
+    if (!body.items.length) bodyLootUI.close();
+    return;
+  }
+  if (!inventory.canAddItem(defId, 1)) {
+    hud.showBubble?.('背包已满', 1.5);
+    return;
+  }
+
+  try {
+    const result = await network.sendBodyAction(body.id, 'take_one', defId, 1);
+    if (result.body) _applyAuthoritativeBodyState(result.body);
+    if (!result.accepted) {
+      hud.showBubble?.(result.message || '物品已被拿走', 1.2);
+      return;
+    }
+    inventory.addItem(defId, 1);
+  } catch {
+    hud.showBubble?.('同步失败', 1.2);
+  }
+});
+
+bodyLootUI.onGiveOne(async (body, defId) => {
+  if (!_isMultiplayer || !network.connected) {
+    if (!inventory.removeOneByDefId(defId)) return;
+    const existing = body.items.find(item => item.defId === defId);
+    if (existing) existing.count += 1;
+    else body.items.push({ defId, count: 1 });
+    return;
+  }
+  if (!inventory.removeOneByDefId(defId)) return;
+
+  try {
+    const result = await network.sendBodyAction(body.id, 'give_one', defId, 1);
+    if (result.body) _applyAuthoritativeBodyState(result.body);
+    if (!result.accepted) {
+      inventory.addItem(defId, 1);
+      hud.showBubble?.(result.message || '同步失败', 1.2);
+    }
+  } catch {
+    inventory.addItem(defId, 1);
+    hud.showBubble?.('同步失败', 1.2);
+  }
+});
+
+bodyLootUI.onTakeAll(async (body) => {
+  if (!_isMultiplayer || !network.connected) {
+    const remaining = [];
+    let full = false;
+    for (const item of body.items) {
+      let moved = 0;
+      for (let i = 0; i < item.count; i++) {
+        if (!inventory.addItem(item.defId, 1)) break;
+        moved++;
+      }
+      if (moved < item.count) {
+        full = true;
+        remaining.push({ defId: item.defId, count: item.count - moved });
+      }
+    }
+    body.items = remaining;
+    if (!body.items.length) bodyLootUI.close();
+    if (full) hud.showBubble?.('背包已满', 1.5);
+    return;
+  }
+
+  let full = false;
+  while (true) {
+    const liveBody = loot.getBodyById(body.id);
+    if (!liveBody || liveBody.items.length === 0) break;
+    const nextItem = liveBody.items[0];
+    if (!inventory.canAddItem(nextItem.defId, 1)) {
+      full = true;
+      break;
+    }
+
+    try {
+      const result = await network.sendBodyAction(body.id, 'take_one', nextItem.defId, 1);
+      if (result.body) _applyAuthoritativeBodyState(result.body);
+      if (!result.accepted) break;
+      inventory.addItem(nextItem.defId, 1);
+    } catch {
+      hud.showBubble?.('同步失败', 1.2);
+      return;
+    }
+  }
+
+  if (full) hud.showBubble?.('背包已满', 1.5);
+});
 
 // Right-click: use healing item from inventory
 invUI.onUse((instanceId) => {
@@ -260,6 +410,54 @@ const _crosshairEl = document.getElementById('crosshair');
 const _bossWrap    = document.getElementById('boss-health-wrap');
 const _bossBar     = document.getElementById('boss-health-inner');
 const _bossNameEl  = document.getElementById('boss-name');
+const _equippedArmorItemIds = { body: null, head: null };
+
+function _findLatestArmorInstance(defId) {
+  let found = null;
+  for (const item of inventory.items.values()) {
+    if (item.def.id !== defId || !item.def.armor) continue;
+    if (!found || item.id > found.id) found = item;
+  }
+  return found;
+}
+
+function _syncEquippedArmorItem() {
+  let changed = false;
+  for (const [slot, itemId] of Object.entries(_equippedArmorItemIds)) {
+    if (itemId == null) continue;
+    const item = inventory.items.get(itemId);
+    if (!item || !item.def.armor) {
+      _equippedArmorItemIds[slot] = null;
+      continue;
+    }
+
+    item.armorHp = slot === 'head' ? health.headArmorHp : health.bodyArmorHp;
+    if (item.armorHp <= 0) {
+      inventory.removeItem(item.id);
+      _equippedArmorItemIds[slot] = null;
+      changed = true;
+    }
+  }
+  if (changed && invUI.isOpen) invUI.refresh();
+}
+
+function _equipArmorItem(item) {
+  if (!item?.def?.armor) return false;
+  const slot = item.def.armor.headOnly ? 'head' : 'body';
+  _equippedArmorItemIds[slot] = item.id;
+  const currentHp = item.armorHp ?? item.def.armor.armorHp;
+  health.equipArmor(item.def.armor, talentSystem.getStats().armorBonus, currentHp);
+  item.armorHp = slot === 'head' ? health.headArmorHp : health.bodyArmorHp;
+  return true;
+}
+
+function _serializeInventoryItem(item) {
+  const data = { defId: item.def.id, count: item.count };
+  if (item.def.armor && item.armorHp != null) {
+    data.armorHp = Math.max(0, Math.round(item.armorHp));
+  }
+  return data;
+}
 
 // Weapon constants (hoisted from handlePlayerShoot)
 const RECOIL_STR = { rifle: 0.22, pistol: 0.12, shotgun: 0.45, vss: 0.40, mp5: 0.10 };
@@ -447,6 +645,48 @@ function _gainXP(amount, reason) {
   setTimeout(() => popup.remove(), 1300);
 }
 
+function _applyEnemyHit(enemy, damage, hitPos, {
+  rewardPlayer = false,
+  showHitFeedback = false,
+} = {}) {
+  if (!enemy?.isAlive) return;
+
+  const wasAlive = enemy.isAlive;
+  enemy.takeDamage(damage);
+  bullets.spawnHitEffect(hitPos ?? enemy.position);
+
+  if (showHitFeedback) {
+    sound.playHitMarker();
+    if (_crosshairEl) {
+      _crosshairEl.classList.remove('shoot');
+      _crosshairEl.classList.add('hit');
+      setTimeout(() => _crosshairEl.classList.remove('hit'), 120);
+    }
+  }
+
+  if (!wasAlive || enemy.isAlive) return;
+
+  const LABELS = { normal: '鸭卒', elite: '★精英鸭卒', rusher: '暴走鸭', tank: '重甲鸭', boss: 'BOSS 鸭王' };
+  const label = LABELS[enemy.enemyType] ?? '鸭卒';
+  const XP_BY_TYPE = { normal: 50, elite: 200, rusher: 75, tank: 150, boss: 500 };
+
+  if (rewardPlayer) {
+    _killCount++;
+    hud.pushKillFeed(`击毙${label} [${_killCount}]`);
+    hud.setKillCount(_killCount);
+    _gainXP(XP_BY_TYPE[enemy.enemyType] ?? XP_REWARDS.kill, label);
+  }
+
+  bullets.spawnKillEffect(enemy.position);
+  if (rewardPlayer) {
+    sound.playKillConfirm();
+    _addScreenShake(enemy.isElite ? 0.5 : 0.3);
+    _hitstopTimer = enemy.isElite ? 0.08 : 0.05;
+  }
+  const body = loot.registerBody(enemy, _randomEnemyDrop(enemy.enemyType));
+  _syncBodyState(body, { hostOnly: true });
+}
+
 function handlePlayerShoot() {
   _playerFiredThisFrame = false;
   if (invUI.isOpen) return;
@@ -576,6 +816,7 @@ function handleEnemyShots(shots) {
     if (shot.isMelee) {
       // Melee: instant damage, no projectile
       const partHit = health.takeDamage(shot.damage);
+      _syncEquippedArmorItem();
       player.health = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
       player.speedMultiplier = health.speedMultiplier;
       hud.showDamageFlash();
@@ -583,6 +824,7 @@ function handleEnemyShots(shots) {
       _addScreenShake(0.8);
       _showDamageDirection(shot.origin.x, shot.origin.z);
       hud.pushKillFeed(`被近战攻击！(${_partLabel(partHit)}) -${shot.damage}HP`);
+      if (health.armorJustBroke) hud.pushKillFeed(`⚠ ${health.armorBreakLabel ?? '护甲'}已损毁！`);
       bodyLootUI.notifyPlayerHit();
       if (!health.isAlive) _onPlayerDied();
     } else {
@@ -605,7 +847,7 @@ let _lootedThisSession = false;
 
 function handleLootPickup(dt) {
   const name = loot.getNearbyItemName(player.position);
-  hud.setPickupHint(name ? `[E] 拾取 ${name}` : null);
+  hud.setPickupHint(name);
   if (name) tutorial.notifyNearLoot();
 
   // Body loot takes priority over loose items / containers when player is in range.
@@ -644,7 +886,7 @@ function handleLootPickup(dt) {
       const AMMO_TO_WEAPON = { rifle_ammo: 'rifle', pistol_ammo: 'pistol', shotgun_ammo: 'shotgun', vss_ammo: 'vss', mp5_ammo: 'mp5' };
       const weaponId = AMMO_TO_WEAPON[pickup.defId];
       let pickupCount = pickup.count;
-      if (weaponId) {
+    if (weaponId) {
         for (const slot of weapons.slots) {
           if (slot.def.id === weaponId && slot.reserve < slot.def.reserveMax) {
             const fill = Math.min(pickupCount, slot.def.reserveMax - slot.reserve);
@@ -663,7 +905,7 @@ function handleLootPickup(dt) {
         if (def) _lootValue += def.value * pickup.count;
         // Auto-equip armor items
         if (def?.armor) {
-          health.equipArmor(def.armor, talentSystem.getStats().armorBonus);
+          _equipArmorItem(_findLatestArmorInstance(pickup.defId));
           hud.pushKillFeed(`装备: ${def.name} (${Math.round(def.armor.reduce * 100)}%减伤)`);
         } else {
           hud.pushKillFeed(`拾取: ${def?.name ?? pickup.defId}`);
@@ -835,7 +1077,7 @@ function _showEndScreen(survived) {
           hud.pushKillFeed(`蓝图已注册: ${item.def.name}`);
         }
       } else {
-        items.push({ defId: item.def.id, count: item.count });
+        items.push(_serializeInventoryItem(item));
       }
     }
     saveSystem.depositInventory(items);
@@ -845,7 +1087,7 @@ function _showEndScreen(survived) {
     // Save death position for recovery
     const items = [];
     for (const item of inventory.items.values()) {
-      items.push({ defId: item.def.id, count: item.count });
+      items.push(_serializeInventoryItem(item));
     }
     if (items.length > 0) {
       saveSystem.setDeathRecovery(_currentLevelId, player.position.x, player.position.z, items);
@@ -908,6 +1150,8 @@ let _difficulty = 1; // 0=easy, 1=normal, 2=hard
 stash.onSelect((loadout) => {
   // Clean up previous raid state
   _cleanupRemotePlayers();
+  loot.clearBodies();
+  bodyLootUI.close();
   _difficulty = loadout.difficulty ?? 1;
 
   // Apply difficulty scaling to all enemies (from base stats, not current)
@@ -928,26 +1172,27 @@ stash.onSelect((loadout) => {
 
   // First-run demo seed: judges see identical opening state.
   const firstRun = isFirstRun();
+  const talentStats = talentSystem.getStats();
 
   // Apply weapon loadout (first run: force DEMO_SEED slot)
   weapons.applyLoadout(firstRun ? DEMO_SEED.startingWeaponSlot : loadout.weaponSlot);
 
   // Apply inventory loadout (clear starting gear, apply preset)
   inventory.reset();
+  _equippedArmorItemIds.body = null;
+  _equippedArmorItemIds.head = null;
+  health.reset(talentStats.hpBonus);
   if (firstRun) {
     // Deterministic first-run loadout: starting armor only. Ammo override below.
     inventory.addItem(DEMO_SEED.startingArmor, 1);
-    const armorDef = ITEM_DEFS[DEMO_SEED.startingArmor];
-    if (armorDef?.armor) health.equipArmor(armorDef.armor, talentSystem.getStats().armorBonus);
+    _equipArmorItem(_findLatestArmorInstance(DEMO_SEED.startingArmor));
     // Override reserve ammo on the active weapon to the seeded amount.
     const activeWeapon = weapons.slots[weapons.activeSlot];
     activeWeapon.reserve = Math.min(activeWeapon.def.reserveMax, DEMO_SEED.startingAmmo);
   } else {
     for (const item of loadout.items) {
       inventory.addItem(item.defId, item.count);
-      // Auto-equip armor from starting loadout
-      const def = ITEM_DEFS[item.defId];
-      if (def?.armor) health.equipArmor(def.armor, talentSystem.getStats().armorBonus);
+      _equipArmorItem(_findLatestArmorInstance(item.defId));
     }
   }
 
@@ -961,12 +1206,10 @@ stash.onSelect((loadout) => {
   player.position.y = 0;
 
   // Apply talent bonuses
-  const talentStats = talentSystem.getStats();
   player.maxHealth  = 100 + talentStats.hpBonus;
   player.maxStamina = 100 + talentStats.staminaBonus;
 
-  // Reset health & stamina (pass talent HP bonus to increase body part HP)
-  health.reset(talentStats.hpBonus);
+  // Reset health & stamina
   player.health          = player.maxHealth;
   player.stamina         = player.maxStamina;
   player.speedMultiplier = talentStats.speedMult;
@@ -1048,6 +1291,8 @@ startBtn.addEventListener('click', () => {
 });
 
 lobbyScreen.onStartSolo(() => {
+  network.disconnect();
+  _cleanupRemotePlayers();
   _isMultiplayer = false;
   baseScreen.show();
 });
@@ -1076,8 +1321,14 @@ const loop = new GameLoop(
       input.endFrame();
       return;
     }
-    if (!gameStarted) return;
-    if (_isPaused) return;
+    if (!gameStarted) {
+      input.endFrame();
+      return;
+    }
+    if (_isPaused) {
+      input.endFrame();
+      return;
+    }
     try {
 
     // Hitstop — brief freeze on kills
@@ -1147,33 +1398,13 @@ const loop = new GameLoop(
     const projResult = bullets.updateProjectiles(dt, aiSystem, level.collidables, player);
     for (const hit of projResult.hits) {
       if (hit.target === 'enemy' && hit.enemy) {
-        hit.enemy.takeDamage(hit.damage);
-        bullets.spawnHitEffect(hit.pos);
-        sound.playHitMarker();
-        if (_crosshairEl) {
-          _crosshairEl.classList.remove('shoot');
-          _crosshairEl.classList.add('hit');
-          setTimeout(() => _crosshairEl.classList.remove('hit'), 120);
-        }
-        if (!hit.enemy.isAlive) {
-          _killCount++;
-          const LABELS = { normal: '鸭卒', elite: '★精英鸭卒', rusher: '暴走鸭', tank: '重甲鸭', boss: 'BOSS 鸭王' };
-          const label = LABELS[hit.enemy.enemyType] ?? '鸭卒';
-          const XP_BY_TYPE = { normal: 50, elite: 200, rusher: 75, tank: 150, boss: 500 };
-          const xpGain = XP_BY_TYPE[hit.enemy.enemyType] ?? XP_REWARDS.kill;
-          hud.pushKillFeed(`击毙${label} [${_killCount}]`);
-          hud.setKillCount(_killCount);
-          _gainXP(xpGain, label);
-          bullets.spawnKillEffect(hit.enemy.position);
-          sound.playKillConfirm();
-          _addScreenShake(hit.enemy.isElite ? 0.5 : 0.3);
-          _hitstopTimer = hit.enemy.isElite ? 0.08 : 0.05;
-          // Tarkov-style body loot: enemy carries inventory until searched.
-          // Containers (crates) still use dropLoot; only enemy deaths go through registerBody.
-          loot.registerBody(hit.enemy, _randomEnemyDrop(hit.enemy.enemyType));
+        _applyEnemyHit(hit.enemy, hit.damage, hit.pos, { rewardPlayer: true, showHitFeedback: true });
+        if (_isMultiplayer && network.connected) {
+          network.sendPlayerHit('enemy', hit.enemy.networkId, hit.damage);
         }
       } else if (hit.target === 'player') {
         const partHit = health.takeDamage(hit.damage);
+        _syncEquippedArmorItem();
         player.health = health.isAlive ? Math.round(health.effectiveHpFraction * player.maxHealth) : 0;
         player.speedMultiplier = health.speedMultiplier;
         hud.showDamageFlash();
@@ -1181,7 +1412,7 @@ const loop = new GameLoop(
         _addScreenShake(0.4);
         _showDamageDirection(hit.pos.x, hit.pos.z);
         hud.pushKillFeed(`中弹！(${_partLabel(partHit)}) -${hit.damage}HP`);
-        if (health.armorJustBroke) hud.pushKillFeed('⚠ 护甲已损毁！');
+        if (health.armorJustBroke) hud.pushKillFeed(`⚠ ${health.armorBreakLabel ?? '护甲'}已损毁！`);
         bodyLootUI.notifyPlayerHit();
         if (!health.isAlive) _onPlayerDied();
       }
@@ -1190,11 +1421,16 @@ const loop = new GameLoop(
     // AI
     _firedRecentlyTimer = Math.max(0, _firedRecentlyTimer - dt);
     _playerFiredRecently = _firedRecentlyTimer > 0;
-    const aiResult = aiSystem.update(dt, player.position, level.collidables, _playerFiredRecently);
-    handleEnemyShots(aiResult.shots);
-    if (aiResult.eliteAlerted) {
-      sound.playEliteAlert();
-      hud.pushKillFeed('⚠ 精英鸭卒发现你！');
+    if (!_isMultiplayer || network.isHost) {
+      const aiResult = aiSystem.update(dt, player.position, level.collidables, _playerFiredRecently);
+      handleEnemyShots(aiResult.shots);
+      if (aiResult.eliteAlerted) {
+        sound.playEliteAlert();
+        hud.pushKillFeed('⚠ 精英鸭卒发现你！');
+      }
+      if (_isMultiplayer && network.connected) {
+        network.sendAIState(aiSystem.getNetworkSnapshot(), aiResult.shots, aiResult.eliteAlerted, aiSystem.waveCount);
+      }
     }
 
     // Boss health bar
@@ -1391,7 +1627,7 @@ const loop = new GameLoop(
     hud.update(dt);
     hud.setHealth(player.health, player.maxHealth);
     hud.setStamina(player.stamina, player.maxStamina);
-    hud.setArmor(health.armorPct);
+    hud.setArmor(health.armorState);
     hud.setBleedingState(health.isBleeding);
     hud.setBodyParts(health.getPartSnapshot());
     hud.setWeapon(

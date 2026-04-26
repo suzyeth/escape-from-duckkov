@@ -25,6 +25,8 @@ export class HUD {
     this._bleedEl       = document.getElementById('bleed-indicator');
     this._armorWrap     = document.getElementById('armor-bar-wrap');
     this._armorBar      = document.getElementById('armor-bar-inner');
+    this._helmetWrap    = null;
+    this._helmetBar     = null;
     this._healWrap      = document.getElementById('heal-channel-wrap');
     this._healBar       = document.getElementById('heal-channel-inner');
     this._healLabel     = document.getElementById('heal-channel-label');
@@ -40,6 +42,21 @@ export class HUD {
     this._onTimerExpire = null;
     this._killCountEl   = document.getElementById('kill-count');
     this._lowHpVignette = document.getElementById('low-health-vignette');
+
+    if (this._armorWrap) {
+      this._helmetWrap = this._armorWrap.cloneNode(true);
+      this._helmetWrap.id = 'helmet-bar-wrap';
+      const label = this._helmetWrap.querySelector('#armor-bar-label');
+      if (label) label.id = 'helmet-bar-label';
+      if (label) label.textContent = '头盔';
+      const outer = this._helmetWrap.querySelector('#armor-bar-outer');
+      if (outer) outer.id = 'helmet-bar-outer';
+      const inner = this._helmetWrap.querySelector('#armor-bar-inner');
+      if (inner) inner.id = 'helmet-bar-inner';
+      this._helmetBar = inner;
+      this._helmetWrap.style.display = 'none';
+      this._armorWrap.insertAdjacentElement('afterend', this._helmetWrap);
+    }
 
     // Cache weapon slot elements
     this._wslots = [];
@@ -93,12 +110,27 @@ export class HUD {
    * Armor bar: pct = 0–1 (fraction remaining), -1 = no armor equipped.
    * @param {number} pct
    */
-  setArmor(pct) {
+  setArmor(state) {
     if (!this._armorWrap || !this._armorBar) return;
-    if (pct < 0) { this._armorWrap.style.display = 'none'; return; }
-    this._armorWrap.style.display = 'block';
-    this._armorBar.style.width    = `${Math.max(0, pct) * 100}%`;
-    this._armorBar.style.background = pct > 0.5 ? '#66bb88' : pct > 0.2 ? '#aaaa44' : '#bb6644';
+    const bodyPct = typeof state === 'number' ? state : (state?.bodyPct ?? -1);
+    const headPct = typeof state === 'number' ? -1 : (state?.headPct ?? -1);
+
+    if (bodyPct < 0) {
+      this._armorWrap.style.display = 'none';
+    } else {
+      this._armorWrap.style.display = 'block';
+      this._armorBar.style.width = `${Math.max(0, bodyPct) * 100}%`;
+      this._armorBar.style.background = bodyPct > 0.5 ? '#66bb88' : bodyPct > 0.2 ? '#aaaa44' : '#bb6644';
+    }
+
+    if (!this._helmetWrap || !this._helmetBar) return;
+    if (headPct < 0) {
+      this._helmetWrap.style.display = 'none';
+    } else {
+      this._helmetWrap.style.display = 'block';
+      this._helmetBar.style.width = `${Math.max(0, headPct) * 100}%`;
+      this._helmetBar.style.background = headPct > 0.5 ? '#77aaff' : headPct > 0.2 ? '#88aacc' : '#bb6644';
+    }
   }
 
   /**

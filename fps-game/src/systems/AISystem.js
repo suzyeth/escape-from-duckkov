@@ -26,6 +26,7 @@ export class AISystem {
     this._scene   = scene;
     /** @type {Enemy[]} */
     this.enemies  = [];
+    this._nextEnemyId = 1;
     this._respawnTimer = 0;
     this._waveCount    = 0;
     this._pruneTimer   = 0;
@@ -39,6 +40,52 @@ export class AISystem {
     let count = 0;
     for (const e of this.enemies) if (e.isAlive) count++;
     return count;
+  }
+
+  getEnemyById(id) {
+    if (!id) return null;
+    return this.enemies.find(enemy => enemy.networkId === id) || null;
+  }
+
+  getNetworkSnapshot() {
+    return this.enemies.map((enemy) => ({
+      id: enemy.networkId,
+      enemyType: enemy.enemyType,
+      x: enemy.position.x,
+      z: enemy.position.z,
+      facing: enemy._facing,
+      health: enemy.health,
+      maxHealth: enemy.maxHealth,
+      state: enemy.state,
+      waypoints: enemy.waypoints.map((wp) => [wp.x, wp.z]),
+    }));
+  }
+
+  applyNetworkSnapshot(snapshot = [], waveCount = this._waveCount) {
+    const seen = new Set();
+
+    for (const data of snapshot) {
+      if (!data || !data.id) continue;
+      let enemy = this.getEnemyById(data.id);
+      if (!enemy) {
+        const pos = new THREE.Vector3(Number(data.x) || 0, 0, Number(data.z) || 0);
+        const waypoints = Array.isArray(data.waypoints)
+          ? data.waypoints.map(([x, z]) => new THREE.Vector3(Number(x) || 0, 0, Number(z) || 0))
+          : [];
+        enemy = this._createEnemy(pos, waypoints, data.enemyType ?? 'normal');
+        this.enemies.push(enemy);
+      }
+      seen.add(enemy.networkId);
+      this._applyEnemySnapshot(enemy, data);
+    }
+
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      if (seen.has(this.enemies[i].networkId)) continue;
+      this._disposeEnemy(this.enemies[i]);
+      this.enemies.splice(i, 1);
+    }
+
+    this._waveCount = Number(waveCount) || 0;
   }
 
   /**
@@ -70,15 +117,7 @@ export class AISystem {
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         if (!this.enemies[i].isAlive) {
           const dead = this.enemies[i];
-          // Dispose Three.js resources
-          dead.mesh.traverse(child => {
-            if (child.isMesh) { child.geometry.dispose(); child.material.dispose(); }
-          });
-          this._scene.remove(dead.mesh);
-          if (dead._patrolLine) { this._scene.remove(dead._patrolLine); dead._patrolLine.geometry.dispose(); dead._patrolLine.material.dispose(); }
-          if (dead._stateRing) { this._scene.remove(dead._stateRing); dead._stateRing.geometry.dispose(); dead._stateRing.material.dispose(); }
-          if (dead._targetMarker) { this._scene.remove(dead._targetMarker); dead._targetMarker.geometry.dispose(); dead._targetMarker.material.dispose(); }
-          dead._waypointMarkers?.forEach(m => { this._scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+          this._disposeEnemy(dead);
           this.enemies.splice(i, 1);
         }
       }
@@ -121,7 +160,7 @@ export class AISystem {
       else if (roll < 0.15) type = 'elite';
       else if (roll < 0.30) type = 'rusher';
       else if (roll < 0.40) type = 'tank';
-      const enemy = new Enemy(this._scene, pos, wp, type);
+      const enemy = this._createEnemy(pos, wp, type);
       // Apply difficulty scaling if set
       if (this._difficultyHpMult) {
         const baseDef = ENEMY_TYPES[type] || ENEMY_TYPES.normal;
@@ -170,7 +209,7 @@ export class AISystem {
       const type = cfg.type ?? 'normal';
       const pos = new THREE.Vector3(cfg.pos[0], 0, cfg.pos[1]);
       const waypoints = cfg.waypoints.map(([x, z]) => new THREE.Vector3(x, 0, z));
-      const enemy = new Enemy(this._scene, pos, waypoints, type);
+      const enemy = this._createEnemy(pos, waypoints, type);
       if (enemy.mesh) {
         enemy.mesh.userData.editable = true;
         enemy.mesh.userData.configRef = cfg;
@@ -185,21 +224,10 @@ export class AISystem {
   /** Remove every live enemy and dispose resources. */
   clearEnemies() {
     for (const e of this.enemies) {
-      if (e.mesh) {
-        this._scene.remove(e.mesh);
-        e.mesh.traverse?.(ch => {
-          if (ch.isMesh) {
-            ch.geometry?.dispose?.();
-            if (ch.material?.dispose) ch.material.dispose();
-          }
-        });
-      }
-      if (e._patrolLine)   { this._scene.remove(e._patrolLine);   e._patrolLine.geometry?.dispose?.();   e._patrolLine.material?.dispose?.(); }
-      if (e._stateRing)    { this._scene.remove(e._stateRing);    e._stateRing.geometry?.dispose?.();    e._stateRing.material?.dispose?.(); }
-      if (e._targetMarker) { this._scene.remove(e._targetMarker); e._targetMarker.geometry?.dispose?.(); e._targetMarker.material?.dispose?.(); }
-      e._waypointMarkers?.forEach(m => { this._scene.remove(m); m.geometry?.dispose?.(); m.material?.dispose?.(); });
+      this._disposeEnemy(e);
     }
     this.enemies = [];
+    this._nextEnemyId = 1;
   }
 
   /** Rebuild enemies from a fresh scene config (caller already swapped liveConfig). */
@@ -210,7 +238,7 @@ export class AISystem {
       const type = entry.type ?? 'normal';
       const pos = new THREE.Vector3(entry.pos[0], 0, entry.pos[1]);
       const waypoints = (entry.waypoints ?? [entry.pos]).map(([x, z]) => new THREE.Vector3(x, 0, z));
-      const enemy = new Enemy(this._scene, pos, waypoints, type);
+      const enemy = this._createEnemy(pos, waypoints, type);
       if (enemy.mesh) {
         enemy.mesh.userData.editable = true;
         enemy.mesh.userData.configRef = entry;
@@ -218,6 +246,48 @@ export class AISystem {
       }
       this.enemies.push(enemy);
     }
+  }
+
+  _createEnemy(pos, waypoints, type) {
+    const enemy = new Enemy(this._scene, pos, waypoints, type);
+    enemy.networkId = `e${this._nextEnemyId++}`;
+    return enemy;
+  }
+
+  _applyEnemySnapshot(enemy, data) {
+    enemy.position.set(Number(data.x) || 0, 0, Number(data.z) || 0);
+    enemy._facing = Number(data.facing) || 0;
+    enemy.maxHealth = Math.max(1, Number(data.maxHealth) || enemy.maxHealth);
+    enemy.health = Math.max(0, Math.min(enemy.maxHealth, Number(data.health) || 0));
+
+    const nextState = Number(data.state);
+    enemy.state = Number.isFinite(nextState) ? nextState : enemy.state;
+
+    if (enemy.health <= 0 || enemy.state === 4) {
+      if (enemy.isAlive) enemy._die();
+      return;
+    }
+
+    enemy._syncMesh();
+  }
+
+  _disposeEnemy(enemy) {
+    if (enemy.mesh) {
+      this._scene.remove(enemy.mesh);
+      enemy.mesh.traverse?.(child => {
+        if (!child.isMesh) return;
+        child.geometry?.dispose?.();
+        if (Array.isArray(child.material)) {
+          child.material.forEach(mat => mat?.dispose?.());
+        } else {
+          child.material?.dispose?.();
+        }
+      });
+    }
+    if (enemy._patrolLine)   { this._scene.remove(enemy._patrolLine);   enemy._patrolLine.geometry?.dispose?.();   enemy._patrolLine.material?.dispose?.(); }
+    if (enemy._stateRing)    { this._scene.remove(enemy._stateRing);    enemy._stateRing.geometry?.dispose?.();    enemy._stateRing.material?.dispose?.(); }
+    if (enemy._targetMarker) { this._scene.remove(enemy._targetMarker); enemy._targetMarker.geometry?.dispose?.(); enemy._targetMarker.material?.dispose?.(); }
+    enemy._waypointMarkers?.forEach(marker => { this._scene.remove(marker); marker.geometry?.dispose?.(); marker.material?.dispose?.(); });
   }
 
   /**

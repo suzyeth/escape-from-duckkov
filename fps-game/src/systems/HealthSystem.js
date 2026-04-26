@@ -46,11 +46,14 @@ export class HealthSystem {
   constructor() {
     this._hp       = {};
     this._bleeding = false;
-    // Armor
-    this._armorHp       = 0;     // current armor durability
-    this._armorMax      = 0;     // max armor durability (0 = no armor equipped)
-    this._armorReduce   = 0;     // fraction of incoming damage blocked (0–0.65)
-    this._armorHeadOnly = false; // true for helmet — only protects HEAD part
+    // Armor slots
+    this._bodyArmorHp     = 0;
+    this._bodyArmorMax    = 0;
+    this._bodyArmorReduce = 0;
+    this._headArmorHp     = 0;
+    this._headArmorMax    = 0;
+    this._headArmorReduce = 0;
+    this._armorJustBroke  = null;
     this.reset();
   }
 
@@ -70,6 +73,13 @@ export class HealthSystem {
       this._maxHp[key] = def.maxHp + bonus;
     }
     this._bleeding = false;
+    this._bodyArmorHp = 0;
+    this._bodyArmorMax = 0;
+    this._bodyArmorReduce = 0;
+    this._headArmorHp = 0;
+    this._headArmorMax = 0;
+    this._headArmorReduce = 0;
+    this._armorJustBroke = null;
   }
 
   /** Get actual max HP for a part (including talent bonus) */
@@ -99,11 +109,36 @@ export class HealthSystem {
 
   /** 0–1 fraction of current / max armor HP, or -1 when no armor equipped. */
   get armorPct() {
-    return this._armorMax > 0 ? this._armorHp / this._armorMax : -1;
+    if (this._bodyArmorMax > 0) return this._bodyArmorHp / this._bodyArmorMax;
+    if (this._headArmorMax > 0) return this._headArmorHp / this._headArmorMax;
+    return -1;
   }
+
+  get armorState() {
+    return {
+      bodyPct: this._bodyArmorMax > 0 ? this._bodyArmorHp / this._bodyArmorMax : -1,
+      headPct: this._headArmorMax > 0 ? this._headArmorHp / this._headArmorMax : -1,
+      bodyHp: this._bodyArmorHp,
+      headHp: this._headArmorHp,
+      bodyMax: this._bodyArmorMax,
+      headMax: this._headArmorMax,
+    };
+  }
+
+  get armorHp() { return this._bodyArmorHp; }
+  get armorMax() { return this._bodyArmorMax; }
+  get bodyArmorHp() { return this._bodyArmorHp; }
+  get bodyArmorMax() { return this._bodyArmorMax; }
+  get headArmorHp() { return this._headArmorHp; }
+  get headArmorMax() { return this._headArmorMax; }
 
   /** True on the frame armor was destroyed */
   get armorJustBroke() { return this._armorJustBroke; }
+  get armorBreakLabel() {
+    if (this._armorJustBroke === 'head') return '头盔';
+    if (this._armorJustBroke === 'body') return '护甲';
+    return null;
+  }
 
   /**
    * Equip or replace armor.
@@ -113,11 +148,18 @@ export class HealthSystem {
    * @param {{ armorHp: number, reduce: number }} def
    * @param {number} armorBonus  extra reduction from talents (e.g., 0.20)
    */
-  equipArmor(def, armorBonus = 0) {
-    this._armorHp       = def.armorHp;
-    this._armorMax      = def.armorHp;
-    this._armorReduce   = Math.min(0.85, def.reduce + armorBonus); // cap at 85%
-    this._armorHeadOnly = def.headOnly ?? false;
+  equipArmor(def, armorBonus = 0, currentHp = def.armorHp) {
+    const hp = Math.max(0, Math.min(def.armorHp, currentHp));
+    if (def.headOnly) {
+      this._headArmorHp = hp;
+      this._headArmorMax = def.armorHp;
+      this._headArmorReduce = Math.min(0.85, def.reduce + armorBonus);
+    } else {
+      this._bodyArmorHp = hp;
+      this._bodyArmorMax = def.armorHp;
+      this._bodyArmorReduce = Math.min(0.85, def.reduce + armorBonus);
+    }
+    this._armorJustBroke = null;
   }
 
   /** Aggregate HP across all parts. */
@@ -198,13 +240,18 @@ export class HealthSystem {
   takeDamage(amount, part = null) {
     const target = part ?? this._rollHitPart();
 
-    // Armor absorbs damage; headOnly armor (helmet) only protects the HEAD part
-    this._armorJustBroke = false;
-    if (this._armorHp > 0 && (!this._armorHeadOnly || target === PART.HEAD)) {
-      const absorbed = amount * this._armorReduce;
-      this._armorHp  = Math.max(0, this._armorHp - absorbed);
+    // Armor absorbs damage using separate body/head slots.
+    this._armorJustBroke = null;
+    if (target === PART.HEAD && this._headArmorHp > 0) {
+      const absorbed = amount * this._headArmorReduce;
+      this._headArmorHp = Math.max(0, this._headArmorHp - absorbed);
+      amount = amount - absorbed;
+      if (this._headArmorHp <= 0) this._armorJustBroke = 'head';
+    } else if (target !== PART.HEAD && this._bodyArmorHp > 0) {
+      const absorbed = amount * this._bodyArmorReduce;
+      this._bodyArmorHp = Math.max(0, this._bodyArmorHp - absorbed);
       amount         = amount - absorbed;
-      if (this._armorHp <= 0) this._armorJustBroke = true;
+      if (this._bodyArmorHp <= 0) this._armorJustBroke = 'body';
     }
     this._hp[target] = Math.max(0, this._hp[target] - amount);
     // 30 % chance to cause bleeding on each hit

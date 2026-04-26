@@ -10,6 +10,8 @@ export class LobbyScreen {
     this._onStartSolo = null;
     this._onStartMulti = null;
     this._network = null;
+    this._startBtnShown = false;
+    this._playerCount = 1;
   }
 
   onStartSolo(fn) { this._onStartSolo = fn; }
@@ -97,14 +99,77 @@ export class LobbyScreen {
     el.appendChild(line);
   }
 
+  _showStartButton() {
+    if (this._startBtnShown) return;
+    const el = document.getElementById('lobby-status');
+    if (!el) return;
+    const goBtn = document.createElement('button');
+    goBtn.className = 'lobby-btn';
+    goBtn.textContent = '开始游戏';
+    goBtn.style.marginTop = '0.8rem';
+    goBtn.addEventListener('click', () => this._network.startGame());
+    el.appendChild(goBtn);
+    this._startBtnShown = true;
+  }
+
+  _hideStartButton() {
+    const el = document.getElementById('lobby-status');
+    if (!el) return;
+    for (const btn of el.querySelectorAll('button')) btn.remove();
+    this._startBtnShown = false;
+  }
+
+  _bindRoomHandlers() {
+    this._startBtnShown = false;
+    this._playerCount = 1;
+
+    this._network.onGameStart(() => {
+      this.hide();
+      if (this._onStartMulti) this._onStartMulti();
+    });
+
+    this._network.onError((msg) => {
+      this._setStatus(msg);
+    });
+
+    this._network.onDisconnect(() => {
+      this._hideStartButton();
+      if (this._el.style.display !== 'none') {
+        this._setStatus('连接已断开。');
+      }
+    });
+
+    this._network.onHostChanged((hostId, isHost) => {
+      if (isHost && this._playerCount >= 2) this._showStartButton();
+      else this._hideStartButton();
+      this._appendStatus(isHost ? '你现在是房主。' : `房主已切换为 ${hostId}`);
+    });
+
+    this._network.onPlayerJoined((playerId, count) => {
+      this._playerCount = count;
+      this._appendStatus(`玩家 ${playerId} 已加入 (${count}/2)`);
+      if (count >= 2 && this._network.isHost) {
+        this._showStartButton();
+      }
+    });
+
+    this._network.onPlayerLeft((playerId, count) => {
+      this._playerCount = count;
+      this._appendStatus(`玩家 ${playerId} 已离开 (${count}/2)`);
+      if (count < 2) this._hideStartButton();
+    });
+  }
+
   async _createRoom() {
     this._setStatus('连接服务器…');
 
     try {
       const serverUrl = this._getServerUrl();
       await this._network.connect(serverUrl);
+      this._bindRoomHandlers();
 
       this._network.onRoomCreated((code) => {
+        this._playerCount = 1;
         this._setStatus('');
         const el = document.getElementById('lobby-status');
         if (!el) return;
@@ -114,25 +179,6 @@ export class LobbyScreen {
         codeLine.style.color = '#c8a96e';
         el.appendChild(codeLine);
         this._appendStatus('等待其他玩家加入…');
-      });
-
-      this._network.onPlayerJoined((playerId, count) => {
-        this._appendStatus(`玩家 ${playerId} 已加入 (${count}/2)`);
-        if (count >= 2) {
-          const el = document.getElementById('lobby-status');
-          if (!el) return;
-          const goBtn = document.createElement('button');
-          goBtn.className = 'lobby-btn';
-          goBtn.textContent = '开始游戏';
-          goBtn.style.marginTop = '0.8rem';
-          goBtn.addEventListener('click', () => this._network.startGame());
-          el.appendChild(goBtn);
-        }
-      });
-
-      this._network.onGameStart(() => {
-        this.hide();
-        if (this._onStartMulti) this._onStartMulti();
       });
 
       this._network.createRoom();
@@ -147,18 +193,11 @@ export class LobbyScreen {
     try {
       const serverUrl = this._getServerUrl();
       await this._network.connect(serverUrl);
+      this._bindRoomHandlers();
 
       this._network.onRoomJoined((roomCode) => {
+        this._playerCount = 2;
         this._setStatus(`已加入房间 ${roomCode}，等待房主开始…`);
-      });
-
-      this._network.onGameStart(() => {
-        this.hide();
-        if (this._onStartMulti) this._onStartMulti();
-      });
-
-      this._network.onError((msg) => {
-        this._setStatus(msg);
       });
 
       this._network.joinRoom(code);

@@ -136,7 +136,7 @@ export class InventorySystem {
    */
   addItem(defId, count = 1) {
     const def = ITEM_DEFS[defId];
-    if (!def) return false;
+    if (!def || count <= 0) return false;
 
     // Stack into existing slot for stackables; handle overflow by continuing
     if (def.stackable) {
@@ -149,17 +149,65 @@ export class InventorySystem {
           if (count <= 0) return true;
         }
       }
-      if (count <= 0) return true;
+      let allAdded = true;
+      while (count > 0) {
+        const pos = this._findSpace(def.w, def.h);
+        if (!pos) {
+          allAdded = false;
+          break;
+        }
+
+        const stackCount = Math.min(def.maxStack, count);
+        const id = this._nextId++;
+        const item = { id, def, count: stackCount, row: pos.row, col: pos.col };
+        if (def.armor) item.armorHp = def.armor.armorHp;
+        this.items.set(id, item);
+        this._fill(pos.row, pos.col, def.w, def.h, id);
+        count -= stackCount;
+      }
+      return allAdded;
     }
 
-    // Place new slot (may be called with remaining overflow count)
-    const pos = this._findSpace(def.w, def.h);
-    if (!pos) return false;  // inventory full
+    let allAdded = true;
+    for (let i = 0; i < count; i++) {
+      const pos = this._findSpace(def.w, def.h);
+      if (!pos) {
+        allAdded = false;
+        break;
+      }
 
-    const id   = this._nextId++;
-    const item = { id, def, count: def.stackable ? count : 1, row: pos.row, col: pos.col };
-    this.items.set(id, item);
-    this._fill(pos.row, pos.col, def.w, def.h, id);
+      const id = this._nextId++;
+      const item = { id, def, count: 1, row: pos.row, col: pos.col };
+      if (def.armor) item.armorHp = def.armor.armorHp;
+      this.items.set(id, item);
+      this._fill(pos.row, pos.col, def.w, def.h, id);
+    }
+    return allAdded;
+  }
+
+  canAddItem(defId, count = 1) {
+    const def = ITEM_DEFS[defId];
+    if (!def || count <= 0) return false;
+
+    const grid = this._grid.map((row) => [...row]);
+
+    if (def.stackable) {
+      for (const item of this.items.values()) {
+        if (item.def.id !== defId || item.count >= def.maxStack) continue;
+        const room = def.maxStack - item.count;
+        const take = Math.min(room, count);
+        count -= take;
+        if (count <= 0) return true;
+      }
+    }
+
+    while (count > 0) {
+      const pos = this._findSpaceInGrid(grid, def.w, def.h);
+      if (!pos) return false;
+      this._fillGrid(grid, pos.row, pos.col, def.w, def.h, -1);
+      count -= def.stackable ? Math.min(def.maxStack, count) : 1;
+    }
+
     return true;
   }
 
@@ -185,6 +233,25 @@ export class InventorySystem {
     this._fill(item.row, item.col, def.w, def.h, null);
     this.items.delete(instanceId);
     return def;
+  }
+
+  removeOneByDefId(defId) {
+    let chosen = null;
+    for (const item of this.items.values()) {
+      if (item.def.id === defId) {
+        chosen = item;
+        break;
+      }
+    }
+    if (!chosen) return false;
+
+    if (chosen.def.stackable) {
+      chosen.count -= 1;
+      if (chosen.count <= 0) this.removeItem(chosen.id);
+    } else {
+      this.removeItem(chosen.id);
+    }
+    return true;
   }
 
   /**
@@ -298,27 +365,39 @@ export class InventorySystem {
   // ── Private ────────────────────────────────────────────────────────────────
 
   _findSpace(w, h) {
+    return this._findSpaceInGrid(this._grid, w, h);
+  }
+
+  _findSpaceInGrid(grid, w, h) {
     for (let r = 0; r <= ROWS - h; r++) {
       for (let c = 0; c <= COLS - w; c++) {
-        if (this._canPlace(r, c, w, h)) return { row: r, col: c };
+        if (this._canPlaceInGrid(grid, r, c, w, h)) return { row: r, col: c };
       }
     }
     return null;
   }
 
   _canPlace(row, col, w, h) {
+    return this._canPlaceInGrid(this._grid, row, col, w, h);
+  }
+
+  _canPlaceInGrid(grid, row, col, w, h) {
     for (let r = row; r < row + h; r++) {
       for (let c = col; c < col + w; c++) {
-        if (this._grid[r][c] !== null) return false;
+        if (grid[r][c] !== null) return false;
       }
     }
     return true;
   }
 
   _fill(row, col, w, h, value) {
+    this._fillGrid(this._grid, row, col, w, h, value);
+  }
+
+  _fillGrid(grid, row, col, w, h, value) {
     for (let r = row; r < row + h; r++) {
       for (let c = col; c < col + w; c++) {
-        this._grid[r][c] = value;
+        grid[r][c] = value;
       }
     }
   }
