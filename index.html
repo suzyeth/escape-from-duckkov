@@ -1,0 +1,2434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tarduck — quack and ship it</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; overflow: hidden; font-family: 'Courier New', monospace; cursor: none; }
+    #canvas-container { width: 100vw; height: 100vh; }
+
+    /* ── Crosshair ─────────────────────────────────── */
+    #crosshair {
+      position: fixed; width: 18px; height: 18px;
+      pointer-events: none; transform: translate(-50%, -50%); z-index: 200;
+    }
+    #crosshair::before, #crosshair::after {
+      content: ''; position: absolute; background: rgba(255,255,255,0.85);
+      transition: background 0.05s;
+    }
+    #crosshair::before { width: 1px; height: 100%; left: 50%; transform: translateX(-50%); }
+    #crosshair::after  { height: 1px; width: 100%; top: 50%;  transform: translateY(-50%); }
+    #crosshair.hit::before, #crosshair.hit::after { background: #ff3333; }
+    #crosshair.hit { transform: translate(-50%, -50%) scale(1.6); }
+    #crosshair.shoot { transform: translate(-50%, -50%) scale(1.3); }
+    #crosshair.ads { transform: translate(-50%, -50%) scale(0.6); }
+    #crosshair.ads::before, #crosshair.ads::after { background: rgba(255,100,100,0.9); }
+
+    /* ── Main menu (start screen) ──────────────────────────
+       Two-column edge layout so the live 3D scene fills the centre:
+         LEFT  → brand + action buttons (Solo / Co-op / Rules)
+         RIGHT → info card stack (Bosses / Mission / Controls)
+       Top-right shows the live POI label of the camera tour, bottom
+       shows the Vibe Jam credit. No modal indirection — every action
+       and every piece of info is visible from the menu in one glance. */
+    #start-screen {
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at center, rgba(0,0,0,.18) 0%, rgba(0,0,0,.55) 65%, rgba(0,0,0,.85) 100%);
+      display: grid;
+      grid-template-columns: 360px 1fr 360px;
+      grid-template-rows: 1fr;
+      gap: 0;
+      align-items: center;
+      color: #c8a96e; z-index: 100;
+      animation: startFadeIn .6s ease-out;
+      overflow: hidden;
+      padding: 5.5rem 2.5rem 4rem;
+    }
+    @keyframes startFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Film-grain noise — extraction-shooter texture without scanlines. */
+    #start-screen::before {
+      content: '';
+      position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: overlay;
+      opacity: .5;
+    }
+
+    /* ── Brand corner (top-left) ─────────────────────────── */
+    .menu-brand {
+      position: absolute; top: 2.2rem; left: 2.5rem;
+      animation: featuresIn .6s ease-out both;
+    }
+    #start-screen h1 {
+      font-size: 2.6rem;
+      letter-spacing: .3em;
+      text-transform: uppercase;
+      margin-bottom: .25rem;
+      color: #f0d59a;
+      font-weight: 900;
+      text-shadow:
+        2px 2px 0 #000,
+        0 0 8px rgba(0, 0, 0, 0.9),
+        0 0 24px rgba(200, 169, 110, 0.35);
+      position: relative;
+    }
+    #start-screen h1::after {
+      content: '';
+      position: absolute; left: 0; bottom: -.35rem;
+      width: 70%; height: 2px;
+      background: linear-gradient(90deg, #c8a96e, transparent);
+    }
+    #start-screen p {
+      font-size: .8rem; color: #d8c894;
+      letter-spacing: .45em;
+      opacity: .85;
+      text-shadow: 1px 1px 0 #000;
+      margin: 0;
+    }
+    #start-screen p .tag-dot { color: #ff8800; opacity: .9; margin: 0 .15em; }
+
+    /* ── POI label (top-right) ───────────────────────────── */
+    #menu-poi-label {
+      position: absolute; top: 2.5rem; right: 2.5rem;
+      max-width: 360px;
+      font-size: .7rem; color: #c8a96e;
+      letter-spacing: .25em; text-transform: uppercase;
+      text-align: right;
+      text-shadow: 1px 1px 0 #000;
+      animation: featuresIn .6s ease-out .15s both;
+    }
+    #menu-poi-label::before {
+      content: '◉ ';
+      color: #ff4422;
+      animation: poiBlink 1.6s ease-in-out infinite;
+    }
+    @keyframes poiBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Left column: actions ────────────────────────────── */
+    .menu-actions {
+      grid-column: 1; grid-row: 1;
+      display: flex; flex-direction: column;
+      gap: .8rem;
+      align-self: center;
+      animation: featuresIn .6s ease-out .1s both;
+    }
+    .menu-actions-label {
+      font-size: .65rem; color: #888;
+      letter-spacing: .3em; text-transform: uppercase;
+      margin-bottom: .25rem;
+      padding-bottom: .25rem;
+      border-bottom: 1px solid #4a3820;
+    }
+
+    /* Big primary CTA (Solo) */
+    #start-btn {
+      padding: 1.05rem 1.6rem; font-size: 1.15rem; font-family: inherit;
+      letter-spacing: .25em; text-transform: uppercase; font-weight: 900;
+      background: linear-gradient(180deg, rgba(50, 36, 18, 0.88), rgba(24, 16, 8, 0.94));
+      border: 2px solid #c8a96e;
+      color: #f0d59a;
+      cursor: pointer;
+      border-radius: 0;
+      transition: background .2s, transform .12s, box-shadow .2s, border-color .2s;
+      box-shadow:
+        inset 0 0 0 1px rgba(0,0,0,.4),
+        0 4px 12px rgba(0,0,0,.6);
+      position: relative;
+      text-shadow: 1px 1px 0 #000;
+      text-align: left;
+      width: 100%;
+    }
+    #start-btn .ico {
+      display: inline-block;
+      width: 1.6em;
+      color: #ffaa44;
+    }
+    #start-btn::after {
+      content: ' ▶';
+      display: inline-block;
+      float: right;
+      transition: transform .2s;
+      color: #ffaa44;
+    }
+    #start-btn:hover {
+      background: linear-gradient(180deg, rgba(90, 64, 30, 0.92), rgba(48, 30, 12, 0.95));
+      border-color: #f0d59a;
+      box-shadow:
+        inset 0 0 0 1px rgba(0,0,0,.4),
+        0 4px 12px rgba(0,0,0,.6),
+        0 0 22px rgba(240, 213, 154, .45);
+    }
+    #start-btn:hover::after { transform: translateX(4px); }
+    #start-btn:active { transform: translateY(1px); }
+
+    /* Secondary actions (Co-op / Rules / Settings) — narrower steel buttons */
+    .menu-action-secondary {
+      padding: .75rem 1.2rem; font-size: .85rem; font-family: inherit;
+      letter-spacing: .15em; text-transform: uppercase; font-weight: bold;
+      background: rgba(20, 16, 10, 0.78);
+      border: 1px solid #4a3820;
+      color: #c8a96e;
+      cursor: pointer;
+      border-radius: 0;
+      transition: background .15s, border-color .15s, color .15s, transform .12s;
+      text-align: left;
+      width: 100%;
+      backdrop-filter: blur(2px);
+    }
+    .menu-action-secondary:hover {
+      background: rgba(60, 44, 22, 0.88);
+      border-color: #c8a96e;
+      color: #f0d59a;
+    }
+    .menu-action-secondary:active { transform: translateY(1px); }
+    .menu-action-secondary .ico {
+      display: inline-block;
+      width: 1.4em;
+      color: #ffaa44;
+    }
+    .menu-action-secondary .arrow {
+      float: right; opacity: .5;
+      transition: transform .15s, opacity .15s;
+    }
+    .menu-action-secondary:hover .arrow { opacity: 1; transform: translateX(3px); }
+
+    /* ── Right column: info card stack ───────────────────── */
+    .menu-info {
+      grid-column: 3; grid-row: 1;
+      display: flex; flex-direction: column;
+      gap: .7rem;
+      align-self: center;
+      animation: featuresIn .6s ease-out .2s both;
+    }
+    .menu-info-card {
+      background: rgba(20, 16, 10, 0.78);
+      border: 1px solid #4a3820;
+      border-radius: 0;
+      padding: .8rem 1rem;
+      backdrop-filter: blur(4px);
+      box-shadow:
+        inset 0 0 0 1px rgba(0,0,0,.5),
+        0 2px 8px rgba(0,0,0,.5);
+      transition: border-color .2s;
+    }
+    .menu-info-card:hover { border-color: #c8a96e; }
+    .menu-info-title {
+      font-size: .68rem;
+      color: #f0d59a;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      font-weight: 900;
+      padding-bottom: .35rem;
+      margin-bottom: .5rem;
+      border-bottom: 1px solid #4a3820;
+      text-shadow: 1px 1px 0 #000;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .menu-info-title .tag {
+      font-size: .55rem; color: #888; font-weight: normal;
+      letter-spacing: .15em;
+    }
+    /* key/value rows */
+    .menu-info-row {
+      display: flex; align-items: baseline;
+      font-size: .68rem; line-height: 1.5;
+      margin-bottom: .2rem;
+    }
+    .menu-info-row .key {
+      color: #f0d59a; font-weight: bold;
+      min-width: 56px;
+      letter-spacing: .05em;
+    }
+    .menu-info-row .val {
+      color: #aaa;
+      flex: 1;
+    }
+    /* Boss row variant */
+    .menu-info-boss {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .68rem; line-height: 1.4;
+      margin-bottom: .3rem;
+    }
+    .menu-info-boss-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      box-shadow: 0 0 6px currentColor;
+      flex-shrink: 0;
+      animation: bossPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes bossPulse {
+      0%, 100% { transform: scale(1);    opacity: .85; }
+      50%      { transform: scale(1.15); opacity: 1;   }
+    }
+    .menu-info-boss-name { color: #f0d59a; font-weight: bold; }
+    .menu-info-boss-desc { color: #888; }
+    .menu-info-foot {
+      font-size: .62rem; color: #777; margin-top: .4rem; line-height: 1.4;
+      border-top: 1px solid #2a2010; padding-top: .35rem;
+    }
+    .menu-info-foot b { color: #ff4422; }
+
+    /* Mission bullet list */
+    .menu-info-mission {
+      font-size: .68rem; line-height: 1.55; color: #bbb;
+      list-style: none;
+    }
+    .menu-info-mission li {
+      padding-left: 1rem;
+      position: relative;
+      margin-bottom: .2rem;
+    }
+    .menu-info-mission li::before {
+      content: '▸';
+      position: absolute; left: 0;
+      color: #c8a96e;
+    }
+    .menu-info-mission b { color: #f0d59a; }
+
+    /* Old #start-controls/#raid-stats kept hidden (legacy). */
+    #start-controls { display: none; }
+    #raid-stats { display: none; }
+    #rules-btn { display: none; }
+
+    /* ── Bottom credit (centered footer) ─────────────────── */
+    .start-jam-badge {
+      position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+      font-size: .68rem; color: #888;
+      letter-spacing: .18em; text-transform: uppercase;
+      animation: featuresIn .6s ease-out .35s both;
+      text-align: center;
+    }
+    .start-jam-badge a {
+      color: #c8a96e; text-decoration: none;
+      border-bottom: 1px dotted #5a4820;
+      padding-bottom: 1px;
+      transition: color .2s, border-color .2s;
+    }
+    .start-jam-badge a:hover { color: #f0d59a; border-color: #f0d59a; }
+    .start-jam-badge .sep { margin: 0 .8em; opacity: .4; }
+    .start-jam-badge .full-rules-link { cursor: pointer; }
+
+    /* ── HUD shell ─────────────────────────────────── */
+    #hud { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 10; }
+
+    /* damage flash overlay — vignette style */
+    #damage-flash {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.8) 100%);
+      opacity: 0;
+      transition: opacity .12s; pointer-events: none;
+    }
+    /* persistent low-health vignette */
+    #low-health-vignette {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(180,0,0,0.5) 100%);
+      opacity: 0;
+      transition: opacity .5s; pointer-events: none;
+      animation: pulse-vignette 2s ease-in-out infinite;
+    }
+    @keyframes pulse-vignette {
+      0%, 100% { opacity: var(--vig-opacity, 0); }
+      50% { opacity: calc(var(--vig-opacity, 0) * 0.6); }
+    }
+
+    /* Top-left: status + XP compact. Sizes bumped so they're legible
+       at desktop res without leaning forward; gray brought up from the
+       near-invisible #555 to #aaa. */
+    #status-display {
+      position: absolute; top: .8rem; left: 1.5rem;
+      font-size: .8rem; color: #aaa; letter-spacing: .1em; text-transform: uppercase;
+    }
+    #xp-display {
+      position: absolute; top: 2.4rem; left: 1.5rem;
+      font-size: .75rem; color: #c8a96e; letter-spacing: .08em;
+    }
+    #xp-value { font-size: 1.1rem; display: inline; margin-left: .35rem; font-weight: bold; }
+
+    /* XP popup */
+    .xp-popup {
+      position: fixed; pointer-events: none; z-index: 300;
+      font-size: 1rem; font-weight: bold; color: #ffd700;
+      text-shadow: 0 0 8px rgba(255,215,0,0.5);
+      animation: xpFloat 1.2s ease-out forwards;
+    }
+    @keyframes xpFloat {
+      0%   { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-40px); }
+    }
+
+    /* Top-right: timer — slightly bigger so it reads at a glance under
+       the minimap (which sits above it now after the right-side rework). */
+    #timer-display {
+      position: absolute; bottom: 8.5rem; right: 1.5rem; text-align: center;
+      font-size: .75rem; color: #aaa; letter-spacing: .1em;
+    }
+    #timer-value { display: block; font-size: 1.4rem; color: #c8a96e; margin-top: .15rem; font-weight: bold; }
+
+    /* Bottom-left: health + stamina + armor + weight.
+       All bars share the 220px width column. Heights bumped from 4–16px
+       to 6–22px so they read clearly on a 1080p+ desktop. */
+    #health-display { position: absolute; bottom: 1.2rem; left: 1.5rem; color: #e0e0e0; }
+    #health-label { display: none; }
+    #health-bar-outer {
+      width: 220px; height: 22px; background: rgba(20,20,18,0.85);
+      border: 1px solid #444; border-radius: 4px; overflow: hidden; position: relative;
+      display: flex; align-items: center;
+    }
+    #health-bar-inner {
+      height: 100%; width: 100%; background: linear-gradient(90deg, #cc3333, #ee5544);
+      border-radius: 3px; transition: width .25s, background .25s;
+    }
+    #health-hp-text {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      font-size: .85rem; font-weight: bold; color: #fff; z-index: 1;
+      text-shadow: 0 1px 2px rgba(0,0,0,.9);
+      pointer-events: none;
+    }
+    #health-value { display: none; }
+    #health-danger { font-size: .7rem; color: #f44336; margin-top: .2rem; display: none; animation: bleed-pulse .9s ease-in-out infinite; }
+    #health-display.low-hp #health-bar-outer { animation: hp-pulse .8s ease-in-out infinite; }
+    @keyframes hp-pulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(221,51,51,0.3); }
+      50%      { box-shadow: 0 0 12px rgba(221,51,51,0.7); }
+    }
+
+    /* Stamina bar (hidden when full) */
+    #stamina-bar-wrap { width: 220px; margin-top: .35rem; display: none; }
+    #stamina-bar-label {
+      font-size: .6rem; color: #6aa6d8; letter-spacing: .12em;
+      text-transform: uppercase; margin-bottom: .15rem; display: block;
+    }
+    #stamina-bar-outer { height: 6px; background: rgba(20,20,18,0.85); border-radius: 2px; overflow: hidden; }
+    #stamina-bar-inner { height: 100%; width: 100%; background: #44aaff; border-radius: 2px; transition: width .1s, background .2s; }
+
+    /* Body armor bar (hidden when no armor) */
+    #armor-bar-wrap { width: 220px; margin-top: .35rem; display: none; }
+    #armor-bar-label {
+      font-size: .6rem; color: #88cc99; letter-spacing: .12em;
+      text-transform: uppercase; margin-bottom: .15rem; display: block;
+    }
+    #armor-bar-outer { height: 6px; background: rgba(20,20,18,0.85); border-radius: 2px; overflow: hidden; }
+    #armor-bar-inner { height: 100%; width: 100%; background: #66bb88; border-radius: 2px; transition: width .15s, background .2s; }
+
+    /* Helmet armor durability bar — cloned from #armor-bar-wrap in HUD.js
+       (so the DOM exists), but each id is unique, so explicit CSS rules
+       are needed here. Blue tint to distinguish from the green body armor. */
+    #helmet-bar-wrap { width: 220px; margin-top: .35rem; display: none; }
+    #helmet-bar-label {
+      font-size: .6rem; color: #6aa0d8; letter-spacing: .12em;
+      text-transform: uppercase; margin-bottom: .15rem; display: block;
+    }
+    #helmet-bar-outer { height: 6px; background: rgba(20,20,18,0.85); border-radius: 2px; overflow: hidden; }
+    #helmet-bar-inner { height: 100%; width: 100%; background: #77aaff; border-radius: 2px; transition: width .15s, background .2s; }
+
+    /* Weight display (below armor bar) */
+    #weight-display {
+      font-size: .75rem; color: #aaa; margin-top: .35rem; letter-spacing: .06em;
+    }
+    #weight-value { color: #ddd; font-weight: bold; }
+    #weight-display.heavy #weight-value { color: #ff9800; }
+    #weight-display.overloaded #weight-value { color: #f44336; }
+
+    /* Heal channel progress (shown while using medical item) */
+    #heal-channel-wrap {
+      position: absolute; bottom: 28%; left: 50%; transform: translateX(-50%);
+      width: 180px; display: none;
+    }
+    #heal-channel-label { font-size: .62rem; color: #cc4444; letter-spacing: .15em; text-align: center; margin-bottom: .3rem; }
+    #heal-channel-outer { height: 5px; background: #1a0a0a; border-radius: 3px; overflow: hidden; }
+    #heal-channel-inner { height: 100%; width: 0%; background: #cc4444; border-radius: 3px; transition: width .08s; }
+
+    /* Weapon slot bar — right-side vertical quickbar. Sized to balance
+       with the bumped left-side HUD (220px-wide bars + bigger ammo
+       readout). Slots are 72×58 (was 64×50); spacing widened to match. */
+    #weapon-slots {
+      position: absolute; right: 1rem; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .wslot {
+      width: 72px; height: 58px;
+      background: rgba(20, 20, 18, 0.85);
+      border: 1px solid #555; border-radius: 4px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: .65rem; color: #aaa; position: relative;
+      transition: border-color .15s, background .15s, opacity .15s;
+    }
+    .wslot.active {
+      border-color: #dab840; color: #dab840;
+      background: rgba(218, 184, 64, 0.15);
+      box-shadow: 0 0 8px rgba(218,184,64,0.35);
+    }
+    /* Empty slot: dim — no slot ammo, no inventory ammo. Truly out. */
+    .wslot.empty {
+      opacity: 0.35;
+      border-color: #2a2a2a;
+    }
+    .wslot.empty.active { opacity: 0.7; } /* still show active highlight */
+    /* "Has inventory ammo, no weapon" state: clear green tint that survives
+       the .active gold highlight. Dim the weapon icon + cross it out so the
+       slot visually reads as "locked, waiting for the weapon pickup". */
+    .wslot.has-inv-ammo {
+      border-color: #6acc6a !important;
+      border-width: 2px;
+      background: rgba(76, 140, 76, 0.18);
+    }
+    .wslot.has-inv-ammo .wslot-icon {
+      opacity: 0.45;
+      color: #b0d4b0;
+    }
+    /* Even when active, keep the green "no weapon" cue dominant so the
+       player sees the lock state instead of confusing it with a loaded slot. */
+    .wslot.has-inv-ammo.active {
+      border-color: #6acc6a !important;
+      box-shadow: 0 0 8px rgba(106,204,106,0.45);
+    }
+    .wslot-key {
+      /* Position-only base rule. overrides.css promotes this into a
+         standalone white badge sitting OUTSIDE-LEFT of the slot via
+         `right: 100%`; setting `left` here would conflict with that
+         (browsers prefer left+width and silently drop right), pulling
+         the badge back into the slot and over the icon. */
+      position: absolute; top: 50%;
+      transform: translateY(-50%);
+      font-size: .65rem; color: #888;
+    }
+    .wslot.active .wslot-key { color: #9a7a4e; }
+    .wslot.has-inv-ammo.active .wslot-key { color: #aacc88; }
+    .wslot-icon {
+      font-size: .8rem; color: #ddd; text-align: center;
+      line-height: 1; font-weight: bold;
+    }
+    .wslot.active .wslot-icon { color: #dab840; }
+    .wslot.has-inv-ammo.active .wslot-icon { color: #b0d4b0; }
+    /* Ammo-from-inventory hint: shown bottom-right of the slot in green
+       whenever the span has text content. Decoupled from slot state so
+       the hint surfaces correctly when invAmmo > 0 (which makes the slot
+       NOT .empty — the previous CSS hid the hint exactly when needed). */
+    .wslot-hint {
+      position: absolute; bottom: 3px; right: 5px;
+      font-size: .65rem; color: #66cc66; font-weight: bold;
+      display: none;
+    }
+    .wslot-hint:not(:empty) { display: block; }
+
+    /* Weapon + ammo — bottom-center readout. Bumped sizes so the magazine
+       count is clearly visible during fire fights without taking eyes off
+       the crosshair. Padding widened to match the larger numbers. */
+    #weapon-display {
+      position: absolute; bottom: 1.2rem; left: 50%; transform: translateX(-50%);
+      text-align: center; color: #e0e0e0;
+      background: rgba(20,20,18,0.8); padding: .35rem 1.1rem; border-radius: 5px;
+      border: 1px solid #555;
+    }
+    #weapon-name {
+      font-size: .75rem; color: #aaa; letter-spacing: .14em;
+      text-transform: uppercase; display: inline; margin-right: .6rem; font-weight: bold;
+    }
+    #ammo-current {
+      font-size: 1.8rem; font-weight: bold; line-height: 1; transition: color .15s;
+      display: inline;
+    }
+    #ammo-current.low { animation: ammo-blink .6s ease-in-out infinite; }
+    @keyframes ammo-blink { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+    #ammo-reserve { font-size: .95rem; color: #aaa; display: inline; margin-left: .15rem; }
+    #reload-indicator { display: none; margin-top: .2rem; }
+    #reload-text { font-size: .6rem; color: #dab840; letter-spacing: .1em; }
+    #reload-bar-outer { width: 80px; height: 3px; background: #222; border-radius: 2px; overflow: hidden; margin: .15rem auto 0; }
+    #reload-bar-inner { height: 100%; width: 0%; background: #dab840; border-radius: 2px; transition: width .05s; }
+
+    /* Centre-bottom: pickup hint */
+    #pickup-hint {
+      position: absolute; bottom: 28%; left: 50%; transform: translateX(-50%);
+      font-size: .78rem; color: #c8a96e; letter-spacing: .15em;
+      background: rgba(0,0,0,.5); padding: .3rem .8rem; border-radius: 3px; display: none;
+    }
+
+    /* Bottom-center: key hints bar (fades out after 15s) — above quickbar */
+    #key-hints {
+      position: absolute; bottom: 4.8rem; left: 50%; transform: translateX(-50%);
+      font-size: .55rem; color: #444; letter-spacing: .08em;
+      background: rgba(0,0,0,.3); padding: .2rem .8rem; border-radius: 3px;
+      transition: opacity 2s;
+    }
+    #key-hints .kh-key {
+      color: #888; border: 1px solid #444; border-radius: 2px;
+      padding: 0 3px; margin: 0 1px; font-size: .55rem;
+    }
+
+    /* Centre: extraction progress bar */
+    #extract-bar-wrap {
+      position: absolute; bottom: 24%; left: 50%; transform: translateX(-50%);
+      width: 200px; display: none;
+    }
+    #extract-bar-label { font-size: .65rem; color: #00ff80; letter-spacing: .15em; text-align: center; margin-bottom: .3rem; }
+    #extract-bar-outer { height: 6px; background: #1a3a1a; border-radius: 3px; overflow: hidden; }
+    #extract-bar-inner { height: 100%; width: 0%; background: #00ff80; border-radius: 3px; transition: width .1s; }
+
+    /* Kill feed — top-right */
+    #kill-feed { position: absolute; top: 3.5rem; right: 2rem; text-align: right; font-size: .7rem; color: #e05050; }
+
+    /* ── Bleeding indicator ─────────────────── */
+    #bleed-indicator {
+      position: absolute; bottom: 4.2rem; left: 1.5rem;
+      font-size: .6rem; color: #ff3333; letter-spacing: .1em;
+      display: none; animation: bleed-pulse 0.9s ease-in-out infinite;
+    }
+    @keyframes bleed-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Minimap — bottom-right, circular ──── */
+    #minimap-wrap {
+      position: absolute; bottom: .6rem; right: 1.5rem;
+      border: 2px solid rgba(200,169,110,0.3); border-radius: 50%;
+      overflow: hidden;
+    }
+    #minimap-canvas { display: block; width: 120px; height: 120px; border-radius: 50%; }
+    #minimap-label {
+      position: absolute; bottom: -1.2rem; left: 50%; transform: translateX(-50%);
+      font-size: .5rem; color: #555; letter-spacing: .1em; white-space: nowrap;
+    }
+
+    /* ── Tips ticker — rolling hints at top center ─────── */
+    #tips-ticker {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.65); border-bottom: 1px solid rgba(200,169,110,0.25);
+      padding: .22rem 1.4rem; font-size: .62rem; color: #888;
+      letter-spacing: .12em; white-space: nowrap; pointer-events: none;
+      display: flex; align-items: center; gap: .6rem;
+    }
+    #tips-ticker .tip-key { color: #c8a96e; }
+
+    /* ── Tutorial hint banner ─────────────────────── */
+    #tutorial-hint {
+      position: absolute; top: 1.6rem; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,.75); border: 1px solid #c8a96e; border-radius: 4px;
+      padding: .4rem 1.2rem; font-size: .82rem; color: #c8a96e;
+      letter-spacing: .08em; white-space: nowrap; display: none;
+      pointer-events: none;
+    }
+
+    /* ── Body parts panel — above health, left side ─── */
+    #body-parts {
+      position: absolute; bottom: 5.5rem; left: 1.5rem;
+      font-size: .55rem; color: #888; width: 110px;
+    }
+    .bp-row { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
+    .bp-label { width: 26px; color: #666; text-align: right; flex-shrink: 0; }
+    .bp-bar-outer { flex: 1; height: 4px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+    .bp-bar-inner { height: 100%; border-radius: 2px; transition: width .2s, background .2s; }
+    .bp-val { width: 20px; color: #555; text-align: right; flex-shrink: 0; }
+
+    /* ── Lobby screen ────────────────────────────── */
+    #lobby-screen {
+      position: fixed; inset: 0; background: rgba(0,0,0,.95);
+      display: none; align-items: center; justify-content: center;
+      color: #c8a96e; z-index: 106;
+    }
+    .lobby-content { text-align: center; max-width: 400px; }
+    .lobby-title { font-size: 1.4rem; letter-spacing: .25em; margin-bottom: 1.5rem; }
+    .lobby-buttons { display: flex; flex-direction: column; gap: .8rem; align-items: center; }
+    .lobby-btn {
+      padding: .6rem 2rem; font-size: .8rem; font-family: inherit;
+      letter-spacing: .15em; background: transparent; border: 1px solid #c8a96e66;
+      color: #c8a96e; cursor: pointer; border-radius: 3px; transition: background .2s;
+      min-width: 200px;
+    }
+    .lobby-btn:hover { background: #c8a96e22; border-color: #c8a96e; }
+    .lobby-btn-sm { min-width: auto; padding: .5rem 1rem; }
+    .lobby-join-row { display: flex; gap: .5rem; align-items: center; }
+    .lobby-join-row input {
+      width: 100px; padding: .5rem; font-size: 1rem; font-family: inherit;
+      background: #111; border: 1px solid #333; color: #c8a96e; text-align: center;
+      border-radius: 3px; letter-spacing: .3em;
+    }
+    .lobby-status { margin-top: 1.5rem; font-size: .75rem; color: #888; line-height: 1.8; }
+
+    /* ── Base screen ─────────────────────────────── */
+    #base-screen {
+      position: fixed; inset: 0; background: rgba(0,0,0,.95);
+      display: none; align-items: flex-start; justify-content: center;
+      color: #c8a96e; z-index: 105; overflow-y: auto; padding: 2rem;
+    }
+    .base-content { max-width: 700px; width: 100%; }
+    .base-title { font-size: 2rem; letter-spacing: .3em; text-transform: uppercase; text-align: center; margin-bottom: .5rem; }
+    .base-currency { text-align: center; font-size: 1.1rem; color: #88aa55; margin-bottom: 1rem; }
+    .base-currency span { font-size: 1.4rem; font-weight: bold; }
+    .base-stats { display: flex; gap: 1.5rem; justify-content: center; font-size: .7rem; color: #666; margin-bottom: 1.5rem; }
+    .base-subtitle { font-size: .9rem; letter-spacing: .2em; color: #888; border-bottom: 1px solid #222; padding-bottom: .4rem; margin: 1.5rem 0 .8rem; }
+    .death-notice { text-align: center; font-size: .75rem; color: #ff6644; background: rgba(255,100,60,.1); padding: .4rem .8rem; border-radius: 4px; margin-bottom: 1rem; }
+    .level-grid { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .level-card {
+      background: #111; border: 1px solid #333; border-radius: 4px;
+      padding: 1rem; width: 200px; display: flex; flex-direction: column; gap: .4rem;
+    }
+    .level-card:hover { border-color: #c8a96e; }
+    .level-card.locked { opacity: .4; pointer-events: none; }
+    .level-name { font-size: 1rem; letter-spacing: .15em; color: #c8a96e; }
+    .level-desc { font-size: .65rem; color: #666; line-height: 1.4; }
+    .level-info { font-size: .6rem; color: #555; }
+    .level-unlock { font-size: .6rem; color: #888; }
+    .level-start-btn {
+      margin-top: auto; padding: .4rem 0; font-size: .72rem; font-family: inherit;
+      letter-spacing: .15em; background: transparent; border: 1px solid #c8a96e66;
+      color: #c8a96e; cursor: pointer; border-radius: 3px; transition: background .2s;
+    }
+    .level-start-btn:hover { background: #c8a96e22; border-color: #c8a96e; }
+    .stash-grid { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .stash-item {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
+      padding: .3rem .6rem; font-size: .65rem; color: #888;
+    }
+    .stash-empty { font-size: .65rem; color: #444; }
+
+    /* ── End screen (post-raid) ─────────────────────
+       Dedicated overlay that replaces the old "reuse start-screen"
+       hack. Three distinct outcome themes (success / death / timeout)
+       plus a special champion variant for the jam-hook win. */
+    #end-screen {
+      position: fixed; inset: 0; z-index: 105;
+      display: none; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,.78), rgba(0,0,0,.95));
+      animation: endFadeIn .35s ease-out;
+    }
+    @keyframes endFadeIn  { from { opacity: 0; }                 to { opacity: 1; } }
+    @keyframes endCardIn  { from { opacity: 0; transform: translateY(20px) scale(.96); }
+                            to   { opacity: 1; transform: translateY(0)    scale(1);   } }
+    @keyframes endBadgePop {
+      0%   { transform: scale(.4); opacity: 0; }
+      60%  { transform: scale(1.18); opacity: 1; }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+    @keyframes endGlowPulse {
+      0%, 100% { box-shadow: 0 0 24px var(--end-glow), 0 0 4px var(--end-accent) inset; }
+      50%      { box-shadow: 0 0 56px var(--end-glow), 0 0 4px var(--end-accent) inset; }
+    }
+
+    .end-card {
+      --end-accent: #c8a96e;
+      --end-glow:   rgba(200,169,110,.35);
+      width: min(640px, 92vw);
+      background: rgba(18, 18, 16, .96);
+      border: 2px solid var(--end-accent);
+      border-radius: 10px;
+      padding: 2rem 2rem 1.6rem;
+      text-align: center;
+      animation: endCardIn .45s cubic-bezier(.2,.8,.2,1);
+      box-shadow: 0 0 24px var(--end-glow);
+    }
+    /* Outcome variants: switch the accent + glow in one place. */
+    .end-card.win     { --end-accent: #4caf50; --end-glow: rgba(76,175,80,.40); }
+    .end-card.timeout { --end-accent: #ff9800; --end-glow: rgba(255,152,0,.40); }
+    .end-card.death   { --end-accent: #f44336; --end-glow: rgba(244,67,54,.40); }
+    .end-card.champion {
+      --end-accent: #ffd54a; --end-glow: rgba(255,213,74,.55);
+      animation: endCardIn .45s cubic-bezier(.2,.8,.2,1), endGlowPulse 2.4s ease-in-out 0.5s infinite;
+    }
+
+    .end-badge {
+      width: 88px; height: 88px; margin: 0 auto 1rem;
+      border-radius: 50%; border: 3px solid var(--end-accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3.6rem; line-height: 1;
+      background: rgba(0,0,0,.5);
+      animation: endBadgePop .5s cubic-bezier(.2,1.5,.4,1) both;
+      box-shadow: 0 0 24px var(--end-glow), 0 0 12px var(--end-glow) inset;
+    }
+    .end-card h1 {
+      font-size: 1.8rem; letter-spacing: .2em; text-transform: uppercase;
+      color: var(--end-accent); margin-bottom: .5rem;
+      text-shadow: 0 0 14px var(--end-glow);
+    }
+    .end-card.champion h1 { font-size: 2.2rem; letter-spacing: .25em; }
+
+    .end-rating {
+      display: inline-block;
+      padding: .25rem .85rem; margin: .25rem 0 .8rem;
+      font-size: .75rem; letter-spacing: .15em; text-transform: uppercase;
+      border: 1px solid var(--end-accent); border-radius: 100px;
+      color: var(--end-accent); background: rgba(0,0,0,.4);
+    }
+    .end-rating .rating-letter {
+      display: inline-block; font-weight: bold;
+      font-size: 1.05rem; margin-right: .5rem;
+    }
+
+    .end-quip {
+      font-size: .82rem; color: #999; font-style: italic; line-height: 1.5;
+      margin: .4rem auto 1.4rem; max-width: 90%;
+    }
+
+    .end-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem;
+      margin: 0 0 1.2rem;
+    }
+    .end-stat {
+      background: rgba(0,0,0,.4); border: 1px solid #2a2a2a; border-radius: 4px;
+      padding: .5rem .4rem;
+    }
+    .end-stat label {
+      display: block; font-size: .55rem; color: #777; letter-spacing: .12em;
+      text-transform: uppercase; margin-bottom: .2rem;
+    }
+    .end-stat span {
+      display: block; font-size: 1.05rem; color: #e0e0e0; font-weight: bold;
+      letter-spacing: .04em;
+    }
+
+    .end-loot-section {
+      margin: 0 0 1.2rem; padding-top: .8rem; border-top: 1px solid #2a2a2a;
+      text-align: left;
+    }
+    .end-loot-title {
+      font-size: .6rem; color: #777; letter-spacing: .15em; text-transform: uppercase;
+      margin-bottom: .5rem;
+    }
+    .end-loot-list { display: flex; flex-direction: column; gap: .25rem; }
+    .end-loot-item {
+      display: flex; justify-content: space-between; padding: .25rem .5rem;
+      background: rgba(255,255,255,.03); border-radius: 3px;
+      font-size: .72rem;
+    }
+    .end-loot-item span:first-child { color: #c8a96e; }
+    .end-loot-item span:last-child  { color: #88e088; }
+    .end-loot-empty { font-size: .7rem; color: #555; text-align: center; padding: .4rem; }
+
+    .end-recovery-notice {
+      background: rgba(244,67,54,.08); border: 1px solid #5a2a26;
+      color: #ff9988; font-size: .72rem; line-height: 1.5;
+      padding: .55rem .8rem; border-radius: 4px;
+      margin: 0 0 1rem;
+    }
+
+    .end-actions {
+      display: flex; gap: .8rem; justify-content: center;
+      margin-top: .4rem;
+    }
+    .end-btn {
+      padding: .65rem 1.8rem; font-size: .8rem; font-family: inherit;
+      letter-spacing: .15em; text-transform: uppercase;
+      background: transparent; border: 1px solid var(--end-accent); color: var(--end-accent);
+      cursor: pointer; border-radius: 3px;
+      transition: background .2s, transform .1s;
+    }
+    .end-btn:hover     { background: rgba(255,255,255,.05); }
+    .end-btn:active    { transform: translateY(1px); }
+    .end-btn.primary   { background: var(--end-accent); color: #111; }
+    .end-btn.primary:hover { filter: brightness(1.15); }
+
+    /* ── End-screen polish (round 2) ─────────────────
+       Star rating, prominent +cash banner, count-up-animated stats,
+       confetti dots for win/champion, slow heartbeat pulse for death. */
+
+    /* Big ¥ earnings banner — replaces the boring "your loot was X" line.
+       Sits above the 4-stat grid and pulls the eye first. */
+    .end-earnings {
+      margin: .4rem auto 1rem;
+      font-size: 2rem; font-weight: bold;
+      color: var(--end-accent);
+      letter-spacing: .04em;
+      text-shadow: 0 0 12px var(--end-glow);
+      animation: earningsIn .6s cubic-bezier(.2, 1.4, .4, 1) .15s both;
+    }
+    .end-earnings .earnings-plus { opacity: .7; margin-right: .15rem; }
+    .end-earnings .earnings-suffix { font-size: 1rem; opacity: .65; margin-left: .25rem; letter-spacing: .12em; }
+    @keyframes earningsIn {
+      from { transform: scale(.6) translateY(8px); opacity: 0; }
+      to   { transform: scale(1)   translateY(0);  opacity: 1; }
+    }
+    /* Death / timeout: hide it (no cash earned). */
+    .end-card.death .end-earnings,
+    .end-card.timeout .end-earnings { display: none; }
+
+    /* Star rating bar — replaces (well, complements) the letter chip.
+       Stars fill in sequentially via animation-delay, so the player
+       sees a small "ka-ching ka-ching" reveal effect. */
+    .end-stars {
+      display: flex; justify-content: center; gap: .28rem;
+      margin: 0 0 .4rem;
+      font-size: 1.4rem; line-height: 1;
+    }
+    .end-star {
+      color: #2a2a2a;
+      transition: color .2s;
+      text-shadow: 0 0 0 var(--end-glow);
+    }
+    .end-star.filled {
+      color: var(--end-accent);
+      text-shadow: 0 0 8px var(--end-glow);
+      animation: starPop .35s cubic-bezier(.2, 1.6, .4, 1) both;
+    }
+    /* Stagger via per-index delay variables (set by JS). */
+    .end-star.filled[data-idx="0"] { animation-delay: 0.30s; }
+    .end-star.filled[data-idx="1"] { animation-delay: 0.45s; }
+    .end-star.filled[data-idx="2"] { animation-delay: 0.60s; }
+    .end-star.filled[data-idx="3"] { animation-delay: 0.75s; }
+    .end-star.filled[data-idx="4"] { animation-delay: 0.90s; }
+    @keyframes starPop {
+      0%   { transform: scale(0.2) rotate(-30deg); opacity: 0; }
+      60%  { transform: scale(1.3) rotate(8deg);   opacity: 1; }
+      100% { transform: scale(1)   rotate(0);      opacity: 1; }
+    }
+
+    /* Confetti — sparse falling dots on win/champion variants only.
+       Pure CSS via 8 absolutely-positioned spans with staggered fall
+       animations and randomised left/delay via inline styles in JS. */
+    .end-confetti {
+      position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+      border-radius: inherit;
+    }
+    .end-card.death .end-confetti,
+    .end-card.timeout .end-confetti { display: none; }
+    .end-confetti span {
+      position: absolute; top: -16px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--end-accent);
+      box-shadow: 0 0 6px var(--end-glow);
+      animation: confettiFall 2.4s linear infinite;
+      animation-delay: var(--delay, 0s);
+    }
+    .end-card.champion .end-confetti span {
+      width: 9px; height: 11px; border-radius: 2px;
+      animation-duration: 2s;
+    }
+    @keyframes confettiFall {
+      0%   { transform: translateY(0)      rotate(0deg);    opacity: 0;   }
+      10%  {                                                 opacity: .85; }
+      100% { transform: translateY(110vh) rotate(540deg); opacity: 0;   }
+    }
+
+    /* Death variant — Tarkov × Dark Souls cinematic failure.
+       Layered effects: card shake on entry, blood-edge top, scanline
+       overlay, glitched chromatic-aberration title, slammed-in stamp,
+       flatline EKG. All scoped to .end-card.death so other themes
+       (win / timeout / champion) are unaffected. */
+    .end-card.death {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(60,10,10,.55) 0%, rgba(18,18,16,.98) 28%, rgba(18,18,16,.98) 100%);
+      animation:
+        endCardIn .45s cubic-bezier(.2,.8,.2,1),
+        deathShake .55s cubic-bezier(.36,.07,.19,.97) .05s both,
+        deathPulse 2.2s ease-in-out 0.7s infinite;
+    }
+    @keyframes deathPulse {
+      0%, 100% { box-shadow: 0 0 24px rgba(244,67,54,.40), inset 0 0 0 rgba(244,67,54,0); }
+      50%      { box-shadow: 0 0 56px rgba(244,67,54,.65), inset 0 0 32px rgba(244,67,54,.18); }
+    }
+    /* Card "punch" — physical impact when the screen lands. */
+    @keyframes deathShake {
+      0%, 100% { transform: translate(0,0); }
+      10% { transform: translate(-6px, 4px); }
+      20% { transform: translate(5px, -3px); }
+      30% { transform: translate(-4px, 2px); }
+      45% { transform: translate(3px, -2px); }
+      60% { transform: translate(-2px, 1px); }
+      80% { transform: translate(1px, -1px); }
+    }
+
+    /* Top blood-edge — subtle red gradient bleeding down from the border. */
+    .end-card.death::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 14px;
+      background: linear-gradient(180deg, rgba(244,67,54,.75) 0%, rgba(244,67,54,0) 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Scanline / CRT overlay — faint horizontal ruling that screams "tactical surveillance feed". */
+    .death-scanlines { display: none; }
+    .end-card.death .death-scanlines {
+      display: block;
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0) 0px,
+        rgba(0,0,0,0) 2px,
+        rgba(255,40,40,.045) 3px,
+        rgba(0,0,0,0) 4px
+      );
+      pointer-events: none;
+      border-radius: inherit;
+      mix-blend-mode: overlay;
+      z-index: 1;
+      animation: scanlineDrift 4s linear infinite;
+    }
+    @keyframes scanlineDrift {
+      from { background-position: 0 0; }
+      to   { background-position: 0 8px; }
+    }
+
+    /* Massive KIA title — 2x font size, locked-in chromatic aberration that
+       glitches every few seconds. Slams in via blur+scale entry. */
+    .end-card.death h1 {
+      position: relative;
+      z-index: 3;
+      font-size: 3.4rem;
+      letter-spacing: .35em;
+      color: #ff4438;
+      margin-bottom: .15rem;
+      text-shadow:
+         0 0 6px rgba(244,67,54,.85),
+         0 0 24px rgba(244,67,54,.55),
+         2px 0 0 rgba(0,200,255,.55),
+        -2px 0 0 rgba(255,0,80,.55);
+      animation:
+        deathTitleIn .55s cubic-bezier(.2,1.4,.4,1) both,
+        deathGlitch 4.5s steps(1) 1.2s infinite;
+    }
+    @keyframes deathTitleIn {
+      0%   { transform: scale(.35); opacity: 0; filter: blur(8px); letter-spacing: 1.2em; }
+      60%  { transform: scale(1.08); opacity: 1; filter: blur(0);  letter-spacing: .35em; }
+      100% { transform: scale(1);    opacity: 1; }
+    }
+    @keyframes deathGlitch {
+      0%, 92%, 100% {
+        text-shadow:
+           0 0 6px rgba(244,67,54,.85), 0 0 24px rgba(244,67,54,.55),
+           2px 0 0 rgba(0,200,255,.55), -2px 0 0 rgba(255,0,80,.55);
+        transform: translateX(0);
+      }
+      93% {
+        text-shadow:
+           0 0 6px rgba(244,67,54,.85), 0 0 24px rgba(244,67,54,.55),
+           5px 0 0 rgba(0,200,255,.85), -5px 0 0 rgba(255,0,80,.85);
+        transform: translateX(2px);
+      }
+      95% {
+        text-shadow:
+           0 0 6px rgba(244,67,54,.85), 0 0 24px rgba(244,67,54,.55),
+          -3px 0 0 rgba(0,200,255,.55), 3px 0 0 rgba(255,0,80,.55);
+        transform: translateX(-2px);
+      }
+      96% { transform: translateX(0); }
+    }
+
+    /* Subtitle line under the KIA title — fades in with letter-spacing collapse. */
+    .death-subtitle { display: none; }
+    .end-card.death .death-subtitle {
+      display: block;
+      position: relative;
+      z-index: 3;
+      font-size: .68rem;
+      letter-spacing: .5em;
+      color: #f44336;
+      opacity: .55;
+      margin: 0 0 .9rem;
+      padding-left: .5em; /* offset for the trailing letter-spacing */
+      text-transform: uppercase;
+      font-weight: 300;
+      animation: deathSubtitleIn 1.1s cubic-bezier(.2,.6,.2,1) .55s both;
+    }
+    @keyframes deathSubtitleIn {
+      0%   { opacity: 0; letter-spacing: 1.4em; transform: translateY(-4px); }
+      100% { opacity: .55; letter-spacing: .5em; transform: translateY(0); }
+    }
+
+    /* "RAID TERMINATED" stamp — top-right corner of the card, slammed in like a
+       document rejection stamp. Lives in the corner so it never covers the
+       title, stats, recovery notice, or buttons. */
+    .raid-stamp { display: none; }
+    .end-card.death .raid-stamp {
+      display: block;
+      position: absolute;
+      top: 14px; right: 14px;
+      transform: rotate(-9deg) scale(1);
+      transform-origin: top right;
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: .14em;
+      color: #ff2424;
+      border: 2.5px solid #ff2424;
+      padding: .22rem .55rem;
+      border-radius: 3px;
+      pointer-events: none;
+      text-shadow: 0 0 6px rgba(255,36,36,.55);
+      box-shadow:
+        0 0 12px rgba(255,36,36,.35),
+        inset 0 0 6px rgba(255,36,36,.18);
+      background: rgba(0,0,0,.22);
+      z-index: 4;
+      white-space: nowrap;
+      text-transform: uppercase;
+      font-family: 'Impact', 'Arial Black', system-ui, sans-serif;
+      opacity: .85;
+      animation: raidStampIn .35s cubic-bezier(.2,1.6,.4,1) .85s both;
+    }
+    @keyframes raidStampIn {
+      0%   { transform: rotate(-9deg) scale(3.4);  opacity: 0;   filter: blur(8px); }
+      55%  { transform: rotate(-9deg) scale(1.15); opacity: 1;   filter: blur(0); }
+      80%  { transform: rotate(-9deg) scale(.94);  opacity: .95; }
+      100% { transform: rotate(-9deg) scale(1);    opacity: .85; }
+    }
+
+    /* Skull badge — bigger, glowing, with the radial bg pulled deep red. */
+    .end-card.death .end-badge {
+      position: relative;
+      z-index: 3;
+      font-size: 3.2rem;
+      color: #ff5450;
+      text-shadow: 0 0 14px rgba(244,67,54,.8);
+      background: radial-gradient(circle, rgba(60,10,10,.85) 0%, rgba(0,0,0,.7) 70%);
+    }
+
+    /* Stat tiles on death — desaturate to a red tint to emphasize "what was lost". */
+    .end-card.death .end-stats { position: relative; z-index: 3; }
+    .end-card.death .end-stat {
+      border-color: #441818;
+      background: rgba(40,8,8,.32);
+    }
+    .end-card.death .end-stat span {
+      color: #ff8a82;
+      text-shadow: 0 0 6px rgba(244,67,54,.35);
+    }
+    .end-card.death .end-stat label { color: #885050; }
+
+    /* Recovery notice — left-bar emphasis on death so it reads as "your shit is on the field". */
+    .end-card.death #end-recovery-notice {
+      position: relative;
+      z-index: 3;
+      background: linear-gradient(90deg, rgba(244,67,54,.18) 0%, rgba(244,67,54,.04) 100%);
+      border: 1px solid #5a2a26;
+      border-left: 3px solid #f44336;
+      letter-spacing: .03em;
+      padding: .7rem .9rem;
+    }
+
+    /* Quip + rating chip — keep above scanlines/stamp so the meme line survives. */
+    .end-card.death .end-rating,
+    .end-card.death .end-quip,
+    .end-card.death .end-stars,
+    .end-card.death .end-loot-section,
+    .end-card.death .end-actions { position: relative; z-index: 3; }
+
+    /* Flatline EKG strip — pulses for a moment, then dies into a flat line.
+       SVG inlined as data-uri so we don't have to ship an asset. */
+    .death-flatline { display: none; }
+    .end-card.death .death-flatline {
+      display: block;
+      position: relative;
+      z-index: 3;
+      height: 22px;
+      margin: .4rem 0 .2rem;
+      overflow: hidden;
+    }
+    .end-card.death .death-flatline::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 22' preserveAspectRatio='none'><polyline points='0,11 28,11 32,4 36,18 40,11 70,11 74,4 78,18 82,11 200,11' fill='none' stroke='%23ff4438' stroke-width='1.4'/></svg>");
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      filter: drop-shadow(0 0 3px rgba(244,67,54,.7));
+      animation: flatlineDie 2.6s ease-out 1.1s both;
+    }
+    @keyframes flatlineDie {
+      0%   { opacity: 0; transform: translateX(-100%); }
+      15%  { opacity: 1; transform: translateX(0); }
+      80%  {
+        opacity: 1;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 22' preserveAspectRatio='none'><polyline points='0,11 28,11 32,4 36,18 40,11 70,11 74,4 78,18 82,11 200,11' fill='none' stroke='%23ff4438' stroke-width='1.4'/></svg>");
+      }
+      100% {
+        opacity: .6;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 22' preserveAspectRatio='none'><polyline points='0,11 200,11' fill='none' stroke='%23ff4438' stroke-width='1.4'/></svg>");
+      }
+    }
+
+    /* On death, dim the loot section title (reads as "Recovery available" not "Loot earned"). */
+    .end-card.death .end-loot-title { color: #885050; }
+
+    /* Stronger backdrop on death — bloody radial vignette + light scanline grain. */
+    #end-screen:has(.end-card.death) {
+      background:
+        radial-gradient(ellipse at center, rgba(60,8,8,.55) 0%, rgba(0,0,0,.97) 70%),
+        repeating-linear-gradient(
+          0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+          rgba(0,0,0,.18) 3px, rgba(0,0,0,0) 4px
+        );
+    }
+
+    /* Stat tiles — count-up animation pop on first paint. */
+    .end-stat span {
+      display: inline-block;
+      animation: statPop .5s cubic-bezier(.2, 1.5, .4, 1) both;
+      animation-delay: 0.5s;
+    }
+    @keyframes statPop {
+      from { transform: scale(.7); opacity: 0; }
+      to   { transform: scale(1);  opacity: 1; }
+    }
+
+    /* Loot rows — light hover highlight + slide-in stagger. */
+    .end-loot-item {
+      animation: lootSlideIn .35s ease-out both;
+      transition: background .15s, transform .1s;
+    }
+    .end-loot-item:hover {
+      background: rgba(255,255,255,.07);
+      transform: translateX(2px);
+    }
+    .end-loot-item[data-idx="0"] { animation-delay: 0.55s; }
+    .end-loot-item[data-idx="1"] { animation-delay: 0.62s; }
+    .end-loot-item[data-idx="2"] { animation-delay: 0.69s; }
+    .end-loot-item[data-idx="3"] { animation-delay: 0.76s; }
+    .end-loot-item[data-idx="4"] { animation-delay: 0.83s; }
+    .end-loot-item[data-idx="5"] { animation-delay: 0.90s; }
+    @keyframes lootSlideIn {
+      from { transform: translateX(-12px); opacity: 0; }
+      to   { transform: translateX(0);     opacity: 1; }
+    }
+
+    /* Quip — proper typographic quote marks; italic stays. */
+    .end-quip { position: relative; }
+    .end-quip::before { content: '\201C '; opacity: .4; }
+    .end-quip::after  { content: ' \201D'; opacity: .4; }
+
+    /* Tweet button — only shown on champion. Twitter blue accent so it
+       reads as a distinct external action vs the primary "return" CTA. */
+    .end-btn.tweet {
+      background: #1da1f2;
+      color: #ffffff;
+      border-color: #1da1f2;
+    }
+    .end-btn.tweet:hover { background: #1a91da; border-color: #1a91da; }
+
+    /* ── Rules screen ──────────────────────────────
+       Full mission briefing — multi-column dashboard layout that
+       matches the main menu's military extraction aesthetic.
+       Sticky top bar with title + close, scrollable content area
+       with 2-column grid (single column on narrow screens). */
+    #rules-screen {
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at center, rgba(0,0,0,.92) 0%, rgba(0,0,0,.97) 100%);
+      display: none; flex-direction: column; align-items: stretch;
+      color: #c8a96e; z-index: 110; overflow: hidden;
+      animation: startFadeIn .35s ease-out;
+    }
+    /* Subtle film grain to match menu */
+    #rules-screen::before {
+      content: '';
+      position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: overlay;
+      opacity: .5;
+    }
+
+    /* ── Sticky top bar ─────────────────────────── */
+    .rules-topbar {
+      position: sticky; top: 0;
+      flex-shrink: 0;
+      background: linear-gradient(180deg, rgba(20,16,10,.95), rgba(12,8,4,.85));
+      border-bottom: 2px solid #c8a96e;
+      padding: 1.1rem 2.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 2;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
+    }
+    #rules-screen h2 {
+      font-size: 1.5rem; letter-spacing: .35em; text-transform: uppercase;
+      color: #f0d59a; font-weight: 900;
+      margin: 0;
+      text-shadow: 2px 2px 0 #000, 0 0 24px rgba(200,169,110,.35);
+    }
+    .rules-topbar-sub {
+      font-size: .7rem; color: #888; letter-spacing: .2em;
+      text-transform: uppercase; margin-top: .15rem;
+    }
+    .rules-topbar-close {
+      width: 2.2rem; height: 2.2rem;
+      background: rgba(40,30,20,.7); border: 1px solid #4a3820;
+      color: #c8a96e; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; font-weight: bold;
+      transition: background .15s, border-color .15s, color .15s;
+      border-radius: 0;
+    }
+    .rules-topbar-close:hover {
+      background: rgba(80,40,20,.8); border-color: #ff6644; color: #ff8866;
+    }
+
+    /* ── Scrollable content area ───────────────────
+       `min-height: 0` is the magic line — without it, a flex column
+       child with `flex: 1` defaults to `min-height: auto` (= content
+       height), which means `overflow-y: auto` never triggers a
+       scrollbar. Setting min-height: 0 lets the body actually shrink
+       inside the container so its overflow scrolls. */
+    .rules-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 1.6rem 2.5rem 5rem;
+      /* Themed scrollbar so it matches the military aesthetic */
+      scrollbar-width: thin;
+      scrollbar-color: #4a3820 rgba(0, 0, 0, 0.4);
+    }
+    .rules-body::-webkit-scrollbar { width: 8px; }
+    .rules-body::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.4); }
+    .rules-body::-webkit-scrollbar-thumb {
+      background: #4a3820; border: 1px solid #1a1208;
+    }
+    .rules-body::-webkit-scrollbar-thumb:hover { background: #6a5230; }
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 1rem;
+      max-width: 1400px; margin: 0 auto;
+    }
+    .rules-grid .span-2 { grid-column: span 2; }
+    @media (max-width: 800px) {
+      .rules-grid { grid-template-columns: 1fr; }
+      .rules-grid .span-2 { grid-column: 1; }
+    }
+
+    /* ── Generic section panel ───────────────────── */
+    .rules-section {
+      background: rgba(20, 16, 10, 0.78);
+      border: 1px solid #4a3820;
+      backdrop-filter: blur(4px);
+      padding: 1rem 1.2rem 1.1rem;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.5);
+      transition: border-color .2s;
+    }
+    .rules-section:hover { border-color: #c8a96e; }
+    .rules-section h3 {
+      font-size: .8rem;
+      color: #f0d59a;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      font-weight: 900;
+      padding-bottom: .45rem;
+      margin-bottom: .7rem;
+      border-bottom: 1px solid #4a3820;
+      text-shadow: 1px 1px 0 #000;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .rules-section h3 .badge {
+      font-size: .55rem; color: #888; font-weight: normal;
+      letter-spacing: .15em;
+    }
+    .rules-table { width: 100%; border-collapse: collapse; font-size: .72rem; }
+    .rules-table tr { border-bottom: 1px solid #2a2010; }
+    .rules-table tr:last-child { border-bottom: none; }
+    .rules-table td { padding: .4rem .5rem; color: #b0b0b0; line-height: 1.55; }
+    .rules-table td:first-child {
+      color: #f0d59a; width: 160px;
+      font-family: 'Courier New', monospace;
+      white-space: nowrap; font-weight: bold;
+    }
+    .rules-desc {
+      font-size: .73rem; color: #b0b0b0; line-height: 1.65; margin-top: .2rem;
+    }
+    .rules-desc b, .rules-desc strong { color: #f0d59a; }
+
+    /* ── Boss profile cards (horizontal flex) ───── */
+    .rules-bosses {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: .7rem;
+    }
+    .rules-boss-card {
+      background: rgba(15, 12, 8, .75);
+      border-left: 3px solid var(--boss-color, #c8a96e);
+      padding: .75rem .9rem;
+      transition: background .15s, transform .15s;
+    }
+    .rules-boss-card:hover {
+      background: rgba(30, 22, 12, .85);
+      transform: translateX(3px);
+    }
+    .rules-boss-card-name {
+      color: var(--boss-color, #f0d59a);
+      font-weight: 900; font-size: .9rem;
+      letter-spacing: .08em;
+      text-shadow: 0 0 6px rgba(0,0,0,.7), 0 0 10px var(--boss-glow, transparent);
+      margin-bottom: .2rem;
+    }
+    .rules-boss-card-tag {
+      font-size: .58rem; color: #aaa; letter-spacing: .15em;
+      text-transform: uppercase; margin-bottom: .35rem;
+    }
+    .rules-boss-card-desc {
+      font-size: .68rem; color: #b0b0b0; line-height: 1.5;
+    }
+    .rules-boss-card-trophy {
+      font-size: .65rem; color: var(--boss-color, #c8a96e);
+      margin-top: .35rem; padding-top: .35rem;
+      border-top: 1px dashed #2a2010;
+    }
+
+    /* ── Weapon stat cards ──────────────────────── */
+    .rules-weapons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: .6rem;
+    }
+    .rules-weapon-card {
+      background: rgba(15, 12, 8, .75);
+      border: 1px solid #3a2c18;
+      padding: .7rem .85rem;
+      transition: border-color .15s;
+    }
+    .rules-weapon-card:hover { border-color: #c8a96e; }
+    .rules-weapon-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: .4rem;
+      padding-bottom: .25rem;
+      border-bottom: 1px solid #2a2010;
+    }
+    .rules-weapon-name {
+      color: #f0d59a; font-weight: 900;
+      font-size: .85rem; letter-spacing: .05em;
+    }
+    .rules-weapon-slot {
+      color: #888; font-size: .58rem;
+      letter-spacing: .2em; text-transform: uppercase;
+    }
+    .rules-weapon-stat {
+      display: flex; align-items: center; gap: .4rem;
+      font-size: .62rem;
+      margin-bottom: .18rem;
+    }
+    .rules-weapon-stat .stat-label {
+      width: 38px; color: #888;
+      letter-spacing: .12em; text-transform: uppercase;
+      font-weight: bold;
+    }
+    .rules-weapon-stat .stat-bar {
+      flex: 1; height: 6px;
+      background: rgba(0,0,0,.5);
+      border: 1px solid #2a2010;
+      position: relative;
+    }
+    .rules-weapon-stat .stat-bar::after {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: var(--pct, 0%);
+      background: linear-gradient(90deg, var(--bar-color, #c8a96e), var(--bar-color2, #f0d59a));
+      box-shadow: 0 0 6px var(--bar-glow, rgba(200,169,110,.4));
+    }
+    .rules-weapon-stat .stat-val {
+      width: 38px; text-align: right;
+      color: #d8d8d8; font-weight: bold;
+      font-family: 'Courier New', monospace;
+    }
+    .rules-weapon-tag {
+      font-size: .6rem; color: #888;
+      margin-top: .35rem; line-height: 1.4;
+      font-style: italic;
+    }
+
+    /* ── Map cards ──────────────────────────────── */
+    .rules-maps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: .6rem;
+    }
+    .rules-map-card {
+      background: rgba(15, 12, 8, .75);
+      border-top: 3px solid var(--map-color, #c8a96e);
+      padding: .7rem .85rem;
+    }
+    .rules-map-name {
+      color: var(--map-color, #f0d59a); font-weight: 900;
+      font-size: .9rem; letter-spacing: .15em;
+      text-transform: uppercase;
+      margin-bottom: .15rem;
+    }
+    .rules-map-difficulty {
+      color: #888; font-size: .58rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      margin-bottom: .4rem;
+    }
+    .rules-map-difficulty .diff-stars {
+      color: var(--map-color, #c8a96e);
+      letter-spacing: 0;
+    }
+    .rules-map-desc {
+      font-size: .65rem; color: #aaa; line-height: 1.5;
+    }
+    .rules-map-unlock {
+      font-size: .58rem; color: #888;
+      margin-top: .4rem; padding-top: .35rem;
+      border-top: 1px dashed #2a2010;
+      letter-spacing: .1em; text-transform: uppercase;
+    }
+
+    /* Footer + #rules-close-btn removed — only the top-right ✕ remains. */
+
+    /* ── Cross-screen consistency layer ────────────────────────
+       The menu, rules and end-screen are now consistently styled
+       (military stencil + dark steel panels + sharp edges + amber).
+       But lobby / base / stash were built earlier with rounded
+       corners + lighter colors. This block aligns those surfaces
+       to the same aesthetic without touching their JS templates. */
+
+    /* Shared full-screen vignette + film grain so every overlay
+       has the same backdrop feel. */
+    #lobby-screen,
+    #base-screen,
+    #stash-screen {
+      background:
+        radial-gradient(ellipse at center, rgba(0,0,0,.92) 0%, rgba(0,0,0,.97) 100%) !important;
+    }
+    #lobby-screen::before,
+    #base-screen::before,
+    #stash-screen::before {
+      content: '';
+      position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: overlay;
+      opacity: .5;
+      z-index: 0;
+    }
+    /* Push real content above the grain layer */
+    #lobby-screen > *,
+    #base-screen  > *,
+    #stash-screen > * { position: relative; z-index: 1; }
+
+    /* Sharp edges across all gameplay overlays */
+    .level-card,
+    .stash-card,
+    .lobby-btn,
+    .lobby-join-row input,
+    .stash-select-btn,
+    .level-start-btn {
+      border-radius: 0 !important;
+    }
+
+    /* Card surfaces — consistent dark steel + amber border. */
+    .level-card,
+    .stash-card {
+      background: rgba(20, 16, 10, 0.82) !important;
+      border-color: #4a3820 !important;
+      backdrop-filter: blur(4px);
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, .5),
+        0 2px 8px rgba(0, 0, 0, .5) !important;
+      transition: border-color .2s, transform .2s !important;
+    }
+    .level-card:hover,
+    .stash-card:hover {
+      border-color: #c8a96e !important;
+      transform: translateY(-2px);
+    }
+    /* Locked level cards stay dim but keep the new aesthetic. */
+    .level-card.locked {
+      background: rgba(15, 12, 8, 0.78) !important;
+      border-color: #2a2010 !important;
+    }
+
+    /* Titles — military stencil weight + tracking + black drop shadow.
+       Applied to base/lobby/stash big titles so they match the menu's
+       TARDUCK h1 and the rules MISSION BRIEFING. */
+    .base-title,
+    .lobby-title,
+    .stash-header h2 {
+      font-weight: 900 !important;
+      text-shadow: 2px 2px 0 #000, 0 0 24px rgba(200, 169, 110, .25) !important;
+      color: #f0d59a !important;
+      letter-spacing: .25em !important;
+    }
+    .base-subtitle {
+      letter-spacing: .22em !important;
+      font-weight: 900 !important;
+      color: #f0d59a !important;
+      text-shadow: 1px 1px 0 #000;
+    }
+
+    /* Lobby + stash buttons — match the menu's primary CTA gradient. */
+    .lobby-btn:not(.lobby-btn-sm),
+    .level-start-btn,
+    .stash-card .stash-select-btn {
+      background: linear-gradient(180deg, rgba(50, 36, 18, 0.88), rgba(24, 16, 8, 0.94)) !important;
+      border-color: #c8a96e !important;
+      color: #f0d59a !important;
+      text-shadow: 1px 1px 0 #000;
+      font-weight: 900;
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, .4),
+        0 4px 12px rgba(0, 0, 0, .55) !important;
+      transition: background .18s, border-color .18s, box-shadow .18s, transform .12s;
+    }
+    .lobby-btn:not(.lobby-btn-sm):hover,
+    .level-start-btn:hover,
+    .stash-card .stash-select-btn:hover {
+      background: linear-gradient(180deg, rgba(90, 64, 30, 0.92), rgba(48, 30, 12, 0.95)) !important;
+      border-color: #f0d59a !important;
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, .4),
+        0 0 22px rgba(240, 213, 154, .42) !important;
+    }
+    .lobby-btn:not(.lobby-btn-sm):active,
+    .level-start-btn:active,
+    .stash-card .stash-select-btn:active { transform: translateY(1px); }
+
+    /* Lobby join input — match the steel aesthetic */
+    .lobby-join-row input {
+      background: rgba(0, 0, 0, 0.6) !important;
+      border: 1px solid #4a3820 !important;
+      color: #f0d59a !important;
+      letter-spacing: .15em;
+    }
+    .lobby-join-row input:focus {
+      outline: none;
+      border-color: #c8a96e !important;
+      box-shadow: 0 0 12px rgba(200, 169, 110, .3) !important;
+    }
+
+    /* ── Stash screen ─────────────────────────────── */
+    #stash-screen {
+      position: fixed; inset: 0; background: rgba(0,0,0,.92);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      color: #c8a96e; z-index: 100;
+    }
+    .stash-header { text-align: center; margin-bottom: 2rem; }
+    .stash-header h2 { font-size: 1.8rem; letter-spacing: .2em; text-transform: uppercase; margin-bottom: .4rem; }
+    .stash-header p  { font-size: .8rem; color: #555; letter-spacing: .1em; }
+    .stash-grid { display: flex; gap: 1.4rem; }
+    .stash-card {
+      background: #111; border: 1px solid #333; border-radius: 4px;
+      padding: 1.4rem 1.2rem; width: 200px; cursor: default;
+      display: flex; flex-direction: column; gap: .5rem;
+      transition: border-color .2s;
+    }
+    .stash-card:hover { border-color: #c8a96e; }
+    .stash-card-name { font-size: 1.1rem; letter-spacing: .15em; text-transform: uppercase; color: #c8a96e; }
+    .stash-card-sub  { font-size: .68rem; color: #888; letter-spacing: .1em; }
+    .stash-card-desc { font-size: .7rem; color: #555; line-height: 1.5; margin: .3rem 0; }
+    .stash-card-items { font-size: .68rem; color: #666; padding-left: 1rem; margin: 0; }
+    .stash-card-items li { margin-bottom: 2px; }
+    .stash-select-btn {
+      margin-top: auto; padding: .5rem 0; font-size: .75rem; font-family: inherit;
+      letter-spacing: .18em; text-transform: uppercase;
+      background: transparent; border: 1px solid #c8a96e66; color: #c8a96e;
+      cursor: pointer; border-radius: 3px; transition: background .2s, border-color .2s;
+    }
+    .stash-select-btn:hover { background: #c8a96e22; border-color: #c8a96e; }
+
+    /* ── Inventory panel ───────────────────────────── */
+    #inventory-panel {
+      position: fixed; inset: 0; background: rgba(0,0,0,.82);
+      display: none; align-items: center; justify-content: center;
+      z-index: 80; cursor: default !important;
+    }
+    #inventory-panel * { cursor: default !important; }
+    #inventory-box {
+      background: #1a1a1a; border: 1px solid #333; padding: 1.2rem;
+      border-radius: 4px; min-width: 480px;
+    }
+    #inventory-title {
+      font-size: .75rem; letter-spacing: .2em; color: #888; text-transform: uppercase;
+      margin-bottom: .8rem; display: flex; justify-content: space-between; align-items: center;
+    }
+    #inventory-title span { color: #555; }
+    #inv-weight { font-size: .65rem; color: #888; letter-spacing: .1em; }
+    #inv-weight.heavy { color: #ff9800; }
+    #inv-weight.overloaded { color: #f44336; }
+    #inventory-grid {
+      position: relative; gap: 2px;
+    }
+    .inv-cell {
+      background: #222; border: 1px solid #2a2a2a; border-radius: 2px;
+      width: 46px; height: 46px;
+    }
+    .inv-item {
+      background: #3a5a3a; border: 1px solid #4a7a4a; border-radius: 2px;
+      padding: 2px 4px; cursor: grab; display: flex; flex-direction: column;
+      justify-content: space-between; overflow: hidden;
+      transition: filter .15s;
+      z-index: 1;
+    }
+    .inv-item:hover { filter: brightness(1.3); }
+    .inv-item .inv-actions { display: none; position: absolute; top: 2px; right: 2px; gap: 2px; z-index: 2; }
+    .inv-item:hover .inv-actions { display: flex; }
+    .inv-btn {
+      width: 16px; height: 16px; font-size: .5rem; line-height: 16px; text-align: center;
+      background: rgba(0,0,0,.7); border: 1px solid #555; border-radius: 2px;
+      color: #ccc; cursor: pointer !important; padding: 0;
+    }
+    .inv-btn:hover { background: rgba(200,169,110,.3); border-color: #c8a96e; color: #fff; }
+    .inv-btn-use { color: #4caf50; }
+    .inv-btn-drop { color: #f44336; }
+    .inv-item-name  { font-size: .55rem; color: #ccc; line-height: 1.2; }
+    .inv-item-count { font-size: .65rem; color: #aaa; align-self: flex-end; }
+    .inv-item-value { font-size: .5rem;  color: #88aa55; align-self: flex-end; }
+
+    /* Drag & Drop */
+    .inv-drop-target {
+      background: #3a5a3a !important;
+      border-color: #6a9a6a !important;
+    }
+    .inv-drag-ghost .inv-item-name {
+      font-size: .55rem; color: #ccc; line-height: 1.2;
+    }
+
+    /* Tooltip */
+    #inv-tooltip {
+      position: fixed; background: #111; border: 1px solid #444; border-radius: 3px;
+      padding: .4rem .7rem; font-size: .72rem; color: #ccc;
+      pointer-events: none; display: none; z-index: 90; white-space: nowrap;
+    }
+
+    /* ── Pause screen ────────────────────────────── */
+    #pause-screen {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: none; align-items: center; justify-content: center;
+      z-index: 50; pointer-events: auto;
+    }
+    .pause-content {
+      text-align: center; min-width: 260px;
+    }
+    .pause-content h2 {
+      font-size: 1.8rem; letter-spacing: .4em; color: #c8a96e;
+      text-transform: uppercase; margin-bottom: 2rem;
+    }
+    .pause-buttons { display: flex; flex-direction: column; gap: .6rem; }
+    .pause-btn {
+      padding: .6rem 2rem; font-size: .8rem; font-family: inherit;
+      letter-spacing: .15em; background: transparent;
+      border: 1px solid #555; color: #aaa;
+      cursor: pointer; border-radius: 4px; transition: all .2s;
+    }
+    .pause-btn:hover { border-color: #c8a96e; color: #c8a96e; background: rgba(200,169,110,0.08); }
+    .pause-btn-danger { color: #aa5544; border-color: #553333; }
+    .pause-btn-danger:hover { border-color: #dd3333; color: #dd3333; background: rgba(200,0,0,0.08); }
+    .pause-hint { font-size: .6rem; color: #444; margin-top: 1.5rem; letter-spacing: .15em; }
+
+    /* ── Settings screen ─────────────────────────── */
+    #settings-screen {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: none; align-items: center; justify-content: center;
+      z-index: 55; pointer-events: auto;
+    }
+    .settings-content {
+      min-width: 320px; max-width: 400px;
+    }
+    .settings-content h2 {
+      font-size: 1.4rem; letter-spacing: .3em; color: #c8a96e;
+      text-transform: uppercase; margin-bottom: 1.5rem; text-align: center;
+    }
+    .settings-group {
+      display: flex; align-items: center; gap: .8rem;
+      margin-bottom: 1rem; font-size: .75rem; color: #888;
+    }
+    .settings-label { width: 100px; text-align: right; color: #888; flex-shrink: 0; }
+    .settings-slider {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 4px; background: #333; border-radius: 2px; outline: none;
+    }
+    .settings-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      background: #c8a96e; border-radius: 50%; cursor: pointer;
+    }
+    .settings-val { width: 40px; color: #aaa; font-size: .7rem; }
+    .settings-toggle { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
+    .settings-toggle input { accent-color: #c8a96e; width: 16px; height: 16px; cursor: pointer; }
+    .toggle-text { color: #888; font-size: .7rem; }
+
+    /* ── Damage direction indicator ───────────────── */
+    #damage-direction {
+      position: fixed; inset: 0; pointer-events: none; z-index: 8;
+    }
+    .dmg-indicator {
+      position: absolute; width: 60px; height: 60px;
+      background: radial-gradient(ellipse, rgba(255,0,0,0.6) 0%, transparent 70%);
+      pointer-events: none;
+      animation: dmg-fade 0.8s ease-out forwards;
+    }
+    @keyframes dmg-fade {
+      0% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* ── Boss health bar ─────────────────────────── */
+    #boss-health-wrap {
+      position: absolute; top: 4rem; left: 50%; transform: translateX(-50%);
+      width: 300px; display: none; text-align: center;
+    }
+    #boss-name {
+      font-size: .75rem; color: #ff4444; letter-spacing: .2em;
+      text-transform: uppercase; margin-bottom: .3rem;
+      text-shadow: 0 0 8px rgba(255,60,60,0.4);
+    }
+    #boss-health-outer {
+      height: 8px; background: rgba(20,20,18,0.85);
+      border: 1px solid #553333; border-radius: 4px; overflow: hidden;
+    }
+    #boss-health-inner {
+      height: 100%; width: 100%; background: linear-gradient(90deg, #cc2222, #ff4444);
+      border-radius: 3px; transition: width .2s;
+    }
+  </style>
+  <!-- Cursor Vibe Jam 2026 required widget -->
+  <script async src="https://vibej.am/2026/widget.js"></script>
+  <script type="module" crossorigin src="/escape-from-duckkov/assets/index-XBod4zgq.js"></script>
+  <link rel="modulepreload" crossorigin href="/escape-from-duckkov/assets/three-BeKitR27.js">
+  <link rel="stylesheet" crossorigin href="/escape-from-duckkov/assets/index-XXyPJNOa.css">
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="crosshair"></div>
+
+  <!-- ── Lobby screen ─────────────────────────── -->
+  <div id="lobby-screen"></div>
+
+  <!-- ── Base screen ──────────────────────────── -->
+  <div id="base-screen"></div>
+
+  <!-- ── Rules screen ─────────────────────────── -->
+  <div id="rules-screen">
+
+    <!-- Sticky top bar -->
+    <div class="rules-topbar">
+      <div>
+        <h2>Mission Briefing</h2>
+        <div class="rules-topbar-sub">TARDUCK · Operative Field Manual</div>
+      </div>
+      <button class="rules-topbar-close" id="rules-topbar-close" aria-label="Close">✕</button>
+    </div>
+
+    <!-- Scrollable body with 2-column auto-fit grid -->
+    <div class="rules-body">
+      <div class="rules-grid">
+
+        <!-- Movement -->
+        <div class="rules-section">
+          <h3><span>Movement</span><span class="badge">CORE</span></h3>
+          <table class="rules-table">
+            <tr><td>WASD</td><td>Move character</td></tr>
+            <tr><td>Mouse</td><td>Aim — character faces cursor</td></tr>
+            <tr><td>LMB</td><td>Fire</td></tr>
+            <tr><td>RMB</td><td>Aim assist — tightens spread</td></tr>
+            <tr><td>Shift</td><td>Sprint — consumes stamina</td></tr>
+            <tr><td>Ctrl</td><td>Crouch — slow + faster stamina regen</td></tr>
+          </table>
+        </div>
+
+        <!-- Weapons & Items -->
+        <div class="rules-section">
+          <h3><span>Items &amp; Loot</span><span class="badge">INTERACT</span></h3>
+          <table class="rules-table">
+            <tr><td>1 – 5</td><td>Switch weapon slot</td></tr>
+            <tr><td>R</td><td>Reload (auto on empty mag)</td></tr>
+            <tr><td>H</td><td>Use best healing item</td></tr>
+            <tr><td>E</td><td>Loot · open corpse/crate panel · hold to extract</td></tr>
+            <tr><td>F</td><td>Open / close door</td></tr>
+            <tr><td>Tab</td><td>Inventory · ESC pause</td></tr>
+          </table>
+        </div>
+
+        <!-- Combat & Survival -->
+        <div class="rules-section span-2">
+          <h3><span>Combat &amp; Survival</span><span class="badge">DAMAGE MODEL</span></h3>
+          <p class="rules-desc">
+            6 independent body-part HP pools: <b>head / torso / arms / legs</b>.
+            <b>Head or torso = 0 ⇒ KIA</b>; limbs at 0 = fracture (broken leg blocks sprint, broken arm widens spread).<br>
+            Hits roll a 30% chance to trigger <b style="color:#ff6644">bleeding</b> — continuous HP drain until cured with bandage / painkillers.<br>
+            <b style="color:#88e088">Two armor pieces, both equip simultaneously:</b><br>
+            &nbsp;&nbsp;• <b>Body Armor</b> — Light Vest (HP 80, -40% body dmg) · Heavy Vest (HP 150, -60% body dmg). Shows as a green ring next to the HP bar.<br>
+            &nbsp;&nbsp;• <b>Helmet</b> — HP 50, -55% head dmg. Head-only protection. Shows as a blue ring.<br>
+            Both have durability and break when depleted. Talents can boost armor efficiency further.<br>
+            <b>Encumbrance:</b> over <b style="color:#ffaa44">25 kg</b> blocks sprint; over <b style="color:#f44336">35 kg</b> drops walk speed by 20% (Pack Mule talent shifts both thresholds +10 kg).
+          </p>
+        </div>
+
+        <!-- Enemy types -->
+        <div class="rules-section span-2">
+          <h3><span>Enemy Roster</span><span class="badge">5 TYPES</span></h3>
+          <table class="rules-table">
+            <tr><td style="color:#dd5544">Normal</td><td>HP 80 · DMG 10 · vision 18m · hearing 12m</td></tr>
+            <tr><td style="color:#cc2222">★ Elite</td><td>HP 160 · DMG 16 · larger model · guaranteed premium loot</td></tr>
+            <tr><td style="color:#ff6633">Rusher</td><td>HP 60 · MELEE 25 · very fast — close-range threat</td></tr>
+            <tr><td style="color:#5566aa">Tank</td><td>HP 300 · DMG 20 · slow · drops heavy armor</td></tr>
+            <tr><td style="color:#882288">Boss</td><td>HP 600 · DMG 30 · guaranteed weapon + blueprint</td></tr>
+          </table>
+        </div>
+
+        <!-- Named Bosses -->
+        <div class="rules-section span-2">
+          <h3><span>Named Bosses</span><span class="badge">🏆 3 LEGENDARY</span></h3>
+          <div class="rules-bosses">
+            <div class="rules-boss-card" style="--boss-color:#ff8800;--boss-glow:rgba(255,136,0,.5)">
+              <div class="rules-boss-card-name">@levelsio</div>
+              <div class="rules-boss-card-tag">Industrial Map · Jam Boss</div>
+              <div class="rules-boss-card-desc">HP 200 · DMG 4 · slow shots. Indie hacker meta — "build in 6 days · $250k MRR · Bali remote". Drops the <b>Indie Hacker's Revolver</b> + heavy vest + helmet + 60 rifle ammo. Extracting with the Revolver triggers 🏆 YOU SHIPPED IT.</div>
+              <div class="rules-boss-card-trophy">🎯 Trophy: Indie Hacker's Revolver (jam victory)</div>
+            </div>
+            <div class="rules-boss-card" style="--boss-color:#ff4422;--boss-glow:rgba(255,68,34,.5)">
+              <div class="rules-boss-card-name">@boltdotnew</div>
+              <div class="rules-boss-card-tag">Port Map · Glass Cannon</div>
+              <div class="rules-boss-card-desc">HP 220 · DMG 14 @ 0.35s interval. bolt.new / StackBlitz — "prompt → run → edit → deploy" + WebContainers. SMG-grade rate, lower HP. Reward: MP5 + 90 SMG ammo.</div>
+              <div class="rules-boss-card-trophy">🚢 Trophy: Deploy Token</div>
+            </div>
+            <div class="rules-boss-card" style="--boss-color:#44ddaa;--boss-glow:rgba(68,221,170,.5)">
+              <div class="rules-boss-card-name">@cursor_ai</div>
+              <div class="rules-boss-card-tag">Lab Map · Long-Range Sniper</div>
+              <div class="rules-boss-card-desc">HP 280 · DMG 18 · range 30m. Jam sponsor — Tab autocomplete, Composer, $60B SpaceX deal. Predictive shots from across the map. Reward: VSS rifle + 30 SP-6 ammo.</div>
+              <div class="rules-boss-card-trophy">🤖 Trophy: Cursor Tab Pass</div>
+            </div>
+          </div>
+          <div class="rules-desc" style="margin-top:.7rem;border-top:1px dashed #2a2010;padding-top:.6rem">
+            <b>Hibernation:</b> bosses sleep until <b>~90 s</b> elapsed OR you approach an extraction point — gives you time to scavenge before the encounter triggers.<br>
+            <b>Ship-It rage:</b> at ≤30% HP every boss enters red-screen mode — fire rate doubles, special line plays.<br>
+            <b>Trophy reuse:</b> each trophy can be <b>consumed</b> at the base under <b style="color:#ffd54a">🏆 Legendary Talents</b> for permanent buffs (re-farm the boss for more).
+          </div>
+        </div>
+
+        <!-- Maps -->
+        <div class="rules-section span-2">
+          <h3><span>Maps &amp; Extraction</span><span class="badge">3 TIERS</span></h3>
+          <div class="rules-maps">
+            <div class="rules-map-card" style="--map-color:#c8a96e">
+              <div class="rules-map-name">Industrial</div>
+              <div class="rules-map-difficulty"><span class="diff-stars">★ ☆ ☆</span> · 1.0× difficulty</div>
+              <div class="rules-map-desc">Abandoned factories and warehouses. Open sightlines + cover crates. Tutorial-grade.</div>
+              <div class="rules-map-unlock">Unlocked from start</div>
+            </div>
+            <div class="rules-map-card" style="--map-color:#6a8aa8">
+              <div class="rules-map-name">Port</div>
+              <div class="rules-map-difficulty"><span class="diff-stars">★ ★ ☆</span> · 1.25× difficulty</div>
+              <div class="rules-map-desc">Stacked container yards + dock walls. Tight CQB lanes between containers.</div>
+              <div class="rules-map-unlock">Unlocks · Extract once</div>
+            </div>
+            <div class="rules-map-card" style="--map-color:#aa44dd">
+              <div class="rules-map-name">Lab</div>
+              <div class="rules-map-difficulty"><span class="diff-stars">★ ★ ★</span> · 1.5× difficulty</div>
+              <div class="rules-map-desc">Tight modular bunkers + cover arrays. Long sightlines through corridors. Highest difficulty.</div>
+              <div class="rules-map-unlock">Unlocks · Extract 3×</div>
+            </div>
+          </div>
+          <div class="rules-desc" style="margin-top:.7rem;border-top:1px dashed #2a2010;padding-top:.6rem">
+            Every map has <b style="color:#ffd54a">golden supply crates</b> (floating glow + ground ring) — press E to loot.<br>
+            <b style="color:#00ff80">Green zones</b> are extraction points — hold E for 10 s to escape with your stash.<br>
+            <b style="color:#ffaa00">Basement (orange)</b> requires the <b style="color:#d4a017">Basement Key</b> from the south stairwell.<br>
+            Raid limit <b>8 minutes</b> — timer hits 0 ⇒ counts as KIA.
+          </div>
+        </div>
+
+        <!-- Loadout & Difficulty (pre-raid stash screen) -->
+        <div class="rules-section">
+          <h3><span>Loadout &amp; Difficulty</span><span class="badge">PRE-RAID</span></h3>
+          <p class="rules-desc">
+            Picking a level opens the Stash screen. Choose:<br>
+            <b>Difficulty</b> — Easy (0.5×) · Normal (1.0×) · Hard (1.5×) — scales every enemy's HP and damage.<br>
+            <b>Loadout</b> — 5 preset kits (Assault / Medic / Shotgun / Sniper / SMG). Each preset spawns you with one weapon + matching ammo + starter armor.<br>
+            <b>Stash carry</b> — drag extras from the stash into your starting inventory (subject to grid space + weight limits).
+          </p>
+        </div>
+
+        <!-- Talents (PerkPalace) -->
+        <div class="rules-section span-2">
+          <h3><span>Talents</span><span class="badge">PERMANENT</span></h3>
+          <p class="rules-desc">
+            Permanent buffs purchased at the base with currency + XP threshold. 4 themed trees + 3 legendary boss-trophy upgrades. T2 / T3 inside a tree require the previous tier; legendary requires the matching boss trophy AND that tree's tier-3 talent.<br><br>
+            <b style="color:#88e088">Survival (4)</b> — Vitality I/II/III (+20 / +40 / +60 HP) · Hemostasis (-50% bleed)<br>
+            <b style="color:#6aa6d8">Mobility (4)</b> — Lightweight I/II (+8% / +15% speed) · Endurance (+30 stamina) · Marathon (+50% stamina regen) · Pack Mule (+10 kg weight cap)<br>
+            <b style="color:#ff8866">Combat (4)</b> — Marksmanship I/II (-20% / -35% spread) · Fast Reload I/II (-25% / -40% reload)<br>
+            <b style="color:#aabbcc">Defense (4)</b> — Armor Mastery I/II (+20% / +35% efficiency) · Iron Head (+20 head HP) · Fortified (+40 HP, -10% speed)<br><br>
+            <b style="color:#ffd54a">🏆 Legendary (3)</b> — boss trophy + matching tier-3 prereq, trophy CONSUMED on unlock:<br>
+            &nbsp;&nbsp;• <b>Vibe Master</b> ← Revolver + Vitality III &nbsp;→ &nbsp;+100 HP, +50 stamina<br>
+            &nbsp;&nbsp;• <b>Deploy Chief</b> ← Deploy Token + Fast Reload II &nbsp;→ &nbsp;-50% reload, +20% speed<br>
+            &nbsp;&nbsp;• <b>Tab Master</b> ← Cursor Pass + Marksmanship II &nbsp;→ &nbsp;-50% spread, +30 HP
+          </p>
+        </div>
+
+        <!-- Crafting -->
+        <div class="rules-section">
+          <h3><span>Workbench</span><span class="badge">CRAFT</span></h3>
+          <p class="rules-desc">
+            Find <b style="color:#4488cc">blueprints</b> on elites and bosses (auto-registered on extract). Once unlocked, the workbench at the base lets you craft consumables in exchange for currency:<br>
+            Medkit · Body Armor · Painkillers · Helmet — useful for runs where you didn't loot enough.
+          </p>
+        </div>
+
+        <!-- Progression -->
+        <div class="rules-section">
+          <h3><span>Progression</span><span class="badge">META</span></h3>
+          <p class="rules-desc">
+            <b>XP &amp; Currency</b> are credited <em>only on successful extraction</em>. Death = nothing carries over.<br>
+            <b>Death Recovery</b> — when you die your pack drops at your kill spot. Re-enter the <em>same map</em> next raid and a glowing pillar marks the bag — loot it back.<br>
+            <b>Map Unlocks</b> — Industrial unlocked from start · Port after 1 extract · Lab after 3 extracts.<br>
+            <b>Scoring</b> — extracts get a tier (S / A / B / C / D / F) + 5-star rating based on kills, loot value and survival time.
+          </p>
+        </div>
+
+        <!-- Arsenal — weapon stat cards with bars -->
+        <div class="rules-section span-2">
+          <h3><span>Arsenal</span><span class="badge">5 SLOTS</span></h3>
+          <div class="rules-weapons">
+            <!-- AK-74 -->
+            <div class="rules-weapon-card">
+              <div class="rules-weapon-head">
+                <span class="rules-weapon-name">AK-74</span>
+                <span class="rules-weapon-slot">SLOT 1</span>
+              </div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc4444;--bar-color2:#ff6666;--bar-glow:rgba(255,80,80,.4)"><span class="stat-label">DMG</span><span class="stat-bar" style="--pct:42%"></span><span class="stat-val">28</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#4488cc;--bar-color2:#66aaee;--bar-glow:rgba(80,170,250,.4)"><span class="stat-label">RANGE</span><span class="stat-bar" style="--pct:65%"></span><span class="stat-val">55m</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc8844;--bar-color2:#ffaa66;--bar-glow:rgba(255,170,80,.4)"><span class="stat-label">RPM</span><span class="stat-bar" style="--pct:55%"></span><span class="stat-val">500</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#88aa55;--bar-color2:#aacc77;--bar-glow:rgba(170,200,100,.4)"><span class="stat-label">MAG</span><span class="stat-bar" style="--pct:60%"></span><span class="stat-val">30</span></div>
+              <div class="rules-weapon-tag">Workhorse full-auto rifle. Default starter — balanced damage and accuracy.</div>
+            </div>
+            <!-- Glock 17 -->
+            <div class="rules-weapon-card">
+              <div class="rules-weapon-head">
+                <span class="rules-weapon-name">Glock 17</span>
+                <span class="rules-weapon-slot">SLOT 2</span>
+              </div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc4444;--bar-color2:#ff6666;--bar-glow:rgba(255,80,80,.4)"><span class="stat-label">DMG</span><span class="stat-bar" style="--pct:38%"></span><span class="stat-val">26</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#4488cc;--bar-color2:#66aaee;--bar-glow:rgba(80,170,250,.4)"><span class="stat-label">RANGE</span><span class="stat-bar" style="--pct:32%"></span><span class="stat-val">30m</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc8844;--bar-color2:#ffaa66;--bar-glow:rgba(255,170,80,.4)"><span class="stat-label">RPM</span><span class="stat-bar" style="--pct:60%"></span><span class="stat-val">333</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#88aa55;--bar-color2:#aacc77;--bar-glow:rgba(170,200,100,.4)"><span class="stat-label">MAG</span><span class="stat-bar" style="--pct:34%"></span><span class="stat-val">17</span></div>
+              <div class="rules-weapon-tag">Fast sidearm. Mid damage, fast reload. Reliable backup.</div>
+            </div>
+            <!-- MP-133 Shotgun -->
+            <div class="rules-weapon-card">
+              <div class="rules-weapon-head">
+                <span class="rules-weapon-name">MP-133</span>
+                <span class="rules-weapon-slot">SLOT 3</span>
+              </div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc4444;--bar-color2:#ff6666;--bar-glow:rgba(255,80,80,.4)"><span class="stat-label">DMG</span><span class="stat-bar" style="--pct:95%"></span><span class="stat-val">8×16</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#4488cc;--bar-color2:#66aaee;--bar-glow:rgba(80,170,250,.4)"><span class="stat-label">RANGE</span><span class="stat-bar" style="--pct:18%"></span><span class="stat-val">16m</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc8844;--bar-color2:#ffaa66;--bar-glow:rgba(255,170,80,.4)"><span class="stat-label">RPM</span><span class="stat-bar" style="--pct:18%"></span><span class="stat-val">70</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#88aa55;--bar-color2:#aacc77;--bar-glow:rgba(170,200,100,.4)"><span class="stat-label">MAG</span><span class="stat-bar" style="--pct:16%"></span><span class="stat-val">8</span></div>
+              <div class="rules-weapon-tag">8-pellet CQB clearer. King of close range — devastating but slow.</div>
+            </div>
+            <!-- VSS Vintorez -->
+            <div class="rules-weapon-card">
+              <div class="rules-weapon-head">
+                <span class="rules-weapon-name">VSS Vintorez</span>
+                <span class="rules-weapon-slot">SLOT 4</span>
+              </div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc4444;--bar-color2:#ff6666;--bar-glow:rgba(255,80,80,.4)"><span class="stat-label">DMG</span><span class="stat-bar" style="--pct:100%"></span><span class="stat-val">95</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#4488cc;--bar-color2:#66aaee;--bar-glow:rgba(80,170,250,.4)"><span class="stat-label">RANGE</span><span class="stat-bar" style="--pct:100%"></span><span class="stat-val">95m</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc8844;--bar-color2:#ffaa66;--bar-glow:rgba(255,170,80,.4)"><span class="stat-label">RPM</span><span class="stat-bar" style="--pct:24%"></span><span class="stat-val">109</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#88aa55;--bar-color2:#aacc77;--bar-glow:rgba(170,200,100,.4)"><span class="stat-label">MAG</span><span class="stat-bar" style="--pct:20%"></span><span class="stat-val">10</span></div>
+              <div class="rules-weapon-tag">Suppressed sniper. Most enemies 2-tap, headshot 1-shot. Drops from @cursor_ai.</div>
+            </div>
+            <!-- MP5 -->
+            <div class="rules-weapon-card">
+              <div class="rules-weapon-head">
+                <span class="rules-weapon-name">MP5</span>
+                <span class="rules-weapon-slot">SLOT 5</span>
+              </div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc4444;--bar-color2:#ff6666;--bar-glow:rgba(255,80,80,.4)"><span class="stat-label">DMG</span><span class="stat-bar" style="--pct:24%"></span><span class="stat-val">16</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#4488cc;--bar-color2:#66aaee;--bar-glow:rgba(80,170,250,.4)"><span class="stat-label">RANGE</span><span class="stat-bar" style="--pct:42%"></span><span class="stat-val">38m</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#cc8844;--bar-color2:#ffaa66;--bar-glow:rgba(255,170,80,.4)"><span class="stat-label">RPM</span><span class="stat-bar" style="--pct:100%"></span><span class="stat-val">923</span></div>
+              <div class="rules-weapon-stat" style="--bar-color:#88aa55;--bar-color2:#aacc77;--bar-glow:rgba(170,200,100,.4)"><span class="stat-label">MAG</span><span class="stat-bar" style="--pct:60%"></span><span class="stat-val">30</span></div>
+              <div class="rules-weapon-tag">High-DPS SMG. Low per-shot, fastest fire rate. Drops from @boltdotnew.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Single close path: top-right ✕ in the sticky topbar.
+         Bottom "Back to Main Menu" + the overrides-injected
+         left-arrow are both removed — three close buttons was noise. -->
+
+  </div>
+
+  <!-- ── Stash screen ──────────────────────────── -->
+  <div id="stash-screen">
+    <!-- populated by StashScreen.js -->
+  </div>
+
+  <!-- ── End screen (post-raid summary) ──────────── -->
+  <div id="end-screen">
+    <div class="end-card" id="end-card">
+      <!-- Confetti only renders on win/champion variants (CSS hides on death/timeout) -->
+      <div class="end-confetti" id="end-confetti"></div>
+      <!-- Death-only decorations: scanlines overlay, diagonal slammed-in
+           "RAID TERMINATED" stamp, and bottom flatline EKG. CSS hides
+           these on win/timeout/champion themes. -->
+      <div class="death-scanlines" aria-hidden="true"></div>
+      <div class="raid-stamp" aria-hidden="true">RAID TERMINATED</div>
+      <div class="end-badge" id="end-badge">✓</div>
+      <h1 id="end-title">Extracted</h1>
+      <div class="death-subtitle" aria-hidden="true">EXTRACTION FAILED</div>
+      <!-- 5-star rating bar — fills sequentially via per-star CSS animation delay -->
+      <div class="end-stars" id="end-stars" aria-hidden="true"></div>
+      <div class="end-rating" id="end-rating">
+        <span class="rating-letter" id="end-rating-letter">A</span>
+        <span id="end-rating-flavor">vibe coded</span>
+      </div>
+      <div class="end-quip" id="end-quip"></div>
+
+      <!-- Big +cash banner (hidden via CSS on death/timeout variants) -->
+      <div class="end-earnings" id="end-earnings">
+        <span class="earnings-plus">+</span><span id="end-earnings-value">0</span><span class="earnings-suffix">Duck Bucks</span>
+      </div>
+
+      <div class="end-stats">
+        <div class="end-stat"><label>Survived</label><span id="end-time">00:00</span></div>
+        <div class="end-stat"><label>Kills</label><span id="end-kills">0</span></div>
+        <div class="end-stat"><label>Loot</label><span id="end-loot">0</span></div>
+        <div class="end-stat"><label>XP</label><span id="end-xp">0</span></div>
+      </div>
+
+      <div class="end-loot-section" id="end-loot-section">
+        <div class="end-loot-title" id="end-loot-section-title">Deposited to Stash</div>
+        <div class="end-loot-list" id="end-loot-list"></div>
+      </div>
+
+      <div class="end-recovery-notice" id="end-recovery-notice" style="display:none">
+        💀 Pack lost on the field — recover it from your death spot in the next raid of this map
+      </div>
+
+      <!-- Death-only flatline EKG strip — pulses, then dies into a flat line. -->
+      <div class="death-flatline" aria-hidden="true"></div>
+
+      <div class="end-actions">
+        <!-- Tweet button shown only on Champion run (toggled by main.js) -->
+        <button class="end-btn tweet" id="end-btn-tweet" style="display:none">🐦 Share on Twitter</button>
+        <button class="end-btn primary" id="end-btn-base">Back to Base</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main menu (start screen) ─────────────────────
+       Two-column edge layout: brand corner + POI label corner,
+       LEFT actions stack, RIGHT info panel stack. The middle stays
+       open so the live 3D POI cycle (main.js _menuRenderTick) is the
+       hero of the screen. Mode/lobby buttons fold in here so there's
+       no Solo/Coop modal step before the base. -->
+  <div id="start-screen">
+
+    <!-- Top-left brand corner -->
+    <div class="menu-brand">
+      <h1>TARDUCK</h1>
+      <p>quack <span class="tag-dot">·</span> loot <span class="tag-dot">·</span> ship it</p>
+    </div>
+
+    <!-- Top-right live camera POI label (updated each shot) -->
+    <div id="menu-poi-label">PATROLLING · INDUSTRIAL DISTRICT</div>
+
+    <!-- LEFT column: deploy modes — no abstract "Enter Raid" wrapper.
+         Each button is the actual deploy choice the player will make. -->
+    <div class="menu-actions">
+      <div class="menu-actions-label">DEPLOY</div>
+      <button id="start-btn">
+        <span class="ico">🎯</span>Solo Raid
+      </button>
+      <button class="menu-action-secondary" id="menu-create-btn">
+        <span class="ico">🌐</span>Create Co-op Room<span class="arrow">›</span>
+      </button>
+      <button class="menu-action-secondary" id="menu-join-btn">
+        <span class="ico">🔑</span>Join Co-op Room<span class="arrow">›</span>
+      </button>
+      <div class="menu-actions-label" style="margin-top:.6rem">REFERENCE</div>
+      <button class="menu-action-secondary" id="menu-rules-btn">
+        <span class="ico">📖</span>Full Rules<span class="arrow">›</span>
+      </button>
+    </div>
+
+    <!-- RIGHT column: info card stack (Bosses / Mission / Controls) -->
+    <div class="menu-info">
+
+      <div class="menu-info-card">
+        <div class="menu-info-title"><span>Boss Briefing</span><span class="tag">3 NAMED</span></div>
+        <div class="menu-info-boss">
+          <span class="menu-info-boss-dot" style="color:#ff8800;background:#ff8800"></span>
+          <span><span class="menu-info-boss-name">@levelsio</span> <span class="menu-info-boss-desc">— Industrial · jam boss</span></span>
+        </div>
+        <div class="menu-info-boss">
+          <span class="menu-info-boss-dot" style="color:#ff4422;background:#ff4422"></span>
+          <span><span class="menu-info-boss-name">@boltdotnew</span> <span class="menu-info-boss-desc">— Port · glass cannon</span></span>
+        </div>
+        <div class="menu-info-boss">
+          <span class="menu-info-boss-dot" style="color:#44ddaa;background:#44ddaa"></span>
+          <span><span class="menu-info-boss-name">@cursor_ai</span> <span class="menu-info-boss-desc">— Lab · long-range</span></span>
+        </div>
+        <div class="menu-info-foot">≤30% HP triggers <b>SHIP IT</b> rage — fire rate doubles.</div>
+      </div>
+
+      <div class="menu-info-card">
+        <div class="menu-info-title"><span>Mission</span><span class="tag">8 MIN</span></div>
+        <ul class="menu-info-mission">
+          <li>Survive an 8-minute top-down raid</li>
+          <li>Kill <b>@levelsio</b>, take the <b>Indie Hacker's Revolver</b></li>
+          <li>Hold E at the green NORTH zone for 10 s</li>
+          <li>Extract with the Revolver → <b>🏆 YOU SHIPPED IT</b></li>
+        </ul>
+      </div>
+
+      <div class="menu-info-card">
+        <div class="menu-info-title"><span>Controls</span><span class="tag">QUICK</span></div>
+        <div class="menu-info-row"><span class="key">WASD</span><span class="val">Move · Shift Sprint · Ctrl Crouch</span></div>
+        <div class="menu-info-row"><span class="key">Mouse</span><span class="val">Aim · LMB Shoot · RMB ADS</span></div>
+        <div class="menu-info-row"><span class="key">1 – 5</span><span class="val">Switch weapon · R Reload</span></div>
+        <div class="menu-info-row"><span class="key">E</span><span class="val">Loot · open panel · hold to extract</span></div>
+        <div class="menu-info-row"><span class="key">F · H</span><span class="val">Door · Heal · Tab Inventory</span></div>
+      </div>
+
+    </div>
+
+    <!-- Legacy elements kept for backwards-compat (hidden by CSS) -->
+    <div id="start-controls"></div>
+    <div id="raid-stats"></div>
+    <button id="rules-btn"></button>
+
+    <!-- Bottom credit -->
+    <div class="start-jam-badge">
+      Built for · <a href="https://vibej.am/2026/" target="_blank" rel="noopener">Cursor Vibe Jam 2026</a>
+    </div>
+  </div>
+
+  <!-- ── HUD ────────────────────────────────────── -->
+  <div id="hud">
+    <div id="damage-flash"></div>
+    <div id="low-health-vignette"></div>
+    <div id="tips-ticker"></div>
+    <div id="tutorial-hint"></div>
+
+    <div id="status-display">In Raid</div>
+    <div id="xp-display">
+      <span>XP</span>
+      <span id="xp-value">0</span>
+      <span style="margin-left:.8rem;color:#555">Kills</span>
+      <span id="kill-count" style="color:#e05050">0</span>
+    </div>
+    <div id="timer-display">
+      Time Left
+      <span id="timer-value">45:00</span>
+    </div>
+
+    <div id="health-display">
+      <div id="health-label">HP</div>
+      <div id="health-bar-outer">
+        <div id="health-bar-inner"></div>
+        <span id="health-hp-text">100</span>
+      </div>
+      <div id="health-value">100</div>
+      <div id="health-danger"></div>
+      <div id="stamina-bar-wrap">
+        <div id="stamina-bar-label">Stamina</div>
+        <div id="stamina-bar-outer"><div id="stamina-bar-inner"></div></div>
+      </div>
+      <div id="armor-bar-wrap">
+        <div id="armor-bar-label">Body</div>
+        <div id="armor-bar-outer"><div id="armor-bar-inner"></div></div>
+      </div>
+      <div id="weight-display">
+        <span id="weight-value">0.0</span><span id="weight-unit"> / 50 kg</span>
+      </div>
+    </div>
+
+    <div id="heal-channel-wrap">
+      <div id="heal-channel-label">Healing…</div>
+      <div id="heal-channel-outer"><div id="heal-channel-inner"></div></div>
+    </div>
+
+    <!-- Body-parts breakdown hidden — head-top + bottom HP bar are the
+         player's only health read. Body-part damage / fractures / bleeding
+         still drive stats internally; UI block hidden to reduce clutter. -->
+    <div id="body-parts" style="display:none"></div>
+
+    <div id="weapon-slots">
+      <div class="wslot active" id="wslot-0"><span class="wslot-key">1</span><span class="wslot-icon">AK</span><span class="wslot-hint"></span></div>
+      <div class="wslot" id="wslot-1"><span class="wslot-key">2</span><span class="wslot-icon">Pistol</span><span class="wslot-hint"></span></div>
+      <div class="wslot" id="wslot-2"><span class="wslot-key">3</span><span class="wslot-icon">Shotgun</span><span class="wslot-hint"></span></div>
+      <div class="wslot" id="wslot-3"><span class="wslot-key">4</span><span class="wslot-icon">VSS</span><span class="wslot-hint"></span></div>
+      <div class="wslot" id="wslot-4"><span class="wslot-key">5</span><span class="wslot-icon">MP5</span><span class="wslot-hint"></span></div>
+    </div>
+
+    <div id="weapon-display">
+      <div id="weapon-name">AK-74</div>
+      <div id="ammo-current">30</div>
+      <div id="ammo-reserve">/ 90</div>
+      <div id="reload-indicator">
+        <div id="reload-text">RELOAD</div>
+        <div id="reload-bar-outer"><div id="reload-bar-inner"></div></div>
+      </div>
+    </div>
+
+    <div id="pickup-hint"></div>
+
+    <div id="extract-bar-wrap">
+      <div id="extract-bar-label">Extracting…</div>
+      <div id="extract-bar-outer"><div id="extract-bar-inner"></div></div>
+    </div>
+
+    <div id="kill-feed"></div>
+    <div id="bleed-indicator">● Bleeding — press H to stop</div>
+
+    <!-- Key hints bar — single source of truth for keyboard reference.
+         The top tips-ticker covers game *concepts* (Bleeding / Fracture /
+         Armor / Boss / Loot / Weight) so it doesn't duplicate these keys. -->
+    <div id="key-hints">
+      <span class="kh-key">WASD</span> Move &nbsp;
+      <span class="kh-key">Shift</span> Sprint &nbsp;
+      <span class="kh-key">Ctrl</span> Crouch &nbsp;
+      <span class="kh-key">Tab</span> Inventory &nbsp;
+      <span class="kh-key">H</span> Heal &nbsp;
+      <span class="kh-key">R</span> Reload &nbsp;
+      <span class="kh-key">E</span> Pickup/Extract &nbsp;
+      <span class="kh-key">F</span> Door &nbsp;
+      <span class="kh-key">1-8</span> Switch Weapon
+    </div>
+
+    <!-- Minimap (positioned top-right, overlaps kill-feed which moves down) -->
+    <div id="minimap-wrap">
+      <canvas id="minimap-canvas" width="140" height="140"></canvas>
+      <div id="minimap-label">Raid Zone</div>
+    </div>
+
+    <div id="damage-direction"></div>
+
+    <div id="boss-health-wrap">
+      <div id="boss-name">BOSS</div>
+      <div id="boss-health-outer"><div id="boss-health-inner"></div></div>
+    </div>
+
+    <div id="pause-screen">
+      <div class="pause-content">
+        <h2>Paused</h2>
+        <div class="pause-buttons">
+          <button class="pause-btn" id="pause-resume">Resume</button>
+          <button class="pause-btn" id="pause-settings">Settings</button>
+          <button class="pause-btn" id="pause-rules">How to Play</button>
+          <button class="pause-btn pause-btn-danger" id="pause-quit">Abandon Raid</button>
+        </div>
+        <div class="pause-hint">ESC to resume</div>
+      </div>
+    </div>
+
+    <div id="settings-screen">
+      <div class="settings-content">
+        <h2>Settings</h2>
+        <div class="settings-group">
+          <label class="settings-label">Master Volume</label>
+          <input type="range" id="setting-volume" class="settings-slider" min="0" max="100" value="70">
+          <span class="settings-val" id="setting-volume-val">70%</span>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Mouse Sensitivity</label>
+          <input type="range" id="setting-sensitivity" class="settings-slider" min="10" max="200" value="100">
+          <span class="settings-val" id="setting-sensitivity-val">100%</span>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Fog of War</label>
+          <label class="settings-toggle">
+            <input type="checkbox" id="setting-fog" checked>
+            <span class="toggle-text">On</span>
+          </label>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Screen Shake</label>
+          <label class="settings-toggle">
+            <input type="checkbox" id="setting-shake" checked>
+            <span class="toggle-text">On</span>
+          </label>
+        </div>
+        <button class="pause-btn" id="settings-close">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Inventory ──────────────────────────────── -->
+  <div id="inventory-panel">
+    <div id="inventory-box">
+      <div id="inventory-title">
+        Inventory <span style="color:#444;font-size:.55rem;margin-left:.5rem">Drag to move | Right-click use/drop | Shift+click drop</span>
+        <span id="inv-weight">0.0 kg</span>
+        <span style="color:#666">TAB to close</span>
+      </div>
+      <div id="inventory-grid"></div>
+    </div>
+  </div>
+  <div id="inv-tooltip"></div>
+
+  <!-- Crosshair tracking -->
+  <script>
+    const ch = document.getElementById('crosshair');
+    document.addEventListener('mousemove', e => {
+      ch.style.left = e.clientX + 'px';
+      ch.style.top  = e.clientY + 'px';
+    });
+    // Prevent Tab from switching browser focus
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Tab') e.preventDefault();
+    });
+
+    // ── Rules screen ──────────────────────────────────────────────────────────
+    // Both the legacy hidden #rules-btn and the new footer #rules-link open
+    // the comprehensive rules modal. Legacy stays for backwards-compat with
+    // any code that still pokes #rules-btn directly.
+    const _openRules = () => {
+      document.getElementById('rules-screen').style.display = 'flex';
+    };
+    document.getElementById('rules-btn')?.addEventListener('click', _openRules);
+    document.getElementById('rules-link')?.addEventListener('click', _openRules);
+    // Single close path: the top-right ✕ in the sticky topbar (+ ESC).
+    // Old footer "Back to Main Menu" button and the overrides-injected
+    // left-arrow have been removed — three close buttons was noise.
+    const _closeRules = () => {
+      document.getElementById('rules-screen').style.display = 'none';
+    };
+    document.getElementById('rules-topbar-close')?.addEventListener('click', _closeRules);
+    // ESC closes the rules screen too — keyboard parity with the rest of the
+    // overlays (inventory, body-loot UI, etc.).
+    document.addEventListener('keydown', (e) => {
+      if (e.code !== 'Escape') return;
+      const rs = document.getElementById('rules-screen');
+      if (rs && rs.style.display === 'flex') _closeRules();
+    });
+
+    // ── Tips ticker ───────────────────────────────────────────────────────────
+    // Concept-only pool. Pure key bindings (WASD / 1~5 / H / E / F / Tab) live
+    // in the bottom #key-hints bar — keeping them out of here prevents the
+    // top ticker and bottom bar from showing the same hint twice.
+const TIPS = [
+      ['🏆 BOSS', 'Orange=@levelsio · Red=@boltdotnew · Teal=@cursor_ai, drops unlock legendary talents'],
+      ['📦 Supply Crate', 'Gold beam + ground ring marker; press E to open the loot panel'],
+      ['Bleeding', '30% chance on hit triggers bleed DOT · use bandage/painkillers (H) to stop'],
+      ['Fracture', 'Leg HP=0 → cannot sprint · Arm HP=0 → larger aim spread'],
+      ['Armor', 'Picked-up vests auto-equip · 40-60% damage reduction · breaks when durability hits 0'],
+      ['Loot', 'Normal enemies drop ammo · Elites drop premium gear · Bosses drop weapons + trophies'],
+      ['Weight', '>25kg blocks sprint · >35kg slows walking · check via Tab'],
+      ['Basement', 'Key spawns near south stairwell · use the orange extraction point'],
+      ['Levels', 'Start at Industrial · 1 extract unlocks Port · 3 extracts unlock Lab'],
+    ];
+    let _tipIdx = 0;
+    let _tipVisible = false;
+
+    function _nextTip() {
+      const ticker = document.getElementById('tips-ticker');
+      if (!ticker || !_tipVisible) return;
+      const [key, desc] = TIPS[_tipIdx % TIPS.length];
+      ticker.innerHTML = `<span class="tip-key">[${key}]</span><span>${desc}</span>`;
+      _tipIdx++;
+    }
+
+    // Show ticker only during game (called from module)
+    window._showTipsTicker = () => {
+      _tipVisible = true;
+      _nextTip();
+      setInterval(_nextTip, 5000);
+
+      // Key hints: show on raid start, fade after 20s
+      const kh = document.getElementById('key-hints');
+      if (kh) {
+        kh.style.opacity = '1';
+        setTimeout(() => { kh.style.opacity = '0'; }, 20000);
+      }
+    };
+  </script>
+
+</body>
+</html>
