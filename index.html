@@ -1156,6 +1156,166 @@
         );
     }
 
+    /* ── WIN-THEME CINEMATIC OVERHAUL ────────────────
+       Mirror of the death theme but in a triumphant register: metallic
+       title shine, slammed-in PAYDAY stamp, MISSION COMPLETE subtitle,
+       gold light-edge top, green-glow stats. Champion variant keeps its
+       own distinct gold-pulse treatment — these rules don't override it. */
+
+    /* Massive EXTRACTED title with metallic shine sweep across the letters.
+       background-clip: text + transparent fill makes the gradient visible
+       as a moving streak. drop-shadow replaces text-shadow (which is lost
+       on transparent text). */
+    .end-card.win h1 {
+      position: relative;
+      z-index: 3;
+      font-size: 2.6rem;
+      letter-spacing: .3em;
+      margin-bottom: .15rem;
+      background: linear-gradient(
+        100deg,
+        #4caf50 0%,
+        #4caf50 40%,
+        #d4ffcc 50%,
+        #4caf50 60%,
+        #4caf50 100%
+      );
+      background-size: 250% 100%;
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      filter: drop-shadow(0 0 6px rgba(76,175,80,.6))
+              drop-shadow(0 0 18px rgba(76,175,80,.35));
+      animation:
+        winTitleIn .55s cubic-bezier(.2,1.4,.4,1) both,
+        winTitleShine 3.5s ease-in-out 0.7s infinite;
+    }
+    @keyframes winTitleIn {
+      0%   { transform: scale(.5);  opacity: 0; letter-spacing: 1em; background-position: 200% 0; }
+      60%  { transform: scale(1.08); opacity: 1;                      background-position: 100% 0; }
+      100% { transform: scale(1);   opacity: 1; letter-spacing: .3em; background-position: 200% 0; }
+    }
+    @keyframes winTitleShine {
+      0%, 30%, 100% { background-position: 200% 0; }
+      60%           { background-position: -50% 0; }
+    }
+
+    /* Subtitle "MISSION COMPLETE" — mirrors the death subtitle's
+       letter-spacing collapse but starts wider and ends green. */
+    .win-subtitle { display: none; }
+    .end-card.win .win-subtitle {
+      display: block;
+      position: relative;
+      z-index: 3;
+      font-size: .68rem;
+      letter-spacing: .5em;
+      color: #4caf50;
+      opacity: .7;
+      margin: 0 0 .9rem;
+      padding-left: .5em;
+      text-transform: uppercase;
+      font-weight: 300;
+      animation: winSubtitleIn 1.1s cubic-bezier(.2,.6,.2,1) .55s both;
+    }
+    @keyframes winSubtitleIn {
+      0%   { opacity: 0;  letter-spacing: 1.4em; transform: translateY(-4px); }
+      100% { opacity: .7; letter-spacing: .5em;  transform: translateY(0); }
+    }
+
+    /* "PAYDAY" stamp — top-right corner, slammed in like the death stamp
+       but green/gold and slightly tilted the other way (-7 vs death's -9). */
+    .extract-stamp { display: none; }
+    .end-card.win .extract-stamp {
+      display: block;
+      position: absolute;
+      top: 14px; right: 14px;
+      transform: rotate(-7deg) scale(1);
+      transform-origin: top right;
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: .14em;
+      color: #5cd66a;
+      border: 2.5px solid #5cd66a;
+      padding: .22rem .55rem;
+      border-radius: 3px;
+      pointer-events: none;
+      text-shadow: 0 0 6px rgba(92,214,106,.55);
+      box-shadow:
+        0 0 12px rgba(92,214,106,.4),
+        inset 0 0 6px rgba(92,214,106,.18);
+      background: rgba(0,0,0,.22);
+      z-index: 4;
+      white-space: nowrap;
+      text-transform: uppercase;
+      font-family: 'Impact', 'Arial Black', system-ui, sans-serif;
+      opacity: .9;
+      animation: extractStampIn .35s cubic-bezier(.2,1.6,.4,1) .85s both;
+    }
+    @keyframes extractStampIn {
+      0%   { transform: rotate(-7deg) scale(3.4);  opacity: 0;  filter: blur(8px); }
+      55%  { transform: rotate(-7deg) scale(1.15); opacity: 1;  filter: blur(0); }
+      80%  { transform: rotate(-7deg) scale(.94);  opacity: .98; }
+      100% { transform: rotate(-7deg) scale(1);    opacity: .9; }
+    }
+
+    /* Top gold light-edge — mirror of death's blood-edge, sun-coming-through feel. */
+    .end-card.win {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(76,175,80,.18) 0%, rgba(18,18,16,.98) 28%, rgba(18,18,16,.98) 100%);
+    }
+    .end-card.win::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 14px;
+      background: linear-gradient(180deg, rgba(122,255,138,.55) 0%, rgba(76,175,80,0) 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Win badge — bigger ✓, glowing green ring. */
+    .end-card.win .end-badge {
+      position: relative;
+      z-index: 3;
+      font-size: 3.2rem;
+      color: #6ee676;
+      text-shadow: 0 0 14px rgba(76,175,80,.75);
+      background: radial-gradient(circle, rgba(20,40,22,.85) 0%, rgba(0,0,0,.7) 70%);
+    }
+
+    /* Stat tiles on win — green-tinted to read as "secured" not "neutral". */
+    .end-card.win .end-stats { position: relative; z-index: 3; }
+    .end-card.win .end-stat {
+      border-color: #2a4a2c;
+      background: rgba(20,40,22,.32);
+    }
+    .end-card.win .end-stat span {
+      color: #b8f0bc;
+      text-shadow: 0 0 6px rgba(76,175,80,.35);
+    }
+    .end-card.win .end-stat label { color: #6a8a6c; }
+
+    /* Stay above any future overlays. */
+    .end-card.win .end-rating,
+    .end-card.win .end-quip,
+    .end-card.win .end-stars,
+    .end-card.win .end-loot-section,
+    .end-card.win .end-earnings,
+    .end-card.win .end-actions { position: relative; z-index: 3; }
+
+    /* Backdrop — warm green vignette with subtle scanline grain (mirror of death). */
+    #end-screen:has(.end-card.win) {
+      background:
+        radial-gradient(ellipse at center, rgba(20,55,24,.5) 0%, rgba(0,0,0,.95) 72%),
+        repeating-linear-gradient(
+          0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+          rgba(0,0,0,.14) 3px, rgba(0,0,0,0) 4px
+        );
+    }
+
     /* Stat tiles — count-up animation pop on first paint. */
     .end-stat span {
       display: inline-block;
@@ -1776,9 +1936,9 @@
   </style>
   <!-- Cursor Vibe Jam 2026 required widget -->
   <script async src="https://vibej.am/2026/widget.js"></script>
-  <script type="module" crossorigin src="/escape-from-duckkov/assets/index-XBod4zgq.js"></script>
+  <script type="module" crossorigin src="/escape-from-duckkov/assets/index-BJN6RJxV.js"></script>
   <link rel="modulepreload" crossorigin href="/escape-from-duckkov/assets/three-BeKitR27.js">
-  <link rel="stylesheet" crossorigin href="/escape-from-duckkov/assets/index-XXyPJNOa.css">
+  <link rel="stylesheet" crossorigin href="/escape-from-duckkov/assets/index-DxebT0PF.css">
 </head>
 <body>
   <div id="canvas-container"></div>
@@ -2058,9 +2218,13 @@
            these on win/timeout/champion themes. -->
       <div class="death-scanlines" aria-hidden="true"></div>
       <div class="raid-stamp" aria-hidden="true">RAID TERMINATED</div>
+      <!-- Win-only decorations: top-right "PAYDAY" corner stamp +
+           subtitle. CSS hides on death/timeout/champion themes. -->
+      <div class="extract-stamp" aria-hidden="true">PAYDAY</div>
       <div class="end-badge" id="end-badge">✓</div>
       <h1 id="end-title">Extracted</h1>
       <div class="death-subtitle" aria-hidden="true">EXTRACTION FAILED</div>
+      <div class="win-subtitle" aria-hidden="true">MISSION COMPLETE</div>
       <!-- 5-star rating bar — fills sequentially via per-star CSS animation delay -->
       <div class="end-stars" id="end-stars" aria-hidden="true"></div>
       <div class="end-rating" id="end-rating">
