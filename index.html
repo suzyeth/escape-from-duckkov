@@ -311,6 +311,199 @@
     .start-jam-badge .sep { margin: 0 .8em; opacity: .4; }
     .start-jam-badge .full-rules-link { cursor: pointer; }
 
+    /* ── Main menu cinematic optimizations ─────────────────────────────
+       (A) Title slam-in + metallic shine sweep on TARDUCK
+       (C) REC indicator + live wall clock + faint scanline overlay
+       (D) Solo Raid arrow chromatic on hover + screen-shake on click
+       (E) Info-card corner ops stamps (OPS-04 / CLASSIFIED / KBD-MAP)
+       (B) Boss Briefing KIA / ALIVE chips with diagonal strike
+       Mirrors the design language of the end-screen win/death overhaul. */
+
+    /* (A) Title — left at the original solid-amber + text-shadow styling.
+       Earlier I added a background-clip:text metallic shine sweep but it
+       washed the title too dark, so reverted. The .menu-brand wrapper
+       still gets its existing featuresIn fade-in. */
+
+    /* Tagline below title: letter-spacing collapse entry mirroring the
+       end-screen subtitle pattern. Makes the duck/loot/ship-it line read
+       like a tactical radio call, not flat marketing copy. */
+    .menu-brand p {
+      animation: menuTaglineIn 1.1s cubic-bezier(.2,.6,.2,1) .55s both;
+    }
+    @keyframes menuTaglineIn {
+      0%   { opacity: 0;  letter-spacing: 1.2em; transform: translateY(-2px); }
+      100% { opacity: .85; letter-spacing: .45em; transform: translateY(0); }
+    }
+
+    /* (C) Surveillance feed corner — REC dot + clock under the POI label.
+       The whole stack now rides one wrapper so featuresIn pulls them in
+       together rather than two independent corners. */
+    .menu-feed-corner {
+      position: absolute; top: 2.5rem; right: 2.5rem;
+      max-width: 360px;
+      text-align: right;
+      animation: featuresIn .6s ease-out .15s both;
+    }
+    .menu-feed-corner #menu-poi-label {
+      position: static;            /* override the original absolute placement */
+      animation: none;             /* parent already runs featuresIn */
+      max-width: none;
+    }
+    .menu-rec-row {
+      display: inline-flex; align-items: center; gap: .5rem;
+      margin-top: .4rem;
+      font-size: .6rem; color: #aaa;
+      letter-spacing: .25em; text-transform: uppercase;
+      font-family: 'Courier New', monospace;
+    }
+    .menu-rec-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #ff2424; box-shadow: 0 0 6px rgba(255,36,36,.85);
+      animation: recBlink 1.4s ease-in-out infinite;
+    }
+    @keyframes recBlink {
+      0%, 100% { opacity: 1;  transform: scale(1); }
+      50%      { opacity: .35; transform: scale(.85); }
+    }
+    .menu-rec-text { color: #ff5544; font-weight: bold; }
+    .menu-rec-clock {
+      color: #c8a96e;
+      font-variant-numeric: tabular-nums;  /* digits don't reflow each tick */
+      letter-spacing: .15em;
+    }
+
+    /* Faint scanline overlay across the whole menu — sells "this is a
+       monitor feed" without overwhelming the existing film-grain. Lower
+       alpha than death-screen scanlines (.025 vs .045). */
+    #start-screen::after {
+      content: '';
+      position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+        rgba(255,255,255,.025) 3px, rgba(0,0,0,0) 4px
+      );
+      mix-blend-mode: overlay;
+      z-index: 1;
+    }
+
+    /* (D) Solo Raid arrow gets chromatic aberration on hover. Communicates
+       "you are about to do something violent" without being noisy at idle. */
+    #start-btn:hover::after {
+      transform: translateX(4px);
+      text-shadow:
+         2px 0 0 rgba(255,40,80,.85),
+        -2px 0 0 rgba(60,180,255,.85);
+    }
+
+    /* (D) Screen-shake + dim flash when Solo Raid is clicked. Plays for
+       ~220ms then the menu fades to base (handled by JS setTimeout). */
+    #start-screen.launching {
+      animation:
+        startFadeIn .6s ease-out,
+        menuLaunchShake .22s cubic-bezier(.36,.07,.19,.97) both;
+    }
+    #start-screen.launching::before {
+      animation: menuLaunchFlash .22s ease-out both;
+    }
+    @keyframes menuLaunchShake {
+      0%, 100% { transform: translate(0, 0); }
+      15% { transform: translate(-7px, 4px); }
+      30% { transform: translate(6px, -4px); }
+      50% { transform: translate(-5px, 3px); }
+      70% { transform: translate(4px, -2px); }
+      85% { transform: translate(-2px, 1px); }
+    }
+    @keyframes menuLaunchFlash {
+      0%   { opacity: .5; }
+      30%  { opacity: 1;  background-color: rgba(255,200,120,.18); }
+      100% { opacity: .5; }
+    }
+
+    /* (E) Info card corner ops stamps. Each card gets a unique tag in
+       its top-right corner so the three boxes feel like distinct dossiers
+       instead of three identical containers. Slammed in at .25s after
+       the card lands. The vestigial .tag ("3 NAMED" / "8 MIN" / "QUICK")
+       is hidden — its info is redundant with the card content (boss rows
+       are countable; "8 MIN" is in the mission bullet list; "QUICK" was
+       just a label). */
+    .menu-info-card { position: relative; }
+    .menu-info-card .menu-info-title .tag { display: none; }
+    .card-stamp {
+      position: absolute;
+      top: 8px; right: 10px;
+      font-size: .55rem;
+      letter-spacing: .2em;
+      font-weight: 900;
+      font-family: 'Courier New', monospace;
+      color: #6a5530;
+      border: 1px solid #4a3820;
+      padding: .15rem .45rem;
+      border-radius: 2px;
+      background: rgba(0,0,0,.35);
+      pointer-events: none;
+      transform: rotate(-4deg);
+      animation: cardStampIn .4s cubic-bezier(.2,1.6,.4,1) .55s both;
+    }
+    .card-stamp.red {
+      color: #ff5544;
+      border-color: #5a2a26;
+      text-shadow: 0 0 4px rgba(255,85,68,.4);
+    }
+    @keyframes cardStampIn {
+      0%   { transform: rotate(-4deg) scale(2.4);  opacity: 0;   filter: blur(4px); }
+      55%  { transform: rotate(-4deg) scale(1.1);  opacity: 1;   filter: blur(0); }
+      100% { transform: rotate(-4deg) scale(1);    opacity: 1; }
+    }
+
+    /* (B) Boss Briefing kill ledger — ALIVE chip / KIA stamp + row strike.
+       Driven by the .kia class added by main.js _paintBossKillLedger().
+       data-boss-key on each row maps to SaveSystem.bossKills entries. */
+    .menu-info-boss {
+      position: relative;
+      display: flex; align-items: center; gap: .5rem;
+      transition: opacity .2s;
+    }
+    .menu-info-boss > span:nth-child(2) { flex: 1; }
+    .boss-status {
+      flex-shrink: 0;
+      font-size: .55rem;
+      font-weight: 900;
+      letter-spacing: .15em;
+      font-family: 'Courier New', monospace;
+      color: #c8a96e;
+      border: 1px solid #4a3820;
+      padding: .1rem .4rem;
+      border-radius: 2px;
+      background: rgba(0,0,0,.35);
+      transition: color .2s, border-color .2s, background .2s;
+    }
+    .menu-info-boss.kia { opacity: .55; }
+    .menu-info-boss.kia .boss-status {
+      color: #ff5544;
+      border-color: #5a2a26;
+      background: rgba(60,10,10,.35);
+      text-shadow: 0 0 4px rgba(255,85,68,.5);
+    }
+    /* Diagonal red strike across a killed boss row — sells "this one is
+       crossed off the list". Pseudo-element overlay, doesn't disturb layout. */
+    .menu-info-boss.kia::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      height: 1px;
+      background: linear-gradient(90deg,
+        rgba(255,68,52,0) 0%,
+        rgba(255,68,52,.85) 8%,
+        rgba(255,68,52,.85) 92%,
+        rgba(255,68,52,0) 100%);
+      box-shadow: 0 0 4px rgba(255,68,52,.6);
+      transform: rotate(-1.5deg);
+      transform-origin: center;
+      pointer-events: none;
+    }
+
     /* ── HUD shell ─────────────────────────────────── */
     #hud { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 10; }
 
@@ -1936,7 +2129,7 @@
   </style>
   <!-- Cursor Vibe Jam 2026 required widget -->
   <script async src="https://vibej.am/2026/widget.js"></script>
-  <script type="module" crossorigin src="/escape-from-duckkov/assets/index-BJN6RJxV.js"></script>
+  <script type="module" crossorigin src="/escape-from-duckkov/assets/index-BVV6oZXX.js"></script>
   <link rel="modulepreload" crossorigin href="/escape-from-duckkov/assets/three-BeKitR27.js">
   <link rel="stylesheet" crossorigin href="/escape-from-duckkov/assets/index-DxebT0PF.css">
 </head>
@@ -2279,8 +2472,17 @@
       <p>quack <span class="tag-dot">·</span> loot <span class="tag-dot">·</span> ship it</p>
     </div>
 
-    <!-- Top-right live camera POI label (updated each shot) -->
-    <div id="menu-poi-label">PATROLLING · INDUSTRIAL DISTRICT</div>
+    <!-- Top-right surveillance feed corner: live camera POI label +
+         REC indicator + wall clock. Sells "you are watching a tactical
+         feed of yourself", not a static splash. -->
+    <div class="menu-feed-corner">
+      <div id="menu-poi-label">PATROLLING · INDUSTRIAL DISTRICT</div>
+      <div class="menu-rec-row">
+        <span class="menu-rec-dot" aria-hidden="true"></span>
+        <span class="menu-rec-text">REC</span>
+        <span class="menu-rec-clock" id="menu-rec-clock">--:--:--</span>
+      </div>
+    </div>
 
     <!-- LEFT column: deploy modes — no abstract "Enter Raid" wrapper.
          Each button is the actual deploy choice the player will make. -->
@@ -2305,23 +2507,28 @@
     <div class="menu-info">
 
       <div class="menu-info-card">
+        <span class="card-stamp" aria-hidden="true">OPS-04</span>
         <div class="menu-info-title"><span>Boss Briefing</span><span class="tag">3 NAMED</span></div>
-        <div class="menu-info-boss">
+        <div class="menu-info-boss" data-boss-key="levelsio">
           <span class="menu-info-boss-dot" style="color:#ff8800;background:#ff8800"></span>
           <span><span class="menu-info-boss-name">@levelsio</span> <span class="menu-info-boss-desc">— Industrial · jam boss</span></span>
+          <span class="boss-status">ALIVE</span>
         </div>
-        <div class="menu-info-boss">
+        <div class="menu-info-boss" data-boss-key="boltdotnew">
           <span class="menu-info-boss-dot" style="color:#ff4422;background:#ff4422"></span>
           <span><span class="menu-info-boss-name">@boltdotnew</span> <span class="menu-info-boss-desc">— Port · glass cannon</span></span>
+          <span class="boss-status">ALIVE</span>
         </div>
-        <div class="menu-info-boss">
+        <div class="menu-info-boss" data-boss-key="cursor_ai">
           <span class="menu-info-boss-dot" style="color:#44ddaa;background:#44ddaa"></span>
           <span><span class="menu-info-boss-name">@cursor_ai</span> <span class="menu-info-boss-desc">— Lab · long-range</span></span>
+          <span class="boss-status">ALIVE</span>
         </div>
         <div class="menu-info-foot">≤30% HP triggers <b>SHIP IT</b> rage — fire rate doubles.</div>
       </div>
 
       <div class="menu-info-card">
+        <span class="card-stamp red" aria-hidden="true">CLASSIFIED</span>
         <div class="menu-info-title"><span>Mission</span><span class="tag">8 MIN</span></div>
         <ul class="menu-info-mission">
           <li>Survive an 8-minute top-down raid</li>
@@ -2332,6 +2539,7 @@
       </div>
 
       <div class="menu-info-card">
+        <span class="card-stamp" aria-hidden="true">KBD-MAP</span>
         <div class="menu-info-title"><span>Controls</span><span class="tag">QUICK</span></div>
         <div class="menu-info-row"><span class="key">WASD</span><span class="val">Move · Shift Sprint · Ctrl Crouch</span></div>
         <div class="menu-info-row"><span class="key">Mouse</span><span class="val">Aim · LMB Shoot · RMB ADS</span></div>
