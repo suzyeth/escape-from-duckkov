@@ -1,2 +1,5 @@
 node_modules/
 dist/
+
+# Local editor settings
+.claude/settings.local.json
